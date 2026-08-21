@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private var isBound = false
     private lateinit var binding: ActivityMainBinding
     private lateinit var btnBluetooth: ImageButton
+    private lateinit var btnCoordinates: ImageButton
     private lateinit var btnAddCoordinate: ImageButton
     private lateinit var bluetoothStatus: ImageView
     private var activateJoyStickBool = false;
@@ -320,13 +321,13 @@ class MainActivity : AppCompatActivity() {
 
         //navView.setupWithNavController(navController)
         btnBluetooth = findViewById(R.id.btnBluetooth)
+        btnCoordinates = findViewById(R.id.btnCoordinates)
         bluetoothStatus = findViewById(R.id.bluetoothStatus)
 
         btnAddCoordinate = findViewById(R.id.btnAddCoordinate)
 
         btnAddCoordinate.setOnClickListener {
-            val dialog = AddCoordinateFragment()
-            dialog.show(supportFragmentManager, "AddCoordinateDialog")
+            showAddCoordinatesFragment()
         }
 
         updateBluetoothStatus()
@@ -421,17 +422,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Initalize navigation tabz
-//        customNavigatorBar.addFragment(AddObstacle(gridMapObj), "Add Coordinates")
-//        customNavigatorBar.addFragment(commsToRobot(gridMapObj), "Robot Comms")
+        customNavigatorBar.addFragment(AddObstacle(gridMapObj), "Add Coordinates")
+        customNavigatorBar.addFragment(commsToRobot(gridMapObj), "Robot Comms")
         customNavigatorBar.addFragment(startTask(gridMapObj), "Task Start")
 
 
         // Initializes Navigation Bar
         val subNavigationBar = findViewById<ViewPager?>(R.id.sub_navigation_bar)
-        subNavigationBar.setAdapter(customNavigatorBar)
-        subNavigationBar.setOffscreenPageLimit(2)
-//        val tabs = findViewById<TabLayout>(R.id.tabs)
-//        tabs.setupWithViewPager(subNavigationBar)
+        subNavigationBar?.setAdapter(customNavigatorBar)
+        subNavigationBar?.setOffscreenPageLimit(2)
+        val tabs = findViewById<TabLayout>(R.id.tabs)
+        tabs.setupWithViewPager(subNavigationBar)
+
+        btnCoordinates.setOnClickListener {
+            subNavigationBar?.currentItem = 0
+        }
 
     }
 
@@ -495,7 +500,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAddCoordinatesFragment() {
-        AddCoordinateFragment().show(supportFragmentManager, "BluetoothFragment")
+        AddCoordinateFragment().show(supportFragmentManager, "AddCoordinateDialog")
     }
 
     private fun updateBluetoothStatus() {
