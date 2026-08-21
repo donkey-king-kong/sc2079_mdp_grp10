@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/north" android:title="Change Direction to Up"/>
-    <item android:id="@+id/south" android:title="Change Direction to Down"/>
-    <item android:id="@+id/east" android:title="Change Direction to Right"/>
-    <item android:id="@+id/west" android:title="Change Direction to Left"/>
-</menu>
