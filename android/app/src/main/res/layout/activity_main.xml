@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/dark_blue_700">
+
+    <!-- Header Bar -->
+    <LinearLayout
+        android:id="@+id/headerBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/dark_blue_700"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="450dp"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <!-- Coordinates -->
+            <LinearLayout
+                android:layout_width="140dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="10dp"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="@color/dark_blue_200">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="Coordinates"
+                    android:textSize="16sp"
+                    android:textColor="@color/white"
+                    android:fontFamily="@font/poppins_bold" />
+
+                <TextView
+                    android:id="@+id/give_vehicle_coord_now"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="(x,y)"
+                    android:textSize="20sp"
+                    android:textColor="@color/white"
+                    android:fontFamily="@font/poppins_regular" />
+
+                <TextView
+                    android:id="@+id/give_vehicle_direction_now"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:fontFamily="@font/poppins_regular"
+                    android:text="EMPTY"
+                    android:textColor="@color/white"
+                    android:textSize="20sp" />
+            </LinearLayout>
+
+            <!-- Direction -->
+
+            <!-- Status -->
+            <LinearLayout
+                android:layout_width="140dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="10dp"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="@color/dark_blue_200"
+                android:layout_marginStart="15dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="Status"
+                    android:textSize="16sp"
+                    android:textColor="@color/white"
+                    android:fontFamily="@font/poppins_bold" />
+
+                <TextView
+                    android:id="@+id/give_vehicle_status_now"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="Inactive"
+                    android:textSize="12sp"
+                    android:textColor="@color/white"
+                    android:fontFamily="@font/poppins_regular" />
+            </LinearLayout>
+        </LinearLayout>
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="10dp">
+
+            <ImageButton
+                android:id="@+id/btnCoordinates"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginEnd="24dp"
+                android:background="@drawable/button_rounded_square_background"
+                android:backgroundTint="@color/cyan"
+                android:contentDescription="Bluetooth"
+                android:padding="15dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_bluetooth_24dp"
+                app:layout_constraintEnd_toStartOf="@+id/btnBluetooth"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="@android:color/white" />
+
+            <ImageButton
+                android:id="@+id/btnAddCoordinate"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginEnd="24dp"
+                android:background="@drawable/button_rounded_square_background"
+                android:backgroundTint="@color/cyan"
+                android:contentDescription="Bluetooth"
+                android:padding="15dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_bluetooth_24dp"
+                app:layout_constraintEnd_toStartOf="@+id/btnCoordinates"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="@android:color/white" />
+
+            <ImageButton
+                android:id="@+id/btnBluetooth"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginEnd="24dp"
+                android:background="@drawable/button_rounded_square_background"
+                android:backgroundTint="@color/cyan"
+                android:contentDescription="Bluetooth"
+                android:padding="15dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_bluetooth_24dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="@android:color/white" />
+
+            <ImageView
+                android:id="@+id/bluetoothStatus"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="@drawable/circle_background"
+                android:backgroundTint="@color/status_disconnected"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_status_disconnected_24dp"
+                app:layout_constraintTop_toTopOf="@+id/btnBluetooth"
+                app:layout_constraintEnd_toEndOf="@+id/btnBluetooth"
+                android:layout_marginTop="40dp"
+                android:layout_marginEnd="-10dp" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
+
+    <!-- Grid Map -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/constraintGridMapView"
+        android:layout_width="750dp"
+        android:layout_height="750dp"
+        android:layout_marginTop="40dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/headerBar">
+
+        <!-- Y-axis -->
+        <LinearLayout
+            android:id="@+id/y_axis_numbers"
+            android:layout_width="40dp"
+            android:layout_height="0dp"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingBottom="10dp"
+            app:layout_constraintBottom_toTopOf="@+id/x_axis_numbers"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- X-axis -->
+        <LinearLayout
+            android:id="@+id/x_axis_numbers"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingStart="5dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/y_axis_numbers">
+
+        </LinearLayout>
+
+        <!-- Grid -->
+        <LinearLayout
+            android:id="@+id/gridMapView"
+            android:layout_width="710dp"
+            android:layout_height="710dp"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toTopOf="@id/x_axis_numbers"
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/y_axis_numbers"
+            app:layout_constraintTop_toTopOf="parent">
+
+
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Joystick + Tabs Layout -->
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/joystick_tabs_layout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!-- Joystick -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/joystickConstraintLayout"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/sub_navigation_bar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <io.github.controlwear.virtual.joystick.android.JoystickView
+                android:id="@+id/joystickView"
+                android:layout_width="174dp"
+                android:layout_height="208dp"
+                app:JV_backgroundColor="@color/cyan"
+                app:JV_borderColor="@color/white"
+                app:JV_borderWidth="4dp"
+                app:JV_buttonColor="@color/magenta"
+                app:JV_buttonSizeRatio="15%"
+                app:JV_fixedCenter="false"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent" />
+
+            <ImageButton
+                android:id="@+id/reverse_left_button"
+                android:layout_width="60dp"
+                android:layout_height="40dp"
+                android:background="@drawable/button_rounded_square_background"
+                android:src="@drawable/reverse_left_button"
+                app:JV_buttonColor="@color/magenta"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/joystickView"
+                app:tint="@android:color/white" />
+
+            <ImageButton
+                android:id="@+id/reverse_right_button"
+                android:layout_width="60dp"
+                android:layout_height="40dp"
+                android:background="@drawable/button_rounded_square_background"
+                android:backgroundTint="@color/magenta"
+                android:src="@drawable/reverse_right_button"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/joystickView"
+                app:tint="@android:color/white" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Change Direction Buttons below joystick -->
+        <LinearLayout
+            android:id="@+id/change_save_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            app:layout_constraintStart_toStartOf="@id/joystickConstraintLayout"
+            app:layout_constraintTop_toBottomOf="@id/joystickConstraintLayout">
+
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/save_map_button"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="150dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="12dp"
+            android:text="Save Map State"
+            android:textColor="@color/white"
+            app:icon="@drawable/save_map_icon"
+            app:iconGravity="textEnd"
+            app:iconPadding="8dp"
+            app:iconSize="35dp"
+            app:iconTint="@android:color/white"
+            app:layout_constraintBottom_toTopOf="@+id/load_map_button"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/sub_navigation_bar"
+            app:layout_constraintTop_toBottomOf="@+id/reset_map_button" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/load_map_button"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="150dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="12dp"
+            android:text="Load Saved Map"
+            android:textColor="@color/white"
+            app:icon="@drawable/save_map_icon"
+            app:iconGravity="textEnd"
+            app:iconPadding="8dp"
+            app:iconSize="35dp"
+            app:iconTint="@android:color/white"
+            app:layout_constraintBottom_toTopOf="@+id/clear_logs_button"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/sub_navigation_bar"
+            app:layout_constraintTop_toBottomOf="@+id/save_map_button" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/clear_logs_button"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="150dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="24dp"
+            android:text="Clear Logs"
+            android:textColor="@color/white"
+            app:icon="@drawable/outline_delete_24dp"
+            app:iconGravity="textEnd"
+            app:iconPadding="8dp"
+            app:iconSize="35dp"
+            app:iconTint="@android:color/white"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/sub_navigation_bar"
+            app:layout_constraintTop_toBottomOf="@+id/load_map_button" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reset_map_button"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="150dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="12dp"
+            android:text="Reset Map"
+            android:textColor="@color/white"
+            app:icon="@drawable/restart_icon"
+            app:iconGravity="textEnd"
+            app:iconPadding="8dp"
+            app:iconSize="35dp"
+            app:iconTint="@android:color/white"
+            app:layout_constraintBottom_toTopOf="@+id/save_map_button"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/sub_navigation_bar"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- TabLayout + ViewPager beside joystick -->
+        <androidx.viewpager.widget.ViewPager
+            android:id="@+id/sub_navigation_bar"
+            android:layout_width="400dp"
+            android:layout_height="350dp"
+            app:layout_constraintEnd_toStartOf="@+id/save_map_button"
+            app:layout_constraintStart_toEndOf="@+id/joystickConstraintLayout"
+            app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>
