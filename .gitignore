@@ -1,0 +1,60 @@
+# Gradle files
+.gradle/
+build/
+**/build/
+
+# IDE files (Android Studio / IntelliJ)
+.idea/
+*.iml
+local.properties
+.navigation/
+
+# Output and Captures
+captures/
+*.log
+.externalNativeBuild/
+.cxx/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# User-specific
+.attach_pid*
+
+# =========================
+# Embedded Build Artifacts
+# =========================
+*.bin
+*.elf
+*.hex
+*.axf
+*.map
+*.list
+*.o
+*.obj
+*.d
+*.su
+*.cyclo
+*.crf
+*.htm
+
+Debug/
+Release/
+
+# =========================
+# Logs / Media
+# =========================
+*.log
+*.mp4
+
+# =========================
+# IDE
+# =========================
+.metadata/
+.vscode/
+
+# =========================
+# Python
+# =========================
+.venv/
