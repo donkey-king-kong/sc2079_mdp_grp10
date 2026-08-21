@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:custom="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.zetzaus.mazeview.core.MazePaintView
+        android:id="@+id/mazePaintView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:cellBorderColor="?attr/colorSurface"
+        app:columnCount="10"
+        app:coordinateTextColor="?attr/colorOnSurface"
+        app:coordinateTextScaleFactor="0.3"
+        app:coordinatesEnabled="true"
+        app:indicatorScale="0.5"
+        app:robotColor="?attr/colorSecondary"
+        app:robotDiameterCellSize="3"
+        app:rowCount="10" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!--
+        <LinearLayout
+            android:id="@+id/gridMapView"
+            android:layout_width="137dp"
+            android:layout_height="80dp"
+            android:orientation="horizontal"
+            tools:layout_editor_absoluteX="16dp"
+            tools:layout_editor_absoluteY="337dp">
+
+            <view
+                android:id="@+id/mapView"
+                class=""
+                android:layout_width="match_parent"
+                android:layout_height="430dp" />
+
+            <Switch
+                android:id="@+id/switch1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Switch" />
+
+        </LinearLayout>
+        -->
