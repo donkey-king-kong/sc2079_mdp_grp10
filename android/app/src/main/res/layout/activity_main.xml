@@ -109,10 +109,10 @@
                 android:layout_marginEnd="24dp"
                 android:background="@drawable/button_rounded_square_background"
                 android:backgroundTint="@color/cyan"
-                android:contentDescription="Bluetooth"
+                android:contentDescription="Coordinates"
                 android:padding="15dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_bluetooth_24dp"
+                android:src="@drawable/ic_dashboard_black_24dp"
                 app:layout_constraintEnd_toStartOf="@+id/btnBluetooth"
                 app:layout_constraintTop_toTopOf="parent"
                 app:tint="@android:color/white" />
@@ -125,10 +125,10 @@
                 android:layout_marginEnd="24dp"
                 android:background="@drawable/button_rounded_square_background"
                 android:backgroundTint="@color/cyan"
-                android:contentDescription="Bluetooth"
+                android:contentDescription="Add Coordinate"
                 android:padding="15dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_bluetooth_24dp"
+                android:src="@drawable/plus_for_enter"
                 app:layout_constraintEnd_toStartOf="@+id/btnCoordinates"
                 app:layout_constraintTop_toTopOf="parent"
                 app:tint="@android:color/white" />
@@ -234,7 +234,7 @@
             android:layout_height="0dp"
 
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/sub_navigation_bar"
+            app:layout_constraintEnd_toStartOf="@+id/sub_navigation_container"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -304,7 +304,7 @@
             app:iconTint="@android:color/white"
             app:layout_constraintBottom_toTopOf="@+id/load_map_button"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/sub_navigation_bar"
+            app:layout_constraintStart_toEndOf="@+id/sub_navigation_container"
             app:layout_constraintTop_toBottomOf="@+id/reset_map_button" />
 
         <com.google.android.material.button.MaterialButton
@@ -325,7 +325,7 @@
             app:iconTint="@android:color/white"
             app:layout_constraintBottom_toTopOf="@+id/clear_logs_button"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/sub_navigation_bar"
+            app:layout_constraintStart_toEndOf="@+id/sub_navigation_container"
             app:layout_constraintTop_toBottomOf="@+id/save_map_button" />
 
         <com.google.android.material.button.MaterialButton
@@ -346,7 +346,7 @@
             app:iconTint="@android:color/white"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/sub_navigation_bar"
+            app:layout_constraintStart_toEndOf="@+id/sub_navigation_container"
             app:layout_constraintTop_toBottomOf="@+id/load_map_button" />
 
         <com.google.android.material.button.MaterialButton
@@ -367,17 +367,32 @@
             app:iconTint="@android:color/white"
             app:layout_constraintBottom_toTopOf="@+id/save_map_button"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/sub_navigation_bar"
+            app:layout_constraintStart_toEndOf="@+id/sub_navigation_container"
             app:layout_constraintTop_toTopOf="parent" />
 
         <!-- TabLayout + ViewPager beside joystick -->
-        <androidx.viewpager.widget.ViewPager
-            android:id="@+id/sub_navigation_bar"
+        <LinearLayout
+            android:id="@+id/sub_navigation_container"
             android:layout_width="400dp"
             android:layout_height="350dp"
+            android:orientation="vertical"
             app:layout_constraintEnd_toStartOf="@+id/save_map_button"
             app:layout_constraintStart_toEndOf="@+id/joystickConstraintLayout"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent">
+
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/tabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:tabMode="fixed"
+                app:tabGravity="fill" />
+
+            <androidx.viewpager.widget.ViewPager
+                android:id="@+id/sub_navigation_bar"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+        </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 
