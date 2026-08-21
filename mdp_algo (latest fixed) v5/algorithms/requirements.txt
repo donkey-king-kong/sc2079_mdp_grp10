@@ -1,0 +1,5 @@
+numpy
+python-tsp
+fastapi
+uvicorn
+pydantic

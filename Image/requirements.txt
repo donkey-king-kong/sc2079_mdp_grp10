@@ -1,0 +1,7 @@
+# Install all dependencies in one shot (run from this folder):
+# pip install -r requirements.txt
+
+flask>=2.0
+opencv-python>=4.5
+numpy>=1.19
+ultralytics>=8.0

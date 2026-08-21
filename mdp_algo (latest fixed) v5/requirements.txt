@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+numpy
+python-tsp
+matplotlib
+requests
