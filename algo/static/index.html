@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SC2079 Group 10 &mdash; Path Planning Simulator</title>
+<style>
+  :root {
+    --bg: #f4f6f9;      --panel: #ffffff;   --ink: #1b2430;   --muted: #667287;
+    --line: #d9e0ea;    --accent: #2563eb;  --accent-soft: #dbeafe;
+    --ok: #15803d;      --warn: #b45309;    --bad: #b91c1c;
+    --arena: #fdfdfe;   --grid: #e5eaf1;    --start: #d1fae5;
+    --obstacle: #334155; --image-face: #f59e0b; --virtual: rgba(239,68,68,.09);
+    --path: #2563eb;    --robot: #0f766e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--ink); }
+  header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 20px;
+           display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .layout { display: grid; grid-template-columns: minmax(420px, 1fr) 400px; gap: 18px;
+            padding: 18px; align-items: start; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .card + .card { margin-top: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+             color: var(--muted); margin: 0 0 10px; font-weight: 650; }
+  canvas { width: 100%; height: auto; display: block; border-radius: 6px; touch-action: none; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  button, select { font: inherit; border: 1px solid var(--line); background: #fff; color: var(--ink);
+                   border-radius: 7px; padding: 7px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: #1d4ed8; color: #fff; }
+  label.check { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 14px; }
+  .stat { border-left: 3px solid var(--accent-soft); padding-left: 9px; }
+  .stat .k { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
+  .stat .v { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 5px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  tr.best td { color: var(--ok); font-weight: 650; }
+  .cmds { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+          max-height: 190px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 4px; }
+  .cmd { padding: 2px 6px; border-radius: 4px; background: #eef2f7; color: #334155; }
+  .cmd.snap { background: #fef3c7; color: #92400e; }
+  .cmd.fin  { background: #dcfce7; color: #166534; }
+  .cmd.now  { outline: 2px solid var(--accent); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.ok { background: #dcfce7; color: var(--ok); }
+  .pill.warn { background: #fef3c7; color: var(--warn); }
+  .pill.bad { background: #fee2e2; color: var(--bad); }
+  .order { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .order b { width: 25px; height: 25px; border-radius: 6px; background: var(--obstacle); color: #fff;
+             display: grid; place-items: center; font-size: 12.5px; }
+  .order .arrow { color: var(--muted); }
+  .order b.done { background: var(--ok); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SC2079 &mdash; Robot Path Planning Simulator</h1>
+  <span class="sub">Group 10 &middot; checklist B.1 movement area &middot; B.2 Hamiltonian path &middot; B.3 shortest-time path</span>
+</header>
+
+<div class="layout">
+  <div>
+    <div class="card">
+      <canvas id="arena" width="760" height="760"></canvas>
+      <div class="row" style="margin-top:12px">
+        <button id="btn-random">Randomise layout</button>
+        <button id="btn-clear">Clear</button>
+        <label class="check"><input type="checkbox" id="show-virtual"> Virtual obstacles</label>
+        <label class="check"><input type="checkbox" id="show-poses"> Capture poses</label>
+        <label class="check"><input type="checkbox" id="show-trail" checked> Trail</label>
+      </div>
+      <p class="hint">
+        Click an empty cell to add an obstacle &middot; click an obstacle to rotate which face carries
+        the image &middot; drag to move it &middot; shift-click to delete.
+        The amber edge is the image; the robot must park in front of it.
+      </p>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Plan</h2>
+      <div class="row">
+        <select id="strategy">
+          <option value="exhaustive">Exhaustive &mdash; B.3 shortest time</option>
+          <option value="nearest">Nearest neighbour &mdash; B.2</option>
+          <option value="greedy_swap">Nearest + 2-swap</option>
+        </select>
+        <select id="metric">
+          <option value="time">Minimise time</option>
+          <option value="distance">Minimise distance</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="primary" id="btn-plan">Plan path</button>
+        <button id="btn-compare">Compare B.2 vs B.3</button>
+      </div>
+      <div class="row">
+        <button id="btn-play" disabled>Play</button>
+        <button id="btn-step" disabled>Step</button>
+        <button id="btn-reset" disabled>Reset</button>
+        <label class="check">Speed
+          <input type="range" id="speed" min="0.25" max="6" step="0.25" value="1.5" style="width:96px">
+          <span id="speed-label" style="width:30px">1.5&times;</span>
+        </label>
+      </div>
+      <div id="status" class="hint">Place obstacles, then plan a path.</div>
+    </div>
+
+    <div class="card">
+      <h2>Manual drive</h2>
+      <div class="row">
+        <button data-drive="SF010">&uarr; Forward 10</button>
+        <button data-drive="SB010">&darr; Back 10</button>
+        <button data-drive="LF030">&#8624; Fwd left 30&deg;</button>
+        <button data-drive="RF030">&#8625; Fwd right 30&deg;</button>
+        <button data-drive="LB030">&#8630; Rev left 30&deg;</button>
+        <button data-drive="RB030">&#8631; Rev right 30&deg;</button>
+        <button id="btn-home">Back to start</button>
+      </div>
+      <p class="hint">
+        Drives the robot with the same STM command strings the planner emits, through
+        the same kinematics and the same collision check. The robot has no on-the-spot
+        turn, so every turn is an arc at the 25cm turning radius. A move that would
+        clip a virtual obstacle or leave the arena is refused rather than driven.
+      </p>
+    </div>
+
+    <div class="card" id="result-card" hidden>
+      <h2>Result</h2>
+      <div class="stats">
+        <div class="stat"><div class="k">Total time</div><div class="v" id="v-time">&mdash;</div></div>
+        <div class="stat"><div class="k">Distance</div><div class="v" id="v-dist">&mdash;</div></div>
+        <div class="stat"><div class="k">Images recognised</div><div class="v" id="v-images">&mdash;</div></div>
+        <div class="stat"><div class="k">Planned in</div><div class="v" id="v-plan">&mdash;</div></div>
+      </div>
+      <div class="row" style="margin-top:12px"><div class="order" id="v-order"></div></div>
+      <div class="row"><div id="v-flags"></div></div>
+    </div>
+
+    <div class="card" id="compare-card" hidden>
+      <h2>Strategy comparison</h2>
+      <table>
+        <thead><tr><th>Strategy</th><th>Images</th><th>Time</th><th>Distance</th></tr></thead>
+        <tbody id="compare-body"></tbody>
+      </table>
+      <p class="hint" id="compare-note"></p>
+    </div>
+
+    <div class="card" id="cmd-card" hidden>
+      <h2>STM commands</h2>
+      <div class="cmds" id="v-cmds"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+const FACES = ["N", "E", "S", "W"];
+const canvas = document.getElementById("arena");
+const ctx = canvas.getContext("2d");
+
+let CONFIG = null;          // filled from /api/config so the drawing matches the planner
+let obstacles = [];         // [{id, x, y, face}] with x/y as 20x20 grid cell indices
+let plan = null;            // last /api/plan response
+let capturePoses = [];      // capture pose markers, when the overlay is on
+
+// Animation state. `steps` is a flat list of {pose, t, leg, snap} so that both
+// playback and scrubbing work off one timeline.
+let steps = [];
+let cursor = 0;
+let clock = 0;              // simulated seconds elapsed in the run
+let playing = false;
+let lastFrame = 0;
+
+// Manual driving runs beside the plan: its own pose and its own trail, so a
+// supervisor can be shown the robot moving forward, backward and turning
+// without a plan loaded. Cleared by "Back to start" or by planning again.
+let manualPose = null;
+let manualTrail = [];
+
+const el = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------------------
+// Geometry helpers -- arena centimetres <-> canvas pixels
+// ---------------------------------------------------------------------------
+
+const PAD = 34;                                  // room for the rulers
+function scale() { return (canvas.width - 2 * PAD) / CONFIG.arena_size; }
+function px(xcm) { return PAD + xcm * scale(); }
+function py(ycm) { return canvas.height - PAD - ycm * scale(); }   // y grows upward
+function toCm(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  const sx = canvas.width / r.width, sy = canvas.height / r.height;
+  return {
+    x: ((clientX - r.left) * sx - PAD) / scale(),
+    y: (canvas.height - PAD - (clientY - r.top) * sy) / scale(),
+  };
+}
+function cellAt(cm) {
+  return { x: Math.floor(cm.x / CONFIG.cell_size), y: Math.floor(cm.y / CONFIG.cell_size) };
+}
+function inGrid(c) {
+  return c.x >= 0 && c.y >= 0 && c.x < CONFIG.grid_cells && c.y < CONFIG.grid_cells;
+}
+
+// ---------------------------------------------------------------------------
+// Drawing
+// ---------------------------------------------------------------------------
+
+function draw() {
+  if (!CONFIG) return;
+  const S = CONFIG.arena_size;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Arena floor and the 10cm grid the Android map also uses.
+  ctx.fillStyle = getVar("--arena");
+  ctx.fillRect(px(0), py(S), S * scale(), S * scale());
+
+  ctx.fillStyle = getVar("--start");
+  const z = CONFIG.start_zone_size;
+  ctx.fillRect(px(0), py(z), z * scale(), z * scale());
+
+  ctx.strokeStyle = getVar("--grid");
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= CONFIG.grid_cells; i++) {
+    const v = i * CONFIG.cell_size;
+    ctx.moveTo(px(v), py(0)); ctx.lineTo(px(v), py(S));
+    ctx.moveTo(px(0), py(v)); ctx.lineTo(px(S), py(v));
+  }
+  ctx.stroke();
+
+  drawRulers(S);
+
+  if (el("show-virtual").checked) drawVirtualObstacles();
+  if (el("show-poses").checked) drawCapturePoses();
+  if (plan && !manualPose) drawPath();
+  if (manualTrail.length > 1) {
+    ctx.strokeStyle = getVar("--robot"); ctx.lineWidth = 2.5;
+    strokePoses(manualTrail, 0, manualTrail.length);
+  }
+
+  obstacles.forEach(drawObstacle);
+  drawStartLabel(z);
+
+  // The robot last, on top of everything.
+  const pose = displayPose();
+  if (pose) drawRobot(pose);
+}
+
+function getVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function drawRulers(S) {
+  ctx.fillStyle = getVar("--muted");
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (let v = 0; v <= S; v += 50) ctx.fillText(String(v), px(v), py(0) + 6);
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let v = 0; v <= S; v += 50) ctx.fillText(String(v), px(0) - 7, py(v));
+  ctx.textAlign = "left"; ctx.textBaseline = "top";
+  ctx.fillText("cm", px(0) - 30, py(0) + 6);
+
+  ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(px(0), py(S), S * scale(), S * scale());
+}
+
+// Briefing slide 36: obstacles inflated by half a robot, so the planner can
+// treat the robot as a single point. Showing them explains every "no path".
+function drawVirtualObstacles() {
+  const inflate = CONFIG.obstacle_inflation, size = CONFIG.obstacle_size;
+  ctx.fillStyle = getVar("--virtual");
+  obstacles.forEach((o) => {
+    const x = o.x * CONFIG.cell_size - inflate, y = o.y * CONFIG.cell_size - inflate;
+    ctx.fillRect(px(x), py(y + size + 2 * inflate),
+                 (size + 2 * inflate) * scale(), (size + 2 * inflate) * scale());
+  });
+  const m = CONFIG.boundary_margin, S = CONFIG.arena_size;
+  ctx.strokeStyle = "rgba(239,68,68,.35)";
+  ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+  ctx.strokeRect(px(m), py(S - m), (S - 2 * m) * scale(), (S - 2 * m) * scale());
+  ctx.setLineDash([]);
+}
+
+function drawCapturePoses() {
+  ctx.fillStyle = "rgba(37,99,235,.5)";
+  capturePoses.forEach((p) => {
+    ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 2.5, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+function drawObstacle(o) {
+  const size = CONFIG.obstacle_size, s = scale();
+  const x = o.x * CONFIG.cell_size, y = o.y * CONFIG.cell_size;
+  ctx.fillStyle = getVar("--obstacle");
+  ctx.fillRect(px(x), py(y + size), size * s, size * s);
+
+  // The face carrying the image, drawn thick so it reads at a glance.
+  ctx.strokeStyle = getVar("--image-face");
+  ctx.lineWidth = 5; ctx.lineCap = "round";
+  const e = { N: [[x, y + size], [x + size, y + size]], S: [[x, y], [x + size, y]],
+              E: [[x + size, y], [x + size, y + size]], W: [[x, y], [x, y + size]] }[o.face];
+  ctx.beginPath(); ctx.moveTo(px(e[0][0]), py(e[0][1])); ctx.lineTo(px(e[1][0]), py(e[1][1])); ctx.stroke();
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "600 12px -apple-system, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(String(o.id), px(x + size / 2), py(y + size / 2));
+}
+
+function drawStartLabel(z) {
+  ctx.fillStyle = "rgba(21,128,61,.75)";
+  ctx.font = "600 10px -apple-system, sans-serif";
+  ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+  ctx.fillText("START", px(4), py(4));
+}
+
+function drawPath() {
+  // The whole planned route, faint; the part already driven, solid.
+  ctx.lineWidth = 2; ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(37,99,235,.28)";
+  strokePoses(plan.trajectory, 0, plan.trajectory.length);
+
+  if (el("show-trail").checked && steps.length) {
+    ctx.strokeStyle = getVar("--path"); ctx.lineWidth = 2.5;
+    strokePoses(steps.map((s) => s.pose), 0, cursor + 1);
+  }
+
+  // Where each photo is taken.
+  plan.legs.forEach((leg, i) => {
+    const p = leg.end;
+    ctx.fillStyle = i < currentLeg() ? getVar("--ok") : "rgba(37,99,235,.85)";
+    ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 4, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+function strokePoses(poses, from, to) {
+  if (to - from < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(px(poses[from].x), py(poses[from].y));
+  for (let i = from + 1; i < to && i < poses.length; i++) ctx.lineTo(px(poses[i].x), py(poses[i].y));
+  ctx.stroke();
+}
+
+function drawRobot(pose) {
+  const half = CONFIG.robot_size / 2 * scale();
+  ctx.save();
+  ctx.translate(px(pose.x), py(pose.y));
+  ctx.rotate(-pose.theta);                       // canvas y is flipped, so negate
+  ctx.fillStyle = "rgba(15,118,110,.22)";
+  ctx.strokeStyle = getVar("--robot"); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.rect(-half, -half, half * 2, half * 2); ctx.fill(); ctx.stroke();
+
+  // Camera at the front centre (briefing slide 3), drawn as its view cone so
+  // it is obvious which way the robot is pointing.
+  ctx.fillStyle = "rgba(245,158,11,.30)";
+  ctx.beginPath(); ctx.moveTo(half, 0);
+  ctx.arc(half, 0, half * 1.5, -Math.PI / 5, Math.PI / 5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = getVar("--robot");
+  ctx.beginPath(); ctx.arc(half, 0, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Editing the layout
+// ---------------------------------------------------------------------------
+
+let dragging = null, dragMoved = false;
+
+canvas.addEventListener("pointerdown", (ev) => {
+  if (!CONFIG) return;
+  const cell = cellAt(toCm(ev.clientX, ev.clientY));
+  if (!inGrid(cell)) return;
+  const hit = obstacles.find((o) => o.x === cell.x && o.y === cell.y);
+
+  if (hit && ev.shiftKey) { removeObstacle(hit); return; }
+  if (hit) { dragging = hit; dragMoved = false; canvas.setPointerCapture(ev.pointerId); return; }
+  addObstacle(cell);
+});
+
+canvas.addEventListener("pointermove", (ev) => {
+  if (!dragging) return;
+  const cell = cellAt(toCm(ev.clientX, ev.clientY));
+  if (!inGrid(cell)) return;
+  if (cell.x === dragging.x && cell.y === dragging.y) return;
+  if (obstacles.some((o) => o !== dragging && o.x === cell.x && o.y === cell.y)) return;
+  dragging.x = cell.x; dragging.y = cell.y; dragMoved = true;
+  invalidatePlan(); draw();
+});
+
+canvas.addEventListener("pointerup", () => {
+  if (dragging && !dragMoved) {
+    // A click without a drag rotates which face carries the image.
+    dragging.face = FACES[(FACES.indexOf(dragging.face) + 1) % 4];
+    invalidatePlan(); draw();
+  }
+  dragging = null;
+});
+
+function addObstacle(cell) {
+  const used = new Set(obstacles.map((o) => o.id));
+  let id = 1; while (used.has(id)) id++;
+  obstacles.push({ id, x: cell.x, y: cell.y, face: "N" });
+  invalidatePlan(); draw();
+}
+
+function removeObstacle(target) {
+  obstacles = obstacles.filter((o) => o !== target);
+  invalidatePlan(); draw();
+}
+
+function invalidatePlan() {
+  plan = null; steps = []; cursor = 0; clock = 0; playing = false; capturePoses = [];
+  manualPose = null; manualTrail = [];
+  el("result-card").hidden = true;
+  el("cmd-card").hidden = true;
+  el("compare-card").hidden = true;
+  ["btn-play", "btn-step", "btn-reset"].forEach((id) => (el(id).disabled = true));
+  el("btn-play").textContent = "Play";
+}
+
+// ---------------------------------------------------------------------------
+// Talking to the planner
+// ---------------------------------------------------------------------------
+
+async function api(path, body) {
+  const res = await fetch(path, body ? {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  } : undefined);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || ("request failed: " + res.status));
+  return data;
+}
+
+function payload(extra) {
+  return Object.assign({ obstacles, units: "cell", metric: el("metric").value }, extra || {});
+}
+
+function setStatus(text, kind) {
+  const node = el("status");
+  node.innerHTML = kind ? `<span class="pill ${kind}">${text}</span>` : text;
+}
+
+async function doPlan() {
+  if (!obstacles.length) { setStatus("Add at least one obstacle first.", "warn"); return; }
+  invalidatePlan();
+  setStatus("Planning…");
+  el("btn-plan").disabled = true; el("btn-compare").disabled = true;
+  try {
+    plan = await api("/api/plan", payload({ strategy: el("strategy").value }));
+    buildTimeline();
+    showResult(plan);
+    setStatus("Ready. Press Play to watch the run.", "ok");
+  } catch (err) {
+    setStatus(String(err.message || err), "bad");
+  } finally {
+    el("btn-plan").disabled = false; el("btn-compare").disabled = false;
+    draw();
+  }
+}
+
+async function doCompare() {
+  if (!obstacles.length) { setStatus("Add at least one obstacle first.", "warn"); return; }
+  setStatus("Comparing strategies…");
+  el("btn-plan").disabled = true; el("btn-compare").disabled = true;
+  try {
+    const data = await api("/api/compare", payload());
+    renderComparison(data);
+    // Leave the currently selected strategy drawn so the two views agree.
+    plan = data.results[el("strategy").value];
+    buildTimeline(); showResult(plan);
+    setStatus("Compared. The best row is the shortest-time path (B.3).", "ok");
+  } catch (err) {
+    setStatus(String(err.message || err), "bad");
+  } finally {
+    el("btn-plan").disabled = false; el("btn-compare").disabled = false;
+    draw();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Results
+// ---------------------------------------------------------------------------
+
+function showResult(p) {
+  el("result-card").hidden = false;
+  el("v-time").textContent = p.total_duration.toFixed(1) + " s";
+  el("v-dist").textContent = Math.round(p.total_distance) + " cm";
+  // Counts up as the run plays. Checklist B.2 is scored on "the number of
+  // images recognized within the time limit", so the honest reading before the
+  // robot has moved is zero.
+  el("v-images").textContent = currentLeg() + " / " + (p.order.length + p.unreachable.length);
+  el("v-plan").textContent = p.planning_seconds.toFixed(2) + " s";
+
+  const order = el("v-order"); order.innerHTML = "";
+  const done = currentLeg();
+  p.order.forEach((id, i) => {
+    if (i) { const a = document.createElement("span"); a.className = "arrow"; a.textContent = "→"; order.appendChild(a); }
+    const b = document.createElement("b"); b.textContent = id;
+    if (i < done) b.classList.add("done");
+    order.appendChild(b);
+  });
+
+  const flags = el("v-flags"); flags.innerHTML = "";
+  if (p.unreachable.length) {
+    flags.innerHTML += `<span class="pill bad">unreachable: ${p.unreachable.join(", ")}</span> `;
+  }
+  flags.innerHTML += p.within_time_limit
+    ? `<span class="pill ok">within the ${CONFIG.task_time_limit}s limit</span>`
+    : `<span class="pill bad">over the ${CONFIG.task_time_limit}s limit</span>`;
+
+  renderCommands(p.commands);
+  capturePoses = p.legs.map((l) => l.end);
+  ["btn-play", "btn-step", "btn-reset"].forEach((id) => (el(id).disabled = steps.length === 0));
+}
+
+function renderCommands(cmds) {
+  el("cmd-card").hidden = false;
+  const box = el("v-cmds"); box.innerHTML = "";
+  cmds.forEach((c) => {
+    const s = document.createElement("span");
+    s.className = "cmd" + (c.startsWith("SNAP") ? " snap" : c === "FIN" ? " fin" : "");
+    s.textContent = c; box.appendChild(s);
+  });
+}
+
+function renderComparison(data) {
+  el("compare-card").hidden = false;
+  const body = el("compare-body"); body.innerHTML = "";
+  const names = { nearest: "Nearest neighbour (B.2)", greedy_swap: "Nearest + 2-swap",
+                  exhaustive: "Exhaustive (B.3)" };
+  const rows = Object.entries(data.results);
+  // "Best" means most images first, then least time -- visiting four obstacles
+  // quickly is worse than visiting five.
+  const best = rows.reduce((a, b) => {
+    const [, ra] = a, [, rb] = b;
+    if (rb.order.length !== ra.order.length) return rb.order.length > ra.order.length ? b : a;
+    return rb.total_duration < ra.total_duration ? b : a;
+  });
+  rows.forEach(([key, r]) => {
+    const tr = document.createElement("tr");
+    if (key === best[0]) tr.className = "best";
+    tr.innerHTML = `<td>${names[key] || key}</td><td>${r.order.length}</td>` +
+                   `<td>${r.total_duration.toFixed(1)} s</td><td>${Math.round(r.total_distance)} cm</td>`;
+    body.appendChild(tr);
+  });
+
+  const greedy = data.results.nearest, opt = data.results.exhaustive;
+  const tail = `All three search the same capture poses under the same cost model, so ` +
+               `the only difference is the visit order. Planned in ${data.planning_seconds.toFixed(2)}s.`;
+  let note = tail;
+  if (greedy && opt && opt.order.length > greedy.order.length) {
+    note = `The greedy walk strands itself and only reaches ${greedy.order.length} obstacles; ` +
+           `the exhaustive search reaches ${opt.order.length}. ` + tail;
+  } else if (greedy && opt && greedy.total_duration - opt.total_duration > 0.05) {
+    const saved = greedy.total_duration - opt.total_duration;
+    note = `The exhaustive search saves ${saved.toFixed(1)}s ` +
+           `(${(100 * saved / greedy.total_duration).toFixed(0)}%) over the greedy path. ` + tail;
+  } else if (greedy && opt) {
+    // A tie is a real result, not a broken comparison: on an open layout the
+    // greedy first choice is often already the optimal one. Say so, rather than
+    // leaving it looking like the exhaustive search did nothing.
+    note = `On this layout the greedy order is already optimal, so B.2 and B.3 agree — ` +
+           `roughly a third of random layouts come out this way. Press Randomise for one ` +
+           `where they differ. ` + tail;
+  }
+  el("compare-note").textContent = note;
+}
+
+// ---------------------------------------------------------------------------
+// Playback
+// ---------------------------------------------------------------------------
+
+// Flatten the plan into one timeline of {pose, t} so playback and scrubbing
+// both work off a single list.
+//
+// The `t` on each pose comes from the server, which derives it from the same
+// time model the plan is scored with. Re-deriving it here from the distance
+// between samples looks equivalent and is not -- it drops the gear- and
+// steering-change penalties, and the animation then finishes several seconds
+// before the figure printed next to it.
+function buildTimeline() {
+  steps = []; cursor = 0; clock = 0;
+  if (!plan) return;
+  steps.push({ pose: plan.start, t: 0, leg: 0, snap: 0 });
+
+  plan.legs.forEach((leg, legIndex) => {
+    let last = steps[steps.length - 1].pose;
+    leg.trajectory.forEach((pose) => {
+      steps.push({ pose, t: pose.t, leg: legIndex, snap: 0 });
+      last = pose;
+    });
+    // Parked in front of the obstacle while the photo is taken.
+    steps.push({ pose: last, t: leg.starts_at + leg.duration + CONFIG.scan_time,
+                 leg: legIndex, snap: leg.obstacle_id });
+  });
+}
+
+function currentLeg() {
+  if (!steps.length || !plan) return 0;
+  const s = steps[Math.min(cursor, steps.length - 1)];
+  return s.snap ? s.leg + 1 : s.leg;
+}
+
+function tick(now) {
+  if (playing) {
+    if (!lastFrame) lastFrame = now;
+    // Accumulate real time into a simulated clock. Spending a per-frame
+    // "budget" in whole steps and dropping the remainder looks equivalent and
+    // is not: one frame at 60fps is 17ms of simulated time, while a 3cm sample
+    // at 40cm/s is 75ms. No single frame ever covers a whole step, so every
+    // frame breaks out having moved nothing and the robot sits still forever.
+    clock += (now - lastFrame) / 1000 * parseFloat(el("speed").value);
+    lastFrame = now;
+
+    while (cursor < steps.length - 1 && steps[cursor + 1].t <= clock) {
+      cursor++;
+      if (steps[cursor].snap) flashSnap(steps[cursor].snap);
+    }
+    if (cursor >= steps.length - 1) {
+      clock = steps[steps.length - 1].t;
+      playing = false; el("btn-play").textContent = "Play";
+      setStatus("Run complete — " + plan.order.length + " images photographed.", "ok");
+    }
+    draw(); updateClock();
+  }
+  requestAnimationFrame(tick);
+}
+
+// Where to draw the robot right now: interpolated between the two samples the
+// clock currently falls between, so it glides rather than hopping 3cm at a
+// time. During a SNAP both samples are the same pose, so it holds still.
+function displayPose() {
+  if (manualPose) return manualPose;
+  if (!steps.length) return CONFIG ? CONFIG.start : null;
+  const from = steps[Math.min(cursor, steps.length - 1)];
+  const to = steps[cursor + 1];
+  if (!to || to.t <= from.t) return from.pose;
+  const f = Math.max(0, Math.min(1, (clock - from.t) / (to.t - from.t)));
+  return {
+    x: from.pose.x + (to.pose.x - from.pose.x) * f,
+    y: from.pose.y + (to.pose.y - from.pose.y) * f,
+    // Interpolate the heading the short way round, or the robot spins a full
+    // turn every time it crosses the +/-pi wrap.
+    theta: from.pose.theta + angleDelta(to.pose.theta, from.pose.theta) * f,
+  };
+}
+
+function angleDelta(a, b) {
+  let d = (a - b) % (2 * Math.PI);
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d <= -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+function flashSnap(obstacleId) {
+  setStatus("Photographing obstacle " + obstacleId + "…", "warn");
+  highlightCommand(obstacleId);
+}
+
+function highlightCommand(obstacleId) {
+  const nodes = el("v-cmds").querySelectorAll(".cmd");
+  nodes.forEach((n) => n.classList.remove("now"));
+  const target = Array.from(nodes).find((n) => n.textContent === "SNAP" + obstacleId);
+  if (target) { target.classList.add("now"); target.scrollIntoView({ block: "nearest" }); }
+}
+
+function updateClock() {
+  if (!steps.length) return;
+  const shown = Math.max(0, Math.min(clock, plan.total_duration));
+  el("v-time").textContent = shown.toFixed(1) + " / " + plan.total_duration.toFixed(1) + " s";
+  const done = currentLeg();
+  el("v-images").textContent = done + " / " + (plan.order.length + plan.unreachable.length);
+  el("v-order").querySelectorAll("b").forEach((b, i) => b.classList.toggle("done", i < done));
+}
+
+// ---------------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------------
+
+async function drive(command) {
+  try {
+    const from = manualPose || displayPose() || CONFIG.start;
+    const result = await api("/api/drive", {
+      start: { x: from.x, y: from.y, theta: from.theta },
+      command, obstacles, units: "cell",
+    });
+    if (result.blocked) {
+      setStatus(command + " refused — that would clip a virtual obstacle or leave the arena.", "warn");
+      return;
+    }
+    if (!manualTrail.length) manualTrail.push(from);
+    result.trajectory.forEach((pose) => manualTrail.push(pose));
+    manualPose = result.pose;
+    playing = false; el("btn-play").textContent = "Play";
+    setStatus("Manual: " + result.description + " → (" + Math.round(manualPose.x) + ", "
+              + Math.round(manualPose.y) + ") facing " + manualPose.face, "ok");
+    draw();
+  } catch (err) { setStatus(String(err.message || err), "bad"); }
+}
+
+document.querySelectorAll("[data-drive]").forEach((button) =>
+  button.addEventListener("click", () => drive(button.getAttribute("data-drive"))));
+
+el("btn-home").addEventListener("click", () => {
+  manualPose = null; manualTrail = [];
+  setStatus(plan ? "Back to the planned path." : "Robot returned to the start zone.");
+  draw();
+});
+
+el("btn-plan").addEventListener("click", doPlan);
+el("btn-compare").addEventListener("click", doCompare);
+el("btn-clear").addEventListener("click", () => { obstacles = []; invalidatePlan(); draw(); });
+
+el("btn-random").addEventListener("click", async () => {
+  setStatus("Generating a layout…");
+  try {
+    const data = await api("/api/random");
+    obstacles = data.obstacles.map((o) => ({ id: o.id, x: o.x, y: o.y, face: o.face }));
+    invalidatePlan(); draw();
+    setStatus("Layout ready. Press Plan path.", "ok");
+  } catch (err) { setStatus(String(err.message || err), "bad"); }
+});
+
+el("btn-play").addEventListener("click", () => {
+  manualPose = null; manualTrail = [];       // playback owns the robot again
+  if (cursor >= steps.length - 1) { cursor = 0; clock = 0; }
+  playing = !playing;
+  lastFrame = 0;
+  el("btn-play").textContent = playing ? "Pause" : "Play";
+});
+
+el("btn-step").addEventListener("click", () => {
+  playing = false; el("btn-play").textContent = "Play";
+  // Step to the next photo, which is the interesting granularity.
+  const target = currentLeg() + 1;
+  while (cursor < steps.length - 1 && currentLeg() < target) cursor++;
+  clock = steps[cursor].t;
+  draw(); updateClock();
+});
+
+el("btn-reset").addEventListener("click", () => {
+  playing = false; cursor = 0; clock = 0; manualPose = null; manualTrail = [];
+  el("btn-play").textContent = "Play";
+  draw(); updateClock();
+});
+
+el("speed").addEventListener("input", () => {
+  el("speed-label").textContent = parseFloat(el("speed").value).toFixed(2).replace(/0$/, "") + "×";
+});
+["show-virtual", "show-poses", "show-trail"].forEach((id) =>
+  el(id).addEventListener("change", draw));
+el("strategy").addEventListener("change", () => { if (plan) doPlan(); });
+el("metric").addEventListener("change", () => { if (plan) doPlan(); });
+
+(async function start() {
+  try {
+    CONFIG = await api("/api/config");
+    const data = await api("/api/random");
+    obstacles = data.obstacles.map((o) => ({ id: o.id, x: o.x, y: o.y, face: o.face }));
+    draw();
+    requestAnimationFrame(tick);
+    setStatus("Sample layout loaded. Press Plan path, or edit the arena first.");
+  } catch (err) {
+    setStatus("Could not reach the server: " + (err.message || err), "bad");
+  }
+})();
+</script>
+</body>
+</html>

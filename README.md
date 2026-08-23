@@ -1,5 +1,24 @@
 # SC2079 MDP - Group 10
 
+## Algorithm (`algo/`)
+
+Path planning for Task 1: work out which order to visit the five obstacles in,
+where to park to photograph each one, and what to send the STM board. Covers
+checklist section B &mdash; B.1 movement area simulator, B.2 Hamiltonian path,
+B.3 shortest-time Hamiltonian path.
+
+```bash
+cd algo
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python3 server.py            # simulator at http://localhost:5001
+```
+
+The same Flask server is both the simulator used for the checklist demo and the
+service the Raspberry Pi calls during a run, so the demo and the robot execute
+identical planning code. See [`algo/README.md`](algo/README.md) for the API
+contract, the design, and what still needs calibrating against the real robot.
+
 ## Android App
 
 The Android application serves as the main remote controller and monitoring interface for the MDP robot. It handles Bluetooth communication with the Raspberry Pi, visualizes the 20x20 arena map, and issues commands for tasks like exploration and image recognition.
