@@ -49,8 +49,30 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for communicateTask */
+osThreadId_t communicateTaskHandle;
+const osThreadAttr_t communicateTask_attributes = {
+  .name = "communicateTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for motorTask */
+osThreadId_t motorTaskHandle;
+const osThreadAttr_t motorTask_attributes = {
+  .name = "motorTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for uartQueue */
+osMessageQueueId_t uartQueueHandle;
+const osMessageQueueAttr_t uartQueue_attributes = {
+  .name = "uartQueue"
+};
 /* USER CODE BEGIN PV */
-
+/* Global variables safely accessed by FreeRTOS tasks */
+uint8_t sbuf[15] = "Hello World!\n\r";
+uint8_t *OLED_buf; // Currently not used, might use when theres OLED task to update a buffer
+uint8_t rxByte;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,6 +80,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 void StartDefaultTask(void *argument);
+void StartCommunicateTask(void *argument);
+void StartMotorTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -75,8 +99,7 @@ void StartDefaultTask(void *argument);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	uint8_t sbuf[15] = "Hello World!\n\r";
-	uint8_t *OLED_buf;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -100,10 +123,10 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   OLED_Init();
-  OLED_ShowString(10, 5, "SC2079/MDP"); // show message on OLED display at line 10
-  OLED_buf = "Ryan Tan"; // another way to show message through buffer
-  OLED_ShowString(40, 30, OLED_buf); // another message at line 40
+  OLED_ShowString(10, 5, "System Ready"); // show message on OLED display at line 10
   OLED_Refresh_Gram();
+
+  HAL_UART_Receive_IT(&huart3, &rxByte, 1);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -121,6 +144,10 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of uartQueue */
+  uartQueueHandle = osMessageQueueNew (32, sizeof(uint8_t), &uartQueue_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -128,6 +155,12 @@ int main(void)
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of communicateTask */
+  communicateTaskHandle = osThreadNew(StartCommunicateTask, NULL, &communicateTask_attributes);
+
+  /* creation of motorTask */
+  motorTaskHandle = osThreadNew(StartMotorTask, NULL, &motorTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -145,9 +178,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-	  HAL_UART_Transmit(&huart3, sbuf, sizeof(sbuf), HAL_MAX_DELAY);
-	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -266,6 +296,15 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// Serial Communication Interrupt Callback
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	/* Prevent unused argument(s) compilation warning */
+	if (huart -> Instance == USART3)
+	{
+		osMessageQueuePut(uartQueueHandle, &rxByte, 0U, 0U);
+		HAL_UART_Receive_IT(&huart3, &rxByte, 1);
+	}
+}
 
 /* USER CODE END 4 */
 
@@ -282,9 +321,80 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+	HAL_UART_Transmit(&huart3, sbuf, sizeof(sbuf), HAL_MAX_DELAY);
+    osDelay(1000);
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartCommunicateTask */
+/**
+* @brief Function implementing the communicateTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCommunicateTask */
+void StartCommunicateTask(void *argument)
+{
+  /* USER CODE BEGIN StartCommunicateTask */
+
+  char cmdBuffer[15];		// Local buffer to hold the built string (e.g. "L90")
+  uint8_t receivedChar;
+  uint8_t cmdIndex = 0;
+
+  /* Infinite loop */
+  for(;;)
+  {
+	// Wait until a character is put into the queue
+	if (osMessageQueueGet(uartQueueHandle, &receivedChar, NULL, osWaitForever) == osOK)
+	{
+		// Check for newline, because RPi will send command ending with newline '\n' or '\r'
+		if (receivedChar == '\n' || receivedChar == '\r')
+		{
+			if (cmdIndex > 0)
+			{
+				cmdBuffer[cmdIndex] = '\0'; // Add null-terminator to make a valid C-string
+
+				// --- COMMAND COMPLETE! ---
+				OLED_Clear();
+				OLED_ShowString(10, 10, "RPi Sent:");
+				OLED_ShowString(10, 30, (uint8_t*)cmdBuffer);
+				OLED_Refresh_Gram();
+
+				cmdIndex = 0; // Reset command index to 0 to prepare for next command
+			}
+		} else {
+			// This means not a newline yet, continue adding character into cmdBuffer
+			// Check for command length, ensure don't overflow the 15-char array limit
+			if (cmdIndex < 14)
+			{
+				cmdBuffer[cmdIndex] = receivedChar;
+				cmdIndex++;
+			}
+		}
+	}
+	osDelay(1);
+  }
+  /* USER CODE END StartCommunicateTask */
+}
+
+/* USER CODE BEGIN Header_StartMotorTask */
+/**
+* @brief Function implementing the motorTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartMotorTask */
+void StartMotorTask(void *argument)
+{
+  /* USER CODE BEGIN StartMotorTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartMotorTask */
 }
 
 /**
