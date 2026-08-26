@@ -23,6 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "oled.h"
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,6 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,16 +66,46 @@ const osThreadAttr_t motorTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for oledTask */
+osThreadId_t oledTaskHandle;
+const osThreadAttr_t oledTask_attributes = {
+  .name = "oledTask",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for gyroTask */
+osThreadId_t gyroTaskHandle;
+const osThreadAttr_t gyroTask_attributes = {
+  .name = "gyroTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for ultrasonicTask */
+osThreadId_t ultrasonicTaskHandle;
+const osThreadAttr_t ultrasonicTask_attributes = {
+  .name = "ultrasonicTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityBelowNormal,
+};
 /* Definitions for uartQueue */
 osMessageQueueId_t uartQueueHandle;
 const osMessageQueueAttr_t uartQueue_attributes = {
   .name = "uartQueue"
 };
 /* USER CODE BEGIN PV */
-/* Global variables safely accessed by FreeRTOS tasks */
+
+// Global variables safely accessed by FreeRTOS tasks
 uint8_t sbuf[15] = "Hello World!\n\r";
-uint8_t *OLED_buf; // Currently not used, might use when theres OLED task to update a buffer
-uint8_t rxByte;
+
+/* --- SERIAL COMMUNICATION VARIABLES --- */
+uint8_t rxByte;									// UART receive buffer
+
+/* --- OLED DISPLAY VARIABLES --- */
+char dash_lastCmd[15] = "None";					// RPi command
+int dash_speedL = 0;							// Left motor speed
+int dash_speedR = 0;							// Right motor speed
+int dash_gyroZ = 0;								// Gyroscope angle
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -82,6 +115,9 @@ static void MX_USART3_UART_Init(void);
 void StartDefaultTask(void *argument);
 void StartCommunicateTask(void *argument);
 void StartMotorTask(void *argument);
+void StartOledTask(void *argument);
+void StartGyroTask(void *argument);
+void StartUltrasonicTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -161,6 +197,15 @@ int main(void)
 
   /* creation of motorTask */
   motorTaskHandle = osThreadNew(StartMotorTask, NULL, &motorTask_attributes);
+
+  /* creation of oledTask */
+  oledTaskHandle = osThreadNew(StartOledTask, NULL, &oledTask_attributes);
+
+  /* creation of gyroTask */
+  gyroTaskHandle = osThreadNew(StartGyroTask, NULL, &gyroTask_attributes);
+
+  /* creation of ultrasonicTask */
+  ultrasonicTaskHandle = osThreadNew(StartUltrasonicTask, NULL, &ultrasonicTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -356,11 +401,12 @@ void StartCommunicateTask(void *argument)
 			{
 				cmdBuffer[cmdIndex] = '\0'; // Add null-terminator to make a valid C-string
 
-				// --- COMMAND COMPLETE! ---
-				OLED_Clear();
-				OLED_ShowString(10, 10, "RPi Sent:");
-				OLED_ShowString(10, 30, (uint8_t*)cmdBuffer);
-				OLED_Refresh_Gram();
+				// --- SEND ACK TO RPi ---
+				uint8_t ackMsg[] = "A\n";
+				HAL_UART_Transmit(&huart3, ackMsg, sizeof(ackMsg)-1, 100);
+
+				// --- UPDATE OLED RPI COMMAND VARIABLE ---
+				strcpy(dash_lastCmd, cmdBuffer);
 
 				cmdIndex = 0; // Reset command index to 0 to prepare for next command
 			}
@@ -395,6 +441,78 @@ void StartMotorTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartMotorTask */
+}
+
+/* USER CODE BEGIN Header_StartOledTask */
+/**
+* @brief Function implementing the oledTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartOledTask */
+void StartOledTask(void *argument)
+{
+  /* USER CODE BEGIN StartOledTask */
+  char textBuffer[20];	// Temp buffer to format numbers into text
+
+  /* Infinite loop */
+  for(;;)
+  {
+	OLED_Clear();
+
+	// 1. RPi Instructions
+	OLED_ShowString(0, 0, "CMD: ");
+	OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
+
+	// 2. Motor Speed
+	sprintf(textBuffer, "L:%d R:%d", dash_speedL, dash_speedR);
+	OLED_ShowString(0, 15, (uint8_t*) textBuffer);
+
+	// 3. Gyroscope Angle
+	sprintf(textBuffer, "Gyro: %d", dash_gyroZ);
+	OLED_ShowString(0, 30, (uint8_t*) textBuffer);
+
+	OLED_Refresh_Gram();
+
+    osDelay(100);
+  }
+  /* USER CODE END StartOledTask */
+}
+
+/* USER CODE BEGIN Header_StartGyroTask */
+/**
+* @brief Function implementing the gyroTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartGyroTask */
+void StartGyroTask(void *argument)
+{
+  /* USER CODE BEGIN StartGyroTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartGyroTask */
+}
+
+/* USER CODE BEGIN Header_StartUltrasonicTask */
+/**
+* @brief Function implementing the ultrasonicTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUltrasonicTask */
+void StartUltrasonicTask(void *argument)
+{
+  /* USER CODE BEGIN StartUltrasonicTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartUltrasonicTask */
 }
 
 /**
