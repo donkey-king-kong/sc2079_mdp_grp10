@@ -127,17 +127,30 @@ class BluetoothService : Service() {
         serviceScope.launch {
             val input = sock.inputStream
             val buf = ByteArray(1024)
+            val receiveBuffer = StringBuilder()
             try {
                 while (true) {
                     val n = input.read(buf)
                     if (n == -1) break
                     val data = buf.copyOf(n)
-                    LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
-                        Intent(ACTION_MESSAGE).apply {
-                            putExtra(EXTRA_BYTES, data)
-                            putExtra(EXTRA_TEXT, runCatching { String(data) }.getOrNull())
+                    receiveBuffer.append(String(data, Charsets.UTF_8))
+
+                    var newlineIndex = receiveBuffer.indexOf("\n")
+                    while (newlineIndex >= 0) {
+                        val line = receiveBuffer.substring(0, newlineIndex)
+                        receiveBuffer.delete(0, newlineIndex + 1)
+
+                        if (line.isNotEmpty()) {
+                            LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
+                                Intent(ACTION_MESSAGE).apply {
+                                    putExtra(EXTRA_BYTES, line.toByteArray(Charsets.UTF_8))
+                                    putExtra(EXTRA_TEXT, line)
+                                }
+                            )
                         }
-                    )
+
+                        newlineIndex = receiveBuffer.indexOf("\n")
+                    }
                 }
             } catch (e: IOException) {
                 Log.w(TAG, "reader ended: ${e.message}")
@@ -154,6 +167,7 @@ class BluetoothService : Service() {
         val s = bluetoothSocket ?: return false
         return try {
             s.outputStream.write(bytes)
+            s.outputStream.write('\n'.code)
             s.outputStream.flush()
             true
         } catch (e: IOException) {
