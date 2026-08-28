@@ -1598,7 +1598,33 @@ public class GridMapClass extends View {
         Log.d("GridMapClas.java", "X Coord "+ x);
         Log.d("GridMapClas.java", "Y Coord "+ y);
         Log.d("GridMapClas.java", "Direction Coords "+ d);
-        return 1;
+
+        int xInt, yInt;
+        try {
+            xInt = Integer.parseInt(x);
+            yInt = Integer.parseInt(y);
+        } catch (NumberFormatException e) {
+            Log.d("GridMapClas.java", "Invalid x/y coordinates");
+            return -2;
+        }
+
+        ObstacleData.Direction direction;
+        switch (d) {
+            case "N": direction = ObstacleData.Direction.NORTH; break;
+            case "S": direction = ObstacleData.Direction.SOUTH; break;
+            case "E": direction = ObstacleData.Direction.EAST;  break;
+            case "W": direction = ObstacleData.Direction.WEST;  break;
+            default:
+                Log.d("GridMapClas.java", "Unknown direction: " + d);
+                return -2;
+        }
+
+        removeVehicleFromGrid();
+        int result = addVehicleToMap(xInt, yInt);
+        if (result == 1) {
+            changeDirectionOfObstacleFlexible(xInt, yInt, direction);
+        }
+        return result > 0 ? 1 : 0;
 
     }
 
