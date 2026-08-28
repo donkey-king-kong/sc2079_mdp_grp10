@@ -6,124 +6,123 @@
 
     <LinearLayout
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_width="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
         android:background="@drawable/rounded_status_background"
         android:backgroundTint="@color/dark_blue_700"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="8dp">
 
         <!-- Row 1: Task 1 and Task 2 -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
             <!-- Task 1 -->
             <LinearLayout
-                android:layout_width="180dp"
-                android:layout_height="170dp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:orientation="vertical"
-                android:layout_margin="5dp">
+                android:layout_margin="4dp">
 
                 <TextView
                     android:id="@+id/exploreTextView"
                     android:layout_width="match_parent"
-                    android:layout_height="60dp"
+                    android:layout_height="wrap_content"
                     android:gravity="center"
                     android:text="TASK 1: Traverse Map"
                     android:textColor="@color/white"
-                    android:textSize="20sp" />
+                    android:textSize="14sp" />
                 <TextView
                     android:id="@+id/calculateObstacleTimer"
-                    android:layout_width="180dp"
-                    android:layout_height="40dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
                     android:background="@color/white"
                     android:gravity="center"
                     android:text="00:00"
                     android:textColor="@color/black"
-                    android:textSize="26sp" />
+                    android:textSize="22sp" />
                 <ToggleButton
                     android:id="@+id/beginExplorationButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
+                    android:layout_marginTop="8dp"
                     android:text="Exploration"
                     android:textOff="TASK 1 START"
                     android:textOn="STOP"
+                    android:textSize="12sp"
                     android:background="@drawable/rounded_background" />
             </LinearLayout>
 
             <!-- Task 2 -->
             <LinearLayout
-                android:layout_width="180dp"
-                android:layout_height="170dp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:orientation="vertical"
-                android:layout_margin="5dp">
+                android:layout_margin="4dp">
 
                 <TextView
                     android:id="@+id/fastestTextView"
                     android:layout_width="match_parent"
-                    android:layout_height="60dp"
+                    android:layout_height="wrap_content"
                     android:gravity="center"
                     android:text="TASK 2: Fastest Round"
                     android:textColor="@color/white"
-                    android:textSize="20sp" />
+                    android:textSize="14sp" />
                 <TextView
                     android:id="@+id/fastestTimeTimer"
-                    android:layout_width="180dp"
-                    android:layout_height="40dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
                     android:background="@color/white"
                     android:gravity="center"
                     android:text="00:00"
                     android:textColor="@color/black"
-                    android:textSize="26sp" />
+                    android:textSize="22sp" />
                 <ToggleButton
                     android:id="@+id/beginFastestButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
+                    android:layout_marginTop="8dp"
                     android:text="FASTEST"
                     android:textOff="TASK 2 START"
                     android:textOn="STOP"
+                    android:textSize="12sp"
                     android:background="@drawable/rounded_background" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Row 2: Task 3 centered below -->
+        <!-- Row 2: Stitch centered below -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:orientation="vertical"
-            android:layout_marginTop="2dp">
+            android:layout_marginTop="8dp">
 
-            <LinearLayout
-                android:layout_width="350dp"
-                android:layout_height="100dp"
-                android:layout_marginTop="10dp"
-                android:orientation="vertical">
+            <TextView
+                android:id="@+id/stichAgainTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="Retrieve Stitched Images"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/stichAgainTextView"
-                    android:layout_width="match_parent"
-                    android:layout_height="30dp"
-                    android:gravity="center"
-                    android:text="Retrieve Stitched Images"
-                    android:textColor="@color/white"
-                    android:textSize="20sp" />
-
-                <ToggleButton
-                    android:id="@+id/beginStichButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="STITCH"
-                    android:textOff="STITCH START"
-                    android:textOn="STOP"
-                    android:background="@drawable/rounded_background" />
-            </LinearLayout>
+            <ToggleButton
+                android:id="@+id/beginStichButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="STITCH"
+                android:textOff="STITCH START"
+                android:textOn="STOP"
+                android:textSize="12sp"
+                android:background="@drawable/rounded_background" />
         </LinearLayout>
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

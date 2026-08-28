@@ -67,6 +67,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var givevehicleCoordinatesNow: TextView
     private lateinit var givevehicleStatusNow: TextView
     private val handler = Handler(Looper.getMainLooper())
+    // Polls AMD every 2s when Auto mode is ON, requesting arena + robot position update
+    private val autoHandler = Handler(Looper.getMainLooper())
+    private val autoRunnable = object : Runnable {
+        override fun run() {
+            bluetoothService?.write("sendArena".toByteArray())
+            autoHandler.postDelayed(this, 2000)
+        }
+    }
     private val updateTask = object : Runnable {
         override fun run() {
             val givevehicleDirectionNow = findViewById<TextView?>(R.id.give_vehicle_direction_now)
@@ -144,6 +152,19 @@ class MainActivity : AppCompatActivity() {
                 text = "[bin] " + sb.toString().trim()
             }
             if (text == null) text = "(empty packet)"
+
+            // AMD bundles grid + robot location as two newline-separated JSONs in one BT packet.
+            // Split and re-dispatch each part so the individual message handlers each fire correctly.
+            val parts = text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+            if (parts.size > 1) {
+                for (part in parts) {
+                    val subIntent = Intent(BluetoothService.ACTION_MESSAGE).apply {
+                        putExtra(BluetoothService.EXTRA_TEXT, part)
+                    }
+                    onReceive(context, subIntent)
+                }
+                return
+            }
 
             val line: String
             /*
@@ -285,6 +306,10 @@ class MainActivity : AppCompatActivity() {
                 gridMapObj.receiveStatusMessageBluetooth(text, activateJoyStickBool);
             }
 
+            if(text.contains("\"grid\"")){
+                gridMapObj.receiveGridHexBluetooth(text);
+            }
+
             // if(text.contains("Failed to convert raw Android message")){
             // gridMapObj.sendAlertToSignalFailure();
             // }
@@ -356,6 +381,30 @@ class MainActivity : AppCompatActivity() {
             findViewById(R.id.clear_logs_button)
         btnLogClear.setOnClickListener {
             clearMessageLog()
+        }
+
+        val btnManual: com.google.android.material.button.MaterialButton = findViewById(R.id.manual_update_button)
+        val btnAuto: com.google.android.material.button.MaterialButton = findViewById(R.id.auto_update_button)
+
+        btnManual.setOnClickListener {
+            bluetoothService?.write("sendArena".toByteArray())
+            Toast.makeText(this, "Requested arena update", Toast.LENGTH_SHORT).show()
+        }
+
+        btnAuto.setOnClickListener {
+            if (btnAuto.text == "Auto") {
+                btnAuto.text = "Auto: ON"
+                btnAuto.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    android.graphics.Color.parseColor("#2E7D32") // green when active
+                )
+                autoHandler.post(autoRunnable)
+                Toast.makeText(this, "Auto update ON (every 2s)", Toast.LENGTH_SHORT).show()
+            } else {
+                btnAuto.text = "Auto"
+                btnAuto.backgroundTintList = null // restore default outline style
+                autoHandler.removeCallbacks(autoRunnable)
+                Toast.makeText(this, "Auto update OFF", Toast.LENGTH_SHORT).show()
+            }
         }
 
         val customNavigatorBar: customNavigator = customNavigator(
@@ -479,6 +528,7 @@ class MainActivity : AppCompatActivity() {
         // Unregister broadcast receivers
         LocalBroadcastManager.getInstance(this).unregisterReceiver(connStateReceiver)
         LocalBroadcastManager.getInstance(this).unregisterReceiver(msgReceiver)
+        autoHandler.removeCallbacks(autoRunnable)
     }
 
     private fun checkBluetoothPermissionsAndState() {
