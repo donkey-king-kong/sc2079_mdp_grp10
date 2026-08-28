@@ -263,8 +263,8 @@
                     android:id="@+id/tabs"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:tabMode="fixed"
-                    app:tabGravity="fill" />
+                    app:tabMode="scrollable"
+                    app:tabGravity="center" />
 
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/sub_navigation_bar"
@@ -292,7 +292,10 @@
                 android:layout_marginEnd="3dp"
                 android:text="Manual"
                 android:textSize="10sp"
-                android:textColor="@color/white" />
+                android:textColor="@color/white"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:iconPadding="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/auto_update_button"
@@ -303,7 +306,10 @@
                 android:layout_marginEnd="3dp"
                 android:text="Auto"
                 android:textSize="10sp"
-                android:textColor="@color/white" />
+                android:textColor="@color/white"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:iconPadding="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/reset_map_button"
@@ -313,12 +319,12 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Reset"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textColor="@color/white"
-                app:icon="@drawable/restart_icon"
-                app:iconGravity="textEnd"
-                app:iconSize="16dp"
-                app:iconTint="@android:color/white" />
+                android:singleLine="true"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:iconPadding="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/save_map_button"
@@ -328,12 +334,12 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Save"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textColor="@color/white"
-                app:icon="@drawable/save_map_icon"
-                app:iconGravity="textEnd"
-                app:iconSize="16dp"
-                app:iconTint="@android:color/white" />
+                android:singleLine="true"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:iconPadding="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/load_map_button"
@@ -343,12 +349,12 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Load"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textColor="@color/white"
-                app:icon="@drawable/save_map_icon"
-                app:iconGravity="textEnd"
-                app:iconSize="16dp"
-                app:iconTint="@android:color/white" />
+                android:singleLine="true"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:iconPadding="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clear_logs_button"
@@ -357,12 +363,12 @@
                 android:layout_height="40dp"
                 android:layout_weight="1"
                 android:text="Clear"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textColor="@color/white"
-                app:icon="@drawable/outline_delete_24dp"
-                app:iconGravity="textEnd"
-                app:iconSize="16dp"
-                app:iconTint="@android:color/white" />
+                android:singleLine="true"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:iconPadding="0dp" />
 
         </LinearLayout>
     </LinearLayout>
