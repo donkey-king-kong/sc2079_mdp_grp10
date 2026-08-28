@@ -22,10 +22,9 @@
             android:layout_height="0dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingBottom="24dp"
-            app:layout_constraintBottom_toTopOf="@+id/x_axis_numbers"
+            app:layout_constraintBottom_toBottomOf="@id/gridMapView"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="@id/gridMapView" />
 
         <!-- X-axis -->
         <LinearLayout
@@ -34,9 +33,10 @@
             android:layout_height="24dp"
             android:gravity="center"
             android:orientation="horizontal"
+            app:layout_constraintTop_toBottomOf="@id/gridMapView"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/y_axis_numbers" />
+            app:layout_constraintEnd_toEndOf="@id/gridMapView"
+            app:layout_constraintStart_toStartOf="@id/gridMapView" />
 
         <!-- Grid (square ratio) -->
         <LinearLayout
@@ -44,6 +44,7 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:orientation="vertical"
+            app:layout_constraintVertical_chainStyle="packed"
             app:layout_constraintBottom_toTopOf="@id/x_axis_numbers"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/y_axis_numbers"
@@ -155,18 +156,7 @@
                 android:layout_marginEnd="4dp"
                 app:tint="@android:color/white" />
 
-            <ImageButton
-                android:id="@+id/btnCoordinates"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/button_rounded_square_background"
-                android:backgroundTint="@color/cyan"
-                android:contentDescription="Coordinates"
-                android:padding="8dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_dashboard_black_24dp"
-                android:layout_marginEnd="4dp"
-                app:tint="@android:color/white" />
+
 
             <!-- Bluetooth button + status indicator -->
             <FrameLayout
@@ -263,8 +253,8 @@
                     android:id="@+id/tabs"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:tabMode="scrollable"
-                    app:tabGravity="center" />
+                    app:tabMode="fixed"
+                    app:tabGravity="fill" />
 
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/sub_navigation_bar"
@@ -291,7 +281,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Manual"
-                android:textSize="9sp"
+                android:textSize="7sp"
                 android:textColor="@color/white"
                 android:singleLine="true"
                 android:insetTop="0dp"
@@ -306,7 +296,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Auto"
-                android:textSize="9sp"
+                android:textSize="7sp"
                 android:textColor="@color/white"
                 android:singleLine="true"
                 android:insetTop="0dp"
@@ -321,7 +311,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Reset"
-                android:textSize="9sp"
+                android:textSize="7sp"
                 android:textColor="@color/white"
                 android:singleLine="true"
                 android:insetTop="0dp"
@@ -336,7 +326,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Save"
-                android:textSize="9sp"
+                android:textSize="7sp"
                 android:textColor="@color/white"
                 android:singleLine="true"
                 android:insetTop="0dp"
@@ -351,7 +341,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Load"
-                android:textSize="9sp"
+                android:textSize="7sp"
                 android:textColor="@color/white"
                 android:singleLine="true"
                 android:insetTop="0dp"
@@ -365,7 +355,7 @@
                 android:layout_height="40dp"
                 android:layout_weight="1"
                 android:text="Clear"
-                android:textSize="9sp"
+                android:textSize="7sp"
                 android:textColor="@color/white"
                 android:singleLine="true"
                 android:insetTop="0dp"

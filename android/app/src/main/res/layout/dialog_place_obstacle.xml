@@ -86,17 +86,17 @@
 
                 <Button
                     android:id="@+id/btn_cancel_coord"
-                    style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Cancel"
+                    android:text="CANCEL"
+                    android:backgroundTint="#FF5252"
                     android:layout_marginEnd="16dp"/>
 
                 <Button
                     android:id="@+id/btn_next"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Next"
+                    android:text="NEXT"
                     android:backgroundTint="#4C88E9"/>
             </LinearLayout>
         </LinearLayout>
@@ -197,11 +197,11 @@
 
             <Button
                 android:id="@+id/btn_cancel_dir"
-                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
-                android:text="Cancel" />
+                android:text="CANCEL"
+                android:backgroundTint="#FF5252" />
         </LinearLayout>
 
     </LinearLayout>

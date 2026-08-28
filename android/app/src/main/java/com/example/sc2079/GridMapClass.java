@@ -32,6 +32,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 
 public class GridMapClass extends View {
+    public enum GridMode {
+        NONE, ADD_VEHICLE, ADD_OBSTACLE, REMOVE, CHANGE_DIRECTION
+    }
+    private GridMode currentMode = GridMode.NONE;
     private int gridColumns, gridRows;
     private float cellWidth, cellHeight;
 
@@ -39,6 +43,7 @@ public class GridMapClass extends View {
     private Paint blackPaint = new Paint(); // obstacles
     private Paint greenPaint = new Paint(); // vehicle
     private Paint redPaint = new Paint();   // direction
+    private Paint bluePaint = new Paint();  // robot center arrow
     private Paint textPaint = new Paint(); // Text color in box
     private Paint verifiedPaint = new Paint(); // Verified Status
     private Paint paintObstacleVerified = new Paint();
@@ -92,6 +97,10 @@ public class GridMapClass extends View {
         redPaint.setColor(Color.RED);
         redPaint.setStrokeWidth(6f);
         redPaint.setAntiAlias(true);
+        bluePaint.setStyle(Paint.Style.STROKE);
+        bluePaint.setColor(Color.BLUE);
+        bluePaint.setStrokeWidth(8f);
+        bluePaint.setAntiAlias(true);
         greenPaint.setStyle(Paint.Style.FILL);
         greenPaint.setColor(Color.GREEN);
         textPaint.setColor(Color.WHITE);
@@ -116,49 +125,42 @@ public class GridMapClass extends View {
                 if (!checkValidObstacle(x_coord, y_coord)) {
                     return false;
                 }
-                // First tap will ALWAYS be vehicle type
-                if (!findVehicleDataType()) {
-                    addVehicleToMap(x_coord, y_coord);
-                } else {
-                    ObstacleData gridMapObstacle = gridMapData.get(y_coord).get(x_coord);
-                    switch (gridMapObstacle.getObstacleType()) {
-                        case EMPTY:
-                            if (!gridMapObstacle.getOccupied()) {
-                                addNewObstacleToGrid(x_coord, y_coord);
-                                Log.d("GridMapClass.java", "Added Obstacle added at (" + x_coord + "," + y_coord + ")");
-                            }
-                            break;
-                        case Vehicle:
-                            // Factor for the new
-                            //if(!checkChangeRightDirectionOfVehicle(true)){
-                            //Log.d("GridMapClass.java", "Unable to change vehicle turning due to invalid coords");
-                            //break;
-                            //}
-                            int[] arrayTake = findVehicleBottomLeftObstacle();
-                            switch(gridMapData.get(arrayTake[1]).get(arrayTake[0]).getDirection()){
-                                case NORTH:
-                                    changeVehicleDirection(ObstacleData.Direction.EAST);
-                                    //rotateRightBluetooth();
-                                    break;
-                                case EAST:
-                                    changeVehicleDirection(ObstacleData.Direction.SOUTH);
-                                    //rotateRightBluetooth();
-                                    break;
-                                case SOUTH:
-                                    changeVehicleDirection(ObstacleData.Direction.WEST);
-                                    //rotateRightBluetooth();
-                                    break;
-                                case WEST:
-                                    changeVehicleDirection(ObstacleData.Direction.NORTH);
-                                    //rotateRightBluetooth();
-                            }
 
-                            break;
-                        case Obstacle:
-                            changeDirectionOfObstacle(x_coord, y_coord, true);
-                            Log.d("GridMapClass.java", "Touched Obstacle changed direction at (" + x_coord + "," + y_coord + ")");
-                            break;
-                    }
+                switch (currentMode) {
+                    case ADD_VEHICLE:
+                        addVehicleToMap(x_coord, y_coord);
+                        break;
+                    case ADD_OBSTACLE:
+                        addNewObstacleToGrid(x_coord, y_coord);
+                        break;
+                    case REMOVE:
+                        removeFromGrid(x_coord, y_coord, true);
+                        break;
+                    case CHANGE_DIRECTION:
+                        changeDirectionOfObstacle(x_coord, y_coord, true);
+                        break;
+                    case NONE:
+                    default:
+                        // Existing logic for backward compatibility
+                        if (!findVehicleDataType()) {
+                            addVehicleToMap(x_coord, y_coord);
+                        } else {
+                            ObstacleData gridMapObstacle = gridMapData.get(y_coord).get(x_coord);
+                            switch (gridMapObstacle.getObstacleType()) {
+                                case EMPTY:
+                                    if (!gridMapObstacle.getOccupied()) {
+                                        addNewObstacleToGrid(x_coord, y_coord);
+                                    }
+                                    break;
+                                case Vehicle:
+                                    rotateVehicleRight();
+                                    break;
+                                case Obstacle:
+                                    changeDirectionOfObstacle(x_coord, y_coord, true);
+                                    break;
+                            }
+                        }
+                        break;
                 }
                 invalidate();
                 return true;
@@ -272,6 +274,28 @@ public class GridMapClass extends View {
                 row.add(cell);
             }
             gridMapData.add(row);
+        }
+    }
+
+    public void setGridMode(GridMode mode) {
+        this.currentMode = mode;
+    }
+
+    private void rotateVehicleRight() {
+        int[] arrayTake = findVehicleBottomLeftObstacle();
+        if (arrayTake[0] == -2) return;
+        switch (gridMapData.get(arrayTake[1]).get(arrayTake[0]).getDirection()) {
+            case NORTH:
+                changeVehicleDirection(ObstacleData.Direction.EAST);
+                break;
+            case EAST:
+                changeVehicleDirection(ObstacleData.Direction.SOUTH);
+                break;
+            case SOUTH:
+                changeVehicleDirection(ObstacleData.Direction.WEST);
+                break;
+            case WEST:
+                changeVehicleDirection(ObstacleData.Direction.NORTH);
         }
     }
 
@@ -402,14 +426,13 @@ public class GridMapClass extends View {
                             drawDirectionalArrow(canvas, obstacle, left, top, redPaint);
                         }
                     }
-                } else if (obstacle.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle) {
-                    canvas.drawRect(left, top, right, bottom, greenPaint);
-                    drawDirectionalArrow(canvas, obstacle, left, top, redPaint);
                 } else if (obstacle.getObstacleType() == ObstacleData.OBSTACLETYPE.passedObstacle) {
                     canvas.drawRect(left, top, right, bottom, verifiedPaint);
                 }
             }
         }
+        drawRobot(canvas);
+
         if (isDragging && ghostX != -1 && ghostY != -1 && draggedObstacleSnapshot != null) {
             if (draggedObstacleSnapshot.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle) {
                 // Draw a 3x3 green ghost for the car
@@ -476,6 +499,75 @@ public class GridMapClass extends View {
         canvas.drawLine(startX, startY, endX, endY, paintColor);
     }
 
+    private void drawRobot(Canvas canvas) {
+        int[] pos = findVehicleBottomLeftObstacle();
+        if (pos[0] == -2) return;
+
+        int x = pos[0];
+        int y = pos[1];
+        ObstacleData robotData = gridMapData.get(y).get(x);
+
+        float left = x * cellWidth;
+        float bottom = (gridRows - y) * cellHeight;
+        float right = (x + 3) * cellWidth;
+        float top = (gridRows - (y + 3)) * cellHeight;
+
+        // 1. Draw Green Body
+        canvas.drawRect(left, top, right, bottom, greenPaint);
+
+        // 2. Draw Red Outline
+        Paint outlinePaint = new Paint(redPaint);
+        outlinePaint.setStyle(Paint.Style.STROKE);
+        outlinePaint.setStrokeWidth(10f);
+        canvas.drawRect(left, top, right, bottom, outlinePaint);
+
+        // 3. Draw Blue Arrow in the center cell
+        float centerX = left + 1.5f * cellWidth;
+        float centerY = top + 1.5f * cellHeight;
+        float arrowSize = Math.min(cellWidth, cellHeight) * 0.8f;
+
+        drawArrow(canvas, centerX, centerY, arrowSize, robotData.getDirection(), bluePaint);
+    }
+
+    private void drawArrow(Canvas canvas, float cx, float cy, float size, ObstacleData.Direction direction, Paint paint) {
+        float halfSize = size / 2f;
+        float x1 = 0, y1 = 0, x2 = 0, y2 = 0, x3 = 0, y3 = 0;
+
+        switch (direction) {
+            case NORTH:
+                x1 = cx; y1 = cy - halfSize;
+                x2 = cx - halfSize; y2 = cy + halfSize;
+                x3 = cx + halfSize; y3 = cy + halfSize;
+                break;
+            case SOUTH:
+                x1 = cx; y1 = cy + halfSize;
+                x2 = cx - halfSize; y2 = cy - halfSize;
+                x3 = cx + halfSize; y3 = cy - halfSize;
+                break;
+            case EAST:
+                x1 = cx + halfSize; y1 = cy;
+                x2 = cx - halfSize; y2 = cy - halfSize;
+                x3 = cx - halfSize; y3 = cy + halfSize;
+                break;
+            case WEST:
+                x1 = cx - halfSize; y1 = cy;
+                x2 = cx + halfSize; y2 = cy - halfSize;
+                x3 = cx + halfSize; y3 = cy + halfSize;
+                break;
+            default: return;
+        }
+
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(x1, y1);
+        path.lineTo(x2, y2);
+        path.lineTo(x3, y3);
+        path.close();
+        
+        Paint fillPaint = new Paint(paint);
+        fillPaint.setStyle(Paint.Style.FILL);
+        canvas.drawPath(path, fillPaint);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         gestureDetector.onTouchEvent(event);
@@ -536,6 +628,7 @@ public class GridMapClass extends View {
                                 //Registering the new position in the list
                                 ObstacleData newlyPlaced = gridMapData.get(currentYCoordRef).get(currentXCoordRef);
                                 if (!placedObstacles.contains(newlyPlaced))placedObstacles.add(newlyPlaced);
+                                sendObstacleDirectionBluetooth(currentXCoordRef, currentYCoordRef);
                             }
                         } else {
                             // Dropped outside grid
@@ -657,6 +750,7 @@ public class GridMapClass extends View {
                 changeObstacleData(x_coord, y_coord, true, ObstacleData.Direction.NORTH, ObstacleData.OBSTACLETYPE.Obstacle, false, obstacleCount);
                 placedObstacles.add(gridMapObstacle);
                 invalidate();
+                sendObstacleDirectionBluetooth(x_coord, y_coord);
                 return 1;
             } else {
                 return 2;
@@ -2031,7 +2125,7 @@ public class GridMapClass extends View {
     public void sendObstacleDirectionBluetooth(int x, int y) {
         if (btService != null) {
             ObstacleData obs = gridMapData.get(y).get(x);
-            String msg = "{\"cat\": \"obstacle\", \"value\": {\"x\": " + x + ", \"y\": " + y + ", \"d\": " + obs.getDirection().getIntFromDirection() + "}}";
+            String msg = "{\"cat\": \"obstacle\", \"value\": {\"x\": " + x + ", \"y\": " + y + ", \"d\": " + obs.getDirection().getIntFromDirection() + ", \"id\": " + obs.getObstacleNumber() + "}}";
             btService.write(msg.getBytes(StandardCharsets.UTF_8));
         }
     }

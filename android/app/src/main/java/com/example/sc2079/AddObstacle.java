@@ -303,6 +303,18 @@ public class AddObstacle extends Fragment{
         removeObstacleButton.setActivated(removeObstacleButton.getId() == currentSelectedButtonId);
         removeVehicleButton.setActivated(removeVehicleButton.getId() == currentSelectedButtonId);
         changeDirectionButton.setActivated(changeDirectionButton.getId() == currentSelectedButtonId);
+
+        if (currentSelectedButtonId == addStartingPointButton.getId()) {
+            gridMap.setGridMode(GridMapClass.GridMode.ADD_VEHICLE);
+        } else if (currentSelectedButtonId == addObstacleToggle.getId()) {
+            gridMap.setGridMode(GridMapClass.GridMode.ADD_OBSTACLE);
+        } else if (currentSelectedButtonId == removeObstacleButton.getId() || currentSelectedButtonId == removeVehicleButton.getId()) {
+            gridMap.setGridMode(GridMapClass.GridMode.REMOVE);
+        } else if (currentSelectedButtonId == changeDirectionButton.getId()) {
+            gridMap.setGridMode(GridMapClass.GridMode.CHANGE_DIRECTION);
+        } else {
+            gridMap.setGridMode(GridMapClass.GridMode.NONE);
+        }
     }
 
 

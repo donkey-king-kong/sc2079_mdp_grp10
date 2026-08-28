@@ -48,7 +48,6 @@ class MainActivity : AppCompatActivity() {
     private var isBound = false
     private lateinit var binding: ActivityMainBinding
     private lateinit var btnBluetooth: ImageButton
-    private lateinit var btnCoordinates: ImageButton
     private lateinit var btnAddCoordinate: ImageButton
     private lateinit var bluetoothStatus: ImageView
     private var activateJoyStickBool = false;
@@ -382,7 +381,6 @@ class MainActivity : AppCompatActivity() {
 
         //navView.setupWithNavController(navController)
         btnBluetooth = findViewById(R.id.btnBluetooth)
-        btnCoordinates = findViewById(R.id.btnCoordinates)
         bluetoothStatus = findViewById(R.id.bluetoothStatus)
 
         btnAddCoordinate = findViewById(R.id.btnAddCoordinate)
@@ -512,9 +510,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Initalize navigation tabz
-        customNavigatorBar.addFragment(AddObstacle(gridMapObj), "Add Coordinates")
-        customNavigatorBar.addFragment(commsToRobot(gridMapObj), "Robot Comms")
-        customNavigatorBar.addFragment(startTask(gridMapObj), "Task Start")
+        customNavigatorBar.addFragment(AddObstacle(gridMapObj), "")
+        customNavigatorBar.addFragment(commsToRobot(gridMapObj), "")
+        customNavigatorBar.addFragment(startTask(gridMapObj), "")
 
 
         // Initializes Navigation Bar
@@ -524,9 +522,9 @@ class MainActivity : AppCompatActivity() {
         val tabs = findViewById<TabLayout>(R.id.tabs)
         tabs.setupWithViewPager(subNavigationBar)
 
-        btnCoordinates.setOnClickListener {
-            subNavigationBar?.currentItem = 0
-        }
+        tabs.getTabAt(0)?.setIcon(R.drawable.plus_for_enter)
+        tabs.getTabAt(1)?.setIcon(R.drawable.send_message)
+        tabs.getTabAt(2)?.setIcon(R.drawable.ic_dashboard_black_24dp)
     }
 
     override fun onStart() {
@@ -639,7 +637,7 @@ class MainActivity : AppCompatActivity() {
         for (i in 0..19) {
             val textView = TextView(context)
             textView.text = i.toString()
-            textView.setTextColor(Color.BLUE)
+            textView.setTextColor(Color.WHITE)
             textView.gravity = Gravity.CENTER
             textView.layoutParams = LinearLayout.LayoutParams(
                 0,
