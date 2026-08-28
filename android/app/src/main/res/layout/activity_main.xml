@@ -17,7 +17,7 @@
         app:layout_constraintEnd_toStartOf="@+id/rightPanel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintWidth_percent="0.55">
+        app:layout_constraintWidth_percent="0.48">
 
         <!-- Y-axis -->
         <LinearLayout
@@ -67,7 +67,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/constraintGridMapView"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintWidth_percent="0.45">
+        app:layout_constraintWidth_percent="0.52">
 
         <!-- Top bar: status + buttons -->
         <LinearLayout
@@ -282,8 +282,8 @@
                     android:id="@+id/tabs"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:tabMode="fixed"
-                    app:tabGravity="fill" />
+                    app:tabMode="scrollable"
+                    app:tabGravity="center" />
 
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/sub_navigation_bar"
