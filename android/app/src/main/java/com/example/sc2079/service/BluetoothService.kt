@@ -32,6 +32,7 @@ class BluetoothService : Service() {
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var bluetoothDevice: BluetoothDevice? = null
     private var bluetoothSocket: BluetoothSocket? = null
+    private var serverSocket: BluetoothServerSocket? = null
     private var lastConnectedDevice: BluetoothDevice? = null
     private var reconnectAttempts = 0
     private val MAX_RECONNECT_ATTEMPTS = 3
@@ -59,6 +60,63 @@ class BluetoothService : Service() {
 
     @Volatile private var connectJob: kotlinx.coroutines.Job? = null
     @Volatile private var readerJob: Job? = null
+    @Volatile private var serverJob: Job? = null
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun startServer() {
+        serverJob?.cancel()
+        serverJob = serviceScope.launch {
+            Log.d(TAG, "Starting Bluetooth server...")
+            try {
+                val adapter = bluetoothAdapter ?: return@launch
+                // Using the same SPP UUID
+                val serverSock = adapter.listenUsingRfcommWithServiceRecord("SC2079_Robot_Server", uuid)
+                synchronized(this@BluetoothService) {
+                    serverSocket = serverSock
+                }
+                Log.d(TAG, "Server listening on UUID: $uuid")
+
+                while (true) {
+                    val socket = try {
+                        serverSock.accept() // Blocking call
+                    } catch (e: IOException) {
+                        Log.d(TAG, "Server socket closed or accept failed: ${e.message}")
+                        break
+                    }
+
+                    if (socket != null) {
+                        Log.d(TAG, "Accepted connection from: ${socket.remoteDevice.name} [${socket.remoteDevice.address}]")
+                        
+                        // If we are already connected, we might want to close the new one or handle it.
+                        // For simplicity, we swap to the new connection.
+                        synchronized(this@BluetoothService) {
+                            connectJob?.cancel() // Cancel any pending outgoing connect
+                            bluetoothSocket?.close()
+                            bluetoothSocket = socket
+                            bluetoothDevice = socket.remoteDevice
+                            lastConnectedDevice = socket.remoteDevice
+                            reconnectAttempts = 0
+                        }
+                        
+                        sendConnState("connected", socket.remoteDevice)
+                        
+                        // We must stop any existing reader before starting a new one
+                        readerJob?.cancel()
+                        startReader(socket)
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Server security error: missing BLUETOOTH_CONNECT", e)
+            } catch (e: Exception) {
+                Log.e(TAG, "Server error", e)
+            } finally {
+                synchronized(this@BluetoothService) {
+                    serverSocket?.close()
+                    serverSocket = null
+                }
+            }
+        }
+    }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connectTo(device: BluetoothDevice) {
@@ -220,6 +278,11 @@ class BluetoothService : Service() {
         if (bluetoothAdapter == null) {
             Log.e("TAG", "Device doesn't support Bluetooth")
             stopSelf() // Stop the service if not supported
+        } else {
+            // Start server if permission is already granted (likely)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                startServer()
+            }
         }
 
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
@@ -317,8 +380,13 @@ class BluetoothService : Service() {
         super.onDestroy()
         connectJob?.cancel()
         readerJob?.cancel()
+        serverJob?.cancel()
         serviceScope.cancel()
         try { unregisterReceiver(receiver) } catch (_: IllegalArgumentException) {}
+        synchronized(this@BluetoothService) {
+            serverSocket?.close()
+            serverSocket = null
+        }
         closeQuietly()
     }
 }
