@@ -291,8 +291,9 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Manual"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textColor="@color/white"
+                android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 app:iconPadding="0dp" />
@@ -305,8 +306,9 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
                 android:text="Auto"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textColor="@color/white"
+                android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 app:iconPadding="0dp" />
