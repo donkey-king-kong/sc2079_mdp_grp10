@@ -1,23 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="horizontal"
     android:background="@color/dark_blue_700">
 
-    <!-- LEFT SIDE: Grid area -->
+    <!-- LEFT: Grid area (square, weight-based) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/constraintGridMapView"
         android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_margin="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@+id/rightPanel"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintWidth_percent="0.48">
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_margin="8dp">
 
         <!-- Y-axis -->
         <LinearLayout
@@ -42,7 +38,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/y_axis_numbers" />
 
-        <!-- Grid -->
+        <!-- Grid (square ratio) -->
         <LinearLayout
             android:id="@+id/gridMapView"
             android:layout_width="0dp"
@@ -56,20 +52,16 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- RIGHT SIDE PANEL -->
+    <!-- RIGHT: Control panel (fixed weight) -->
     <LinearLayout
         android:id="@+id/rightPanel"
         android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
         android:orientation="vertical"
-        android:padding="6dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/constraintGridMapView"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintWidth_percent="0.52">
+        android:padding="6dp">
 
-        <!-- Top bar: status + buttons -->
+        <!-- Row 1: Status cards + action buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -77,7 +69,7 @@
             android:gravity="center_vertical"
             android:layout_marginBottom="6dp">
 
-            <!-- Coordinates -->
+            <!-- Coordinates card -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -86,14 +78,14 @@
                 android:padding="6dp"
                 android:background="@drawable/rounded_status_background"
                 android:backgroundTint="@color/dark_blue_200"
-                android:layout_marginEnd="6dp">
+                android:layout_marginEnd="4dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="Coordinates"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:textColor="@color/white"
                     android:fontFamily="@font/poppins_bold" />
 
@@ -103,7 +95,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="(x,y)"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textColor="@color/white"
                     android:fontFamily="@font/poppins_regular" />
 
@@ -113,12 +105,12 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="EMPTY"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textColor="@color/white"
                     android:fontFamily="@font/poppins_regular" />
             </LinearLayout>
 
-            <!-- Status -->
+            <!-- Status card -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -127,14 +119,14 @@
                 android:padding="6dp"
                 android:background="@drawable/rounded_status_background"
                 android:backgroundTint="@color/dark_blue_200"
-                android:layout_marginEnd="6dp">
+                android:layout_marginEnd="4dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="Status"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:textColor="@color/white"
                     android:fontFamily="@font/poppins_bold" />
 
@@ -144,87 +136,76 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="Inactive"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:textColor="@color/white"
                     android:fontFamily="@font/poppins_regular" />
             </LinearLayout>
 
-            <!-- Action buttons -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+            <!-- Icon buttons -->
+            <ImageButton
+                android:id="@+id/btnAddCoordinate"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/button_rounded_square_background"
+                android:backgroundTint="@color/cyan"
+                android:contentDescription="Add Coordinate"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/plus_for_enter"
+                android:layout_marginEnd="4dp"
+                app:tint="@android:color/white" />
+
+            <ImageButton
+                android:id="@+id/btnCoordinates"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/button_rounded_square_background"
+                android:backgroundTint="@color/cyan"
+                android:contentDescription="Coordinates"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_dashboard_black_24dp"
+                android:layout_marginEnd="4dp"
+                app:tint="@android:color/white" />
+
+            <!-- Bluetooth button + status indicator -->
+            <FrameLayout
+                android:layout_width="40dp"
+                android:layout_height="40dp">
 
                 <ImageButton
-                    android:id="@+id/btnAddCoordinate"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                    android:id="@+id/btnBluetooth"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:background="@drawable/button_rounded_square_background"
                     android:backgroundTint="@color/cyan"
-                    android:contentDescription="Add Coordinate"
-                    android:padding="10dp"
+                    android:contentDescription="Bluetooth"
+                    android:padding="8dp"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/plus_for_enter"
-                    android:layout_marginEnd="6dp"
+                    android:src="@drawable/ic_bluetooth_24dp"
                     app:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/btnCoordinates"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:backgroundTint="@color/cyan"
-                    android:contentDescription="Coordinates"
-                    android:padding="10dp"
+                <ImageView
+                    android:id="@+id/bluetoothStatus"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="end|bottom"
+                    android:background="@drawable/circle_background"
+                    android:backgroundTint="@color/status_disconnected"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/ic_dashboard_black_24dp"
-                    android:layout_marginEnd="6dp"
-                    app:tint="@android:color/white" />
+                    android:src="@drawable/ic_status_disconnected_24dp" />
+            </FrameLayout>
 
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="44dp"
-                    android:layout_height="44dp">
-
-                    <ImageButton
-                        android:id="@+id/btnBluetooth"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/cyan"
-                        android:contentDescription="Bluetooth"
-                        android:padding="10dp"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/ic_bluetooth_24dp"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:tint="@android:color/white" />
-
-                    <ImageView
-                        android:id="@+id/bluetoothStatus"
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:background="@drawable/circle_background"
-                        android:backgroundTint="@color/status_disconnected"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/ic_status_disconnected_24dp"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        android:layout_marginTop="28dp"
-                        android:layout_marginEnd="-4dp" />
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-            </LinearLayout>
         </LinearLayout>
 
-        <!-- Middle: Joystick + Tabs side by side -->
+        <!-- Row 2: Joystick + Tabs -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="horizontal">
 
-            <!-- Joystick column -->
+            <!-- Joystick + reverse buttons -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
@@ -234,8 +215,8 @@
 
                 <io.github.controlwear.virtual.joystick.android.JoystickView
                     android:id="@+id/joystickView"
-                    android:layout_width="150dp"
-                    android:layout_height="150dp"
+                    android:layout_width="140dp"
+                    android:layout_height="140dp"
                     app:JV_backgroundColor="@color/cyan"
                     app:JV_borderColor="@color/white"
                     app:JV_borderWidth="4dp"
@@ -248,21 +229,21 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center"
-                    android:layout_marginTop="6dp">
+                    android:layout_marginTop="4dp">
 
                     <ImageButton
                         android:id="@+id/reverse_left_button"
-                        android:layout_width="60dp"
-                        android:layout_height="36dp"
+                        android:layout_width="55dp"
+                        android:layout_height="34dp"
                         android:background="@drawable/button_rounded_square_background"
                         android:src="@drawable/reverse_left_button"
-                        android:layout_marginEnd="6dp"
+                        android:layout_marginEnd="4dp"
                         app:tint="@android:color/white" />
 
                     <ImageButton
                         android:id="@+id/reverse_right_button"
-                        android:layout_width="60dp"
-                        android:layout_height="36dp"
+                        android:layout_width="55dp"
+                        android:layout_height="34dp"
                         android:background="@drawable/button_rounded_square_background"
                         android:backgroundTint="@color/magenta"
                         android:src="@drawable/reverse_right_button"
@@ -270,7 +251,7 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Tabs column -->
+            <!-- Tabs -->
             <LinearLayout
                 android:id="@+id/sub_navigation_container"
                 android:layout_width="0dp"
@@ -282,8 +263,8 @@
                     android:id="@+id/tabs"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:tabMode="scrollable"
-                    app:tabGravity="center" />
+                    app:tabMode="fixed"
+                    app:tabGravity="fill" />
 
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/sub_navigation_bar"
@@ -291,76 +272,99 @@
                     android:layout_height="0dp"
                     android:layout_weight="1" />
             </LinearLayout>
+
         </LinearLayout>
 
-        <!-- Bottom: action buttons row -->
+        <!-- Row 3: Bottom buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center"
-            android:layout_marginTop="6dp">
+            android:layout_marginTop="4dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/manual_update_button"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="3dp"
+                android:text="Manual"
+                android:textSize="10sp"
+                android:textColor="@color/white" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/auto_update_button"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="3dp"
+                android:text="Auto"
+                android:textSize="10sp"
+                android:textColor="@color/white" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/reset_map_button"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="40dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="3dp"
                 android:text="Reset"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textColor="@color/white"
                 app:icon="@drawable/restart_icon"
                 app:iconGravity="textEnd"
-                app:iconSize="20dp"
+                app:iconSize="16dp"
                 app:iconTint="@android:color/white" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/save_map_button"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="40dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="3dp"
                 android:text="Save"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textColor="@color/white"
                 app:icon="@drawable/save_map_icon"
                 app:iconGravity="textEnd"
-                app:iconSize="20dp"
+                app:iconSize="16dp"
                 app:iconTint="@android:color/white" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/load_map_button"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="40dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="3dp"
                 android:text="Load"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textColor="@color/white"
                 app:icon="@drawable/save_map_icon"
                 app:iconGravity="textEnd"
-                app:iconSize="20dp"
+                app:iconSize="16dp"
                 app:iconTint="@android:color/white" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clear_logs_button"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="40dp"
                 android:layout_weight="1"
-                android:text="Clear Logs"
-                android:textSize="11sp"
+                android:text="Clear"
+                android:textSize="10sp"
                 android:textColor="@color/white"
                 app:icon="@drawable/outline_delete_24dp"
                 app:iconGravity="textEnd"
-                app:iconSize="20dp"
+                app:iconSize="16dp"
                 app:iconTint="@android:color/white" />
 
         </LinearLayout>
     </LinearLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>

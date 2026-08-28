@@ -350,6 +350,26 @@ class MainActivity : AppCompatActivity() {
             clearMessageLog()
         }
 
+        var autoUpdateEnabled = false
+        val btnManual: com.google.android.material.button.MaterialButton = findViewById(R.id.manual_update_button)
+        val btnAuto: com.google.android.material.button.MaterialButton = findViewById(R.id.auto_update_button)
+
+        btnManual.setOnClickListener {
+            bluetoothService?.write("sendArena".toByteArray())
+            Toast.makeText(this, "Requested arena update", Toast.LENGTH_SHORT).show()
+        }
+
+        btnAuto.setOnClickListener {
+            autoUpdateEnabled = !autoUpdateEnabled
+            if (autoUpdateEnabled) {
+                btnAuto.text = "Auto: ON"
+                Toast.makeText(this, "Auto update enabled", Toast.LENGTH_SHORT).show()
+            } else {
+                btnAuto.text = "Auto"
+                Toast.makeText(this, "Auto update disabled", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         val customNavigatorBar: customNavigator = customNavigator(
             supportFragmentManager,
             FragmentPagerAdapter.BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT
