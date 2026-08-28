@@ -279,6 +279,10 @@ class MainActivity : AppCompatActivity() {
                 gridMapObj.receiveStatusMessageBluetooth(text, activateJoyStickBool);
             }
 
+            if(text.contains("\"grid\"")){
+                gridMapObj.receiveGridHexBluetooth(text);
+            }
+
             // if(text.contains("Failed to convert raw Android message")){
             // gridMapObj.sendAlertToSignalFailure();
             // }

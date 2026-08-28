@@ -1629,6 +1629,41 @@ public class GridMapClass extends View {
 
     }
 
+    public void receiveGridHexBluetooth(String msg) {
+        try {
+            String hex = new org.json.JSONObject(msg).getString("grid");
+            // Convert hex string to binary string
+            StringBuilder binary = new StringBuilder();
+            for (char c : hex.toCharArray()) {
+                int val = Integer.parseInt(String.valueOf(c), 16);
+                binary.append(String.format("%4s", Integer.toBinaryString(val)).replace(' ', '0'));
+            }
+            // Clear existing obstacles (keep vehicle)
+            for (int y = 0; y < gridRows; y++) {
+                for (int x = 0; x < gridColumns; x++) {
+                    ObstacleData cell = gridMapData.get(y).get(x);
+                    if (cell.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle) {
+                        changeObstacleData(x, y, false, ObstacleData.Direction.NORTH, ObstacleData.OBSTACLETYPE.EMPTY, false, -1);
+                    }
+                }
+            }
+            // AMD origin is top-left, tablet origin is bottom-left — flip y
+            int idx = 0;
+            for (int row = 0; row < gridRows && idx < binary.length(); row++) {
+                for (int col = 0; col < gridColumns && idx < binary.length(); col++) {
+                    if (binary.charAt(idx) == '1') {
+                        int tabletY = gridRows - 1 - row;
+                        addNewObstacleToGrid(col, tabletY);
+                    }
+                    idx++;
+                }
+            }
+            postInvalidate();
+        } catch (Exception e) {
+            Log.d("GridMapClass.java", "Error parsing grid hex: " + e.getMessage());
+        }
+    }
+
     public String receiveStichImageMessageBluetooth(String msg){
         JSONObject jsonThis;
         String stichValue;
