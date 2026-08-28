@@ -166,6 +166,29 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
+            // Checklist requirements C.9 & C.10 (Plain text protocol)
+            if (text.startsWith("TARGET,")) {
+                val subParts = text.split(",").map { it.trim() }
+                if (subParts.size >= 3) {
+                    try {
+                        gridMapObj.updateObstacleTarget(subParts[1].toInt(), subParts[2])
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Error parsing TARGET: $text")
+                    }
+                }
+            }
+
+            if (text.startsWith("ROBOT,")) {
+                val subParts = text.split(",").map { it.trim() }
+                if (subParts.size >= 4) {
+                    try {
+                        gridMapObj.updateRobotPosition(subParts[1].toInt(), subParts[2].toInt(), subParts[3])
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Error parsing ROBOT: $text")
+                    }
+                }
+            }
+
             val line: String
             /*
             if (text.contains("stitch-image:")) {

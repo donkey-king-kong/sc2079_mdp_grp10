@@ -774,6 +774,7 @@ public class GridMapClass extends View {
         if(gridMapObstacle.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle){
             changeObstacleData(x_coord, y_coord, gridMapObstacle.getOccupied(), takeInNewDirection, gridMapObstacle.getObstacleType(), gridMapObstacle.getVerified(), gridMapObstacle.getObstacleNumber());
             invalidate();
+            sendObstacleDirectionBluetooth(x_coord, y_coord);
             return 1;
         }else if(gridMapObstacle.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle){
             changeVehicleDirection(takeInNewDirection);
@@ -821,6 +822,7 @@ public class GridMapClass extends View {
                     break;
             }
         }
+        sendObstacleDirectionBluetooth(x_coord, y_coord);
         return true;
     }
 
@@ -2002,6 +2004,51 @@ public class GridMapClass extends View {
     public void updateFINStatus(boolean updateFIN){
         Log.d("GridMapClass.java", "FIN updated "+updateFIN);
         FINDetected = updateFIN;
+    }
+
+    public void sendObstacleDirectionBluetooth(int x, int y) {
+        if (btService != null) {
+            ObstacleData obs = gridMapData.get(y).get(x);
+            String msg = "{\"cat\": \"obstacle\", \"value\": {\"x\": " + x + ", \"y\": " + y + ", \"d\": " + obs.getDirection().getIntFromDirection() + "}}";
+            btService.write(msg.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    public void updateRobotPosition(int x, int y, String d) {
+        ObstacleData.Direction direction;
+        switch (d.toUpperCase()) {
+            case "N": direction = ObstacleData.Direction.NORTH; break;
+            case "S": direction = ObstacleData.Direction.SOUTH; break;
+            case "E": direction = ObstacleData.Direction.EAST;  break;
+            case "W": direction = ObstacleData.Direction.WEST;  break;
+            default:
+                Log.d("GridMapClass", "Unknown direction: " + d);
+                return;
+        }
+        removeVehicleFromGrid();
+        if (addVehicleToMap(x, y) == 1) {
+            changeDirectionOfObstacleFlexible(x, y, direction);
+        }
+        postInvalidate();
+    }
+
+    public void updateObstacleTarget(int obstacleNumber, String targetId) {
+        for (int y = 0; y < gridRows; y++) {
+            for (int x = 0; x < gridColumns; x++) {
+                ObstacleData obs = gridMapData.get(y).get(x);
+                if (obs.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle && obs.getObstacleNumber() == obstacleNumber) {
+                    obs.setVerified(true);
+                    try {
+                        obs.setObstacleNumber(Integer.parseInt(targetId));
+                    } catch (NumberFormatException e) {
+                        Log.e("GridMapClass", "Non-numeric Target ID: " + targetId);
+                    }
+                    rearrangeObstacleData(x, y);
+                    postInvalidate();
+                    return;
+                }
+            }
+        }
     }
 }
 
