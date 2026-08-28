@@ -666,6 +666,28 @@ public class GridMapClass extends View {
         }
     }
 
+    public int addNewObstacleToGridWithDirection(int x_coord, int y_coord, ObstacleData.Direction direction) {
+        if (checkValidObstacle(x_coord, y_coord)) {
+            ObstacleData gridMapObstacle = gridMapData.get(y_coord).get(x_coord);
+            if (!gridMapObstacle.getOccupied()) {
+                if (obstacleCount == 0) {
+                    obstacleCount += 1;
+                } else {
+                    obstacleCount = placedObstacles.get(placedObstacles.size() - 1).getObstacleNumber() + 1;
+                }
+                changeObstacleData(x_coord, y_coord, true, direction, ObstacleData.OBSTACLETYPE.Obstacle, false, obstacleCount);
+                placedObstacles.add(gridMapObstacle);
+                invalidate();
+                sendObstacleDirectionBluetooth(x_coord, y_coord);
+                return 1;
+            } else {
+                return 2;
+            }
+        } else {
+            return 0;
+        }
+    }
+
     // Updates the data to anything
     public boolean updateVehiclePassed(int old_x_coord, int old_y_coord, int new_x_coord, int new_y_coord) {
         if (checkValidObstacle(old_x_coord, old_y_coord) && checkValidObstacle(new_x_coord, new_y_coord)) {

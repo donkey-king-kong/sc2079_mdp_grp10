@@ -38,6 +38,7 @@ import com.google.gson.reflect.TypeToken
 import io.github.controlwear.virtual.joystick.android.JoystickView
 import android.util.Base64
 import com.example.sc2079.ui.coordinates.AddCoordinateFragment
+import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment
 import com.example.sc2079.ui.coordinates.SharedViewModel
 
 class MainActivity : AppCompatActivity() {
@@ -400,6 +401,11 @@ class MainActivity : AppCompatActivity() {
             gridMapObj.addNewObstacleToGrid(coordinate.first.toInt(), coordinate.second.toInt())
         }
 
+        sharedViewModel.newObstacleRequest.observe(this) { request ->
+            gridMapObj.addNewObstacleToGridWithDirection(request.x, request.y, request.direction)
+            Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
+        }
+
         val btnLogClear: com.google.android.material.button.MaterialButton =
             findViewById(R.id.clear_logs_button)
         btnLogClear.setOnClickListener {
@@ -584,7 +590,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAddCoordinatesFragment() {
-        AddCoordinateFragment().show(supportFragmentManager, "AddCoordinateDialog")
+        PlaceObstacleDialogFragment().show(supportFragmentManager, "PlaceObstacleDialog")
     }
 
     private fun updateBluetoothStatus() {
