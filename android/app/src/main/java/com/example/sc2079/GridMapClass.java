@@ -1624,6 +1624,7 @@ public class GridMapClass extends View {
         if (result == 1) {
             changeDirectionOfObstacleFlexible(xInt, yInt, direction);
         }
+        postInvalidate();
         return result > 0 ? 1 : 0;
 
     }
