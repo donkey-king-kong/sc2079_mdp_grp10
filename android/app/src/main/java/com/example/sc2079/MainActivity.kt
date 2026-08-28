@@ -88,6 +88,12 @@ class MainActivity : AppCompatActivity() {
             bluetoothService = binder.getService()
             isBound = true
             gridMapObj.setBluetoothService(bluetoothService)
+
+            // Start Bluetooth server to allow incoming connections (e.g., from Windows)
+            val service = bluetoothService
+            if (service != null && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                service.startServer()
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -291,6 +297,12 @@ class MainActivity : AppCompatActivity() {
             if (allGranted) {
                 // Permissions granted, now we can ask to enable Bluetooth
                 checkBluetoothEnabled()
+                // Start the server now that permissions are granted
+                val service = bluetoothService
+                if (isBound && service != null && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                    @Suppress("MissingPermission")
+                    service.startServer()
+                }
             } else {
                 Toast.makeText(this, "Bluetooth permissions are required", Toast.LENGTH_SHORT).show()
             }
@@ -437,7 +449,6 @@ class MainActivity : AppCompatActivity() {
         btnCoordinates.setOnClickListener {
             subNavigationBar?.currentItem = 0
         }
-
     }
 
     override fun onStart() {

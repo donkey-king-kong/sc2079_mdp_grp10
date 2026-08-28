@@ -5,4 +5,8 @@
     <string name="title_notifications">Notifications</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="shortcut_start_task">Start Task</string>
+    <string name="shortcut_start_task_long">Start the robot task</string>
+    <string name="shortcut_reset_map">Reset Map</string>
+    <string name="shortcut_reset_map_long">Clear the robot map grid</string>
 </resources>
