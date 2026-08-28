@@ -38,6 +38,7 @@ import com.google.gson.reflect.TypeToken
 import io.github.controlwear.virtual.joystick.android.JoystickView
 import android.util.Base64
 import com.example.sc2079.ui.coordinates.AddCoordinateFragment
+import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment
 import com.example.sc2079.ui.coordinates.SharedViewModel
 
 class MainActivity : AppCompatActivity() {
@@ -164,6 +165,29 @@ class MainActivity : AppCompatActivity() {
                     onReceive(context, subIntent)
                 }
                 return
+            }
+
+            // Checklist requirements C.9 & C.10 (Plain text protocol)
+            if (text.startsWith("TARGET,")) {
+                val subParts = text.split(",").map { it.trim() }
+                if (subParts.size >= 3) {
+                    try {
+                        gridMapObj.updateObstacleTarget(subParts[1].toInt(), subParts[2])
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Error parsing TARGET: $text")
+                    }
+                }
+            }
+
+            if (text.startsWith("ROBOT,")) {
+                val subParts = text.split(",").map { it.trim() }
+                if (subParts.size >= 4) {
+                    try {
+                        gridMapObj.updateRobotPosition(subParts[1].toInt(), subParts[2].toInt(), subParts[3])
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Error parsing ROBOT: $text")
+                    }
+                }
             }
 
             val line: String
@@ -377,6 +401,11 @@ class MainActivity : AppCompatActivity() {
             gridMapObj.addNewObstacleToGrid(coordinate.first.toInt(), coordinate.second.toInt())
         }
 
+        sharedViewModel.newObstacleRequest.observe(this) { request ->
+            gridMapObj.addNewObstacleToGridWithDirection(request.x, request.y, request.direction)
+            Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
+        }
+
         val btnLogClear: com.google.android.material.button.MaterialButton =
             findViewById(R.id.clear_logs_button)
         btnLogClear.setOnClickListener {
@@ -561,7 +590,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAddCoordinatesFragment() {
-        AddCoordinateFragment().show(supportFragmentManager, "AddCoordinateDialog")
+        PlaceObstacleDialogFragment().show(supportFragmentManager, "PlaceObstacleDialog")
     }
 
     private fun updateBluetoothStatus() {
