@@ -141,25 +141,7 @@ public class GridMapClass extends View {
                         break;
                     case NONE:
                     default:
-                        // Existing logic for backward compatibility
-                        if (!findVehicleDataType()) {
-                            addVehicleToMap(x_coord, y_coord);
-                        } else {
-                            ObstacleData gridMapObstacle = gridMapData.get(y_coord).get(x_coord);
-                            switch (gridMapObstacle.getObstacleType()) {
-                                case EMPTY:
-                                    if (!gridMapObstacle.getOccupied()) {
-                                        addNewObstacleToGrid(x_coord, y_coord);
-                                    }
-                                    break;
-                                case Vehicle:
-                                    rotateVehicleRight();
-                                    break;
-                                case Obstacle:
-                                    changeDirectionOfObstacle(x_coord, y_coord, true);
-                                    break;
-                            }
-                        }
+                        // Do nothing by default
                         break;
                 }
                 invalidate();
@@ -279,24 +261,6 @@ public class GridMapClass extends View {
 
     public void setGridMode(GridMode mode) {
         this.currentMode = mode;
-    }
-
-    private void rotateVehicleRight() {
-        int[] arrayTake = findVehicleBottomLeftObstacle();
-        if (arrayTake[0] == -2) return;
-        switch (gridMapData.get(arrayTake[1]).get(arrayTake[0]).getDirection()) {
-            case NORTH:
-                changeVehicleDirection(ObstacleData.Direction.EAST);
-                break;
-            case EAST:
-                changeVehicleDirection(ObstacleData.Direction.SOUTH);
-                break;
-            case SOUTH:
-                changeVehicleDirection(ObstacleData.Direction.WEST);
-                break;
-            case WEST:
-                changeVehicleDirection(ObstacleData.Direction.NORTH);
-        }
     }
 
     public void setBluetoothService(BluetoothService service) {

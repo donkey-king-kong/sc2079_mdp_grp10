@@ -101,7 +101,11 @@ public class AddObstacle extends Fragment{
         View.OnClickListener selectionListener = new View.OnClickListener(){
             @Override
             public void onClick(View v){
-                currentSelectedButtonId = v.getId();
+                if (currentSelectedButtonId == v.getId()) {
+                    currentSelectedButtonId = View.NO_ID;
+                } else {
+                    currentSelectedButtonId = v.getId();
+                }
                 updateButtonState();
             }
         };
@@ -113,40 +117,45 @@ public class AddObstacle extends Fragment{
         changeDirectionButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                currentSelectedButtonId = view.getId();
-                updateButtonState();
-                if (!activatedMap) {
-                    PopupMenu popup = new PopupMenu(getContext(), changeDirectionButton);
-                    popup.getMenuInflater().inflate(R.menu.direction_menu, popup.getMenu());
-                    popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-                        @Override
-                        public boolean onMenuItemClick(MenuItem item) {
-                            int id = item.getItemId();
+                if (currentSelectedButtonId == view.getId()) {
+                    currentSelectedButtonId = View.NO_ID;
+                    updateButtonState();
+                } else {
+                    currentSelectedButtonId = view.getId();
+                    updateButtonState();
+                    if (!activatedMap) {
+                        PopupMenu popup = new PopupMenu(getContext(), changeDirectionButton);
+                        popup.getMenuInflater().inflate(R.menu.direction_menu, popup.getMenu());
+                        popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                            @Override
+                            public boolean onMenuItemClick(MenuItem item) {
+                                int id = item.getItemId();
 
-                            if (id == R.id.north) {
-                                changeDirectionButton.setText("Change Direction to Up");
-                                selectedDirectionID = ObstacleData.Direction.NORTH;
-                                return true;
-                            } else if (id == R.id.south) {
-                                changeDirectionButton.setText("Change Direction to Down");
-                                selectedDirectionID = ObstacleData.Direction.SOUTH;
-                                return true;
-                            } else if (id == R.id.east) {
-                                changeDirectionButton.setText("Change Direction to Right");
-                                selectedDirectionID = ObstacleData.Direction.EAST;
-                                return true;
-                            } else if (id == R.id.west) {
-                                changeDirectionButton.setText("Change Direction to Left");
-                                selectedDirectionID = ObstacleData.Direction.WEST;
-                                return true;
+                                if (id == R.id.north) {
+                                    changeDirectionButton.setText("Change Direction to Up");
+                                    selectedDirectionID = ObstacleData.Direction.NORTH;
+                                    return true;
+                                } else if (id == R.id.south) {
+                                    changeDirectionButton.setText("Change Direction to Down");
+                                    selectedDirectionID = ObstacleData.Direction.SOUTH;
+                                    return true;
+                                } else if (id == R.id.east) {
+                                    changeDirectionButton.setText("Change Direction to Right");
+                                    selectedDirectionID = ObstacleData.Direction.EAST;
+                                    return true;
+                                } else if (id == R.id.west) {
+                                    changeDirectionButton.setText("Change Direction to Left");
+                                    selectedDirectionID = ObstacleData.Direction.WEST;
+                                    return true;
+                                }
+                                return false;
                             }
-                            return false;
-                        }
-                    });
-                    popup.show();
-                    activatedMap = true;
-                }else{
-                    activatedMap = false;
+                        });
+                        popup.show();
+                        activatedMap = true;
+                    }else{
+                        activatedMap = false;
+                    }
                 }
             }
         });
