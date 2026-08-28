@@ -37,3 +37,41 @@ The Android application serves as the main remote controller and monitoring inte
 2. Select your target device from the device dropdown menu in the top toolbar (either your connected physical device or a created Virtual Device).
 3. Click the **Run** button (green play icon ▶️) or press `Control + R` (Mac).
 4. Android Studio will compile the app (APK) and automatically launch it on your selected device.
+
+Or via command line (tablet connected via USB with USB debugging enabled):
+
+```bash
+cd android
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+### AMD Tool Setup (Windows)
+
+The app is designed to work with the **Android Module Debugger (AMD)** tool running on a Windows laptop. The AMD tool sends arena and robot position data to the tablet over Bluetooth.
+
+**Required one-time setup:**
+
+1. Copy `android/scripts/defaultJson.cs` to the AMD tool's `scripts/` folder on the Windows laptop.
+2. In AMD: **Settings → Custom Scripts** → select `defaultJson.cs`.
+3. In AMD: **Settings → Default Arena Settings** → set arena to **20×20**.
+4. Pair the tablet's Bluetooth to the Windows laptop before launching the app.
+
+> `defaultJson.cs` sends obstacle grid and robot position in the JSON format the tablet expects. Without it, the tablet will not receive robot position updates.
+
+### Manual & Auto Buttons
+
+| Button | Behaviour |
+|--------|-----------|
+| **Manual** | Sends a single `sendArena` request to AMD — tablet receives current obstacle grid and robot position immediately. |
+| **Auto** | Polls `sendArena` every 2 seconds automatically. Button turns green when active. Stops when toggled off or when the app backgrounds. |
+
+### Bluetooth Message Formats
+
+| Keyword | Handler | Format |
+|---------|---------|--------|
+| `location` | Move vehicle on grid | `{"location":"update","value":{"x":"5","y":"3","d":"N"}}` |
+| `"grid"` | Place obstacles on grid | `{"grid":"<hex string>"}` |
+| `image-rec` | Mark obstacle as verified | contains `image-rec` |
+| `status` | Update robot status text | contains `status` |
+| `health` | API health check | contains `health` |
