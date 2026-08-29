@@ -548,11 +548,12 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 				echo = (65535 - tc1) + tc2;
 
 			// Update ultrasonic distance
-			dash_ultraDist = echo * 0.01715;
+			dash_ultraDist = (echo * 0.0343 / 2) + 1;
 
 			first_captured = 0;
 
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+			__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3);
 		}
 	}
 }
@@ -727,11 +728,18 @@ void StartUltrasonicTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+	delay_us(2);
+
+	first_captured = 0;
+	__HAL_TIM_SET_CAPTUREPOLARITY(&htim5, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+	__HAL_TIM_ENABLE_IT(&htim5, TIM_IT_CC3);
+
 	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_SET);
 	delay_us(10); // Hardware blocking delay for 10us is perfectly safe
-
 	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
-	osDelay(100); // Wait for echo to process and settle
+
+	osDelay(60); // Wait for echo to process and settle
   }
   /* USER CODE END StartUltrasonicTask */
 }

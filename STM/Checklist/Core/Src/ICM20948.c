@@ -31,12 +31,12 @@ float GYRO_SCALE = 65.5;
 float ACCEL_SCALE = 8192.0;
 
 static HAL_StatusTypeDef ICM_WriteReg(uint8_t reg, uint8_t dat) {
-	return HAL_I2C_Mem_Write(&hi2c2, ICM20948_I2C_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &dat, 1, 100);
+	return HAL_I2C_Mem_Write(&hi2c2, ICM20948_I2C_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &dat, 1, 10);
 }
 
-static HAL_StatusTypeDef ICM_ReadReg(uint8_t reg) {
+static uint8_t ICM_ReadReg(uint8_t reg) {
 	uint8_t dat = 0;
-	HAL_I2C_Mem_Read(&hi2c2, ICM20948_I2C_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &dat, 1, 100);
+	HAL_I2C_Mem_Read(&hi2c2, ICM20948_I2C_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &dat, 1, 10);
 	return dat;
 }
 
@@ -46,7 +46,7 @@ void ICM_ReadData(ICM20948_Data* data)
 	uint8_t buf[12];
 	ICM_SelBank(0);
 
-	HAL_I2C_Mem_Read(&hi2c2, ICM20948_I2C_ADDR, 0x2D, I2C_MEMADD_SIZE_8BIT, buf, 12, 100);
+	HAL_I2C_Mem_Read(&hi2c2, ICM20948_I2C_ADDR, 0x2D, I2C_MEMADD_SIZE_8BIT, buf, 12, 10);
 	//check for status?
 
 	int16_t raw_x_acc = (int16_t)(buf[0] << 8) | buf[1];
