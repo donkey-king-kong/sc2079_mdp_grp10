@@ -25,6 +25,7 @@
 #include "oled.h"
 #include <stdio.h>
 #include <string.h>
+#include "ICM20948.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,7 +44,10 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- UART_HandleTypeDef huart3;
+ I2C_HandleTypeDef hi2c2;
+TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim6;
+UART_HandleTypeDef huart3;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -104,7 +108,14 @@ uint8_t rxByte;									// UART receive buffer
 char dash_lastCmd[15] = "None";					// RPi command
 int dash_speedL = 0;							// Left motor speed
 int dash_speedR = 0;							// Right motor speed
-int dash_gyroZ = 0;								// Gyroscope angle
+double dash_gyroZ = 0.0;						// Gyroscope angle
+float dash_ultraDist = 0.0;						// Ultrasonic distance
+
+/* --- ULTRASONIC VARIABLES --- */
+uint32_t tc1 = 0;
+uint32_t tc2 = 0;
+uint32_t echo = 0;
+uint8_t first_captured = 0;
 
 /* USER CODE END PV */
 
@@ -112,6 +123,10 @@ int dash_gyroZ = 0;								// Gyroscope angle
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_TIM6_Init(void);
+static void MX_I2C2_Init(void);
+static void MX_TIM5_Init(void);
+
 void StartDefaultTask(void *argument);
 void StartCommunicateTask(void *argument);
 void StartMotorTask(void *argument);
@@ -157,12 +172,23 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
+  MX_TIM6_Init();
+  MX_I2C2_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
   OLED_Init();
   OLED_ShowString(10, 5, "System Ready"); // show message on OLED display at line 10
   OLED_Refresh_Gram();
 
+  // Initialize IMU
+  ICM20948_Init();
+
+  // Start UART Interrupt Listener
   HAL_UART_Receive_IT(&huart3, &rxByte, 1);
+
+  // Start Ultrasonic Timers
+  HAL_TIM_Base_Start(&htim6);
+  HAL_TIM_IC_Start_IT(&htim5, TIM_CHANNEL_3);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -272,6 +298,136 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief I2C2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C2_Init(void)
+{
+
+  /* USER CODE BEGIN I2C2_Init 0 */
+
+  /* USER CODE END I2C2_Init 0 */
+
+  /* USER CODE BEGIN I2C2_Init 1 */
+
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.ClockSpeed = 100000;
+  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C2_Init 2 */
+
+  /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
+  * @brief TIM5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM5_Init(void)
+{
+
+  /* USER CODE BEGIN TIM5_Init 0 */
+
+  /* USER CODE END TIM5_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM5_Init 1 */
+
+  /* USER CODE END TIM5_Init 1 */
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 16-1;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 65535;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim5, &sConfigIC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM5_Init 2 */
+
+  /* USER CODE END TIM5_Init 2 */
+
+}
+
+/**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 16-1;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 65535;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -314,9 +470,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET);
@@ -324,12 +484,25 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, OLED_DC_Pin|OLED_RESET__Pin|OLED_SDIN_Pin|OLED_SCLK_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin : ULTRASONIC_TRIG_Pin */
+  GPIO_InitStruct.Pin = ULTRASONIC_TRIG_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(ULTRASONIC_TRIG_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : LED3_Pin */
   GPIO_InitStruct.Pin = LED3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED3_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : IMU_INT_Pin */
+  GPIO_InitStruct.Pin = IMU_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(IMU_INT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : OLED_DC_Pin OLED_RESET__Pin OLED_SDIN_Pin OLED_SCLK_Pin */
   GPIO_InitStruct.Pin = OLED_DC_Pin|OLED_RESET__Pin|OLED_SDIN_Pin|OLED_SCLK_Pin;
@@ -351,6 +524,39 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	}
 }
 
+// Ultrasonic Microsecond Delay
+void delay_us(uint16_t us) {
+	__HAL_TIM_SET_COUNTER(&htim6, 0);
+	while(__HAL_TIM_GET_COUNTER(&htim6) < us);
+}
+
+// Ultrasonic Input Capture Callback
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+	if (htim->Instance == TIM5 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
+		if (first_captured == 0) {
+			tc1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
+			first_captured = 1;
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_FALLING);
+		}
+		else if (first_captured == 1) {
+			tc2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
+			__HAL_TIM_SET_COUNTER(htim, 0);
+
+			if (tc2 > tc1)
+				echo = tc2 - tc1;
+			else
+				echo = (65535 - tc1) + tc2;
+
+			// Update ultrasonic distance
+			dash_ultraDist = (echo * 0.0343 / 2) + 1;
+
+			first_captured = 0;
+
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+			__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3);
+		}
+	}
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -469,8 +675,12 @@ void StartOledTask(void *argument)
 	OLED_ShowString(0, 15, (uint8_t*) textBuffer);
 
 	// 3. Gyroscope Angle
-	sprintf(textBuffer, "Gyro: %d", dash_gyroZ);
+	sprintf(textBuffer, "Gyro: %.1f", dash_gyroZ);
 	OLED_ShowString(0, 30, (uint8_t*) textBuffer);
+
+	// 4. Ultrasonic Distance
+	sprintf(textBuffer, "Dist: %5.1fcm", dash_ultraDist);
+	OLED_ShowString(0, 45, (uint8_t*) textBuffer);
 
 	OLED_Refresh_Gram();
 
@@ -489,10 +699,18 @@ void StartOledTask(void *argument)
 void StartGyroTask(void *argument)
 {
   /* USER CODE BEGIN StartGyroTask */
+  ICM20948_Data IMU_Data;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    // Fetch IMU data
+	ICM_ReadData(&IMU_Data);
+
+	// Update gyro dashboard variable
+	dash_gyroZ = (int)IMU_Data.z_gyro;
+
+	osDelay(100);
   }
   /* USER CODE END StartGyroTask */
 }
@@ -510,7 +728,18 @@ void StartUltrasonicTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+	delay_us(2);
+
+	first_captured = 0;
+	__HAL_TIM_SET_CAPTUREPOLARITY(&htim5, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+	__HAL_TIM_ENABLE_IT(&htim5, TIM_IT_CC3);
+
+	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_SET);
+	delay_us(10); // Hardware blocking delay for 10us is perfectly safe
+	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+
+	osDelay(60); // Wait for echo to process and settle
   }
   /* USER CODE END StartUltrasonicTask */
 }
