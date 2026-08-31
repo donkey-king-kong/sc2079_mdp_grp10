@@ -16,9 +16,20 @@ class FakeSTMConnection:
         return b"A\n"
 
 
+class FakeImagingConnector:
+    def capture_and_predict(self, obstacle_id):
+        return {
+            "obstacle_id": str(obstacle_id),
+            "image_id": "38",
+            "confidence": 0.94,
+        }
+
+
 def main():
     manager = RPiManager()
+
     manager.stm.connection = FakeSTMConnection()
+    manager.imaging = FakeImagingConnector()
 
     android_arena_message = {
         "cat": "sendArena",
@@ -43,7 +54,9 @@ def main():
         },
     }
 
-    manager.handle_android_message(android_arena_message)
+    manager.handle_android_message(
+        android_arena_message
+    )
 
 
 if __name__ == "__main__":

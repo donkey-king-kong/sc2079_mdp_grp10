@@ -2,6 +2,7 @@ from connectors.android import AndroidConnector
 from connectors.algo import AlgoConnector
 from connectors.bluetooth import BluetoothConnector
 from connectors.stm import STMConnector
+from connectors.imaging import ImagingConnector
 from router import CommandRouter
 
 
@@ -11,6 +12,7 @@ class RPiManager:
         self.bluetooth = BluetoothConnector()
         self.algo = AlgoConnector()
         self.stm = STMConnector()
+        self.imaging = ImagingConnector()
         self.router = CommandRouter()
 
     def send_to_stm(self, command):
@@ -134,12 +136,40 @@ class RPiManager:
             f"[MANAGER] CAMERA SNAP obstacle {obstacle_id}"
         )
 
-        # Camera / image recognition integration goes here later
+        result = self.imaging.capture_and_predict(
+            obstacle_id
+        )
+
+        print(
+            f"[MANAGER] IMAGING RESULT -> {result}"
+        )
+
+        self.handle_imaging_result(result)
+
+    def handle_imaging_result(self, result):
+        if not isinstance(result, dict):
+            print("[MANAGER] Invalid imaging result")
+            return
+
+        obstacle_id = result.get("obstacle_id")
+        image_id = result.get("image_id")
+        confidence = result.get("confidence")
+
+        print(
+            "[MANAGER] IMAGE RECOGNITION "
+            f"obstacle={obstacle_id}, "
+            f"image_id={image_id}, "
+            f"confidence={confidence}"
+        )
+
+        # Later:
+        # Send the recognition result back to Android.
 
     def handle_finish(self):
         print("[MANAGER] FINISHED")
 
-        # Later we can notify Android here
+        # Later:
+        # Notify Android that navigation is complete.
 
     def run_bluetooth_loop(self):
         print("[MANAGER] Starting Bluetooth connection...")
