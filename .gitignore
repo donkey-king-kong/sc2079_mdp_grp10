@@ -58,3 +58,4 @@ Release/
 # Python
 # =========================
 .venv/
+__pycache__/
