@@ -45,8 +45,15 @@
 
 /* Private variables ---------------------------------------------------------*/
  I2C_HandleTypeDef hi2c2;
+
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim6;
+TIM_HandleTypeDef htim9;
+TIM_HandleTypeDef htim12;
+
 UART_HandleTypeDef huart3;
 
 /* Definitions for defaultTask */
@@ -110,6 +117,10 @@ int dash_speedL = 0;							// Left motor speed
 int dash_speedR = 0;							// Right motor speed
 double dash_gyroZ = 0.0;						// Gyroscope angle
 float dash_ultraDist = 0.0;						// Ultrasonic distance
+int dash_encoderL = 0;							// Encoder Left Speed
+int dash_encoderR = 0;							// Encoder Right Speed
+uint16_t dash_direction = 0;					// Robot direction?
+uint32_t diag_timer = 0;
 
 /* --- ULTRASONIC VARIABLES --- */
 uint32_t tc1 = 0;
@@ -126,7 +137,11 @@ static void MX_USART3_UART_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_TIM5_Init(void);
-
+static void MX_TIM4_Init(void);
+static void MX_TIM9_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM12_Init(void);
 void StartDefaultTask(void *argument);
 void StartCommunicateTask(void *argument);
 void StartMotorTask(void *argument);
@@ -175,6 +190,11 @@ int main(void)
   MX_TIM6_Init();
   MX_I2C2_Init();
   MX_TIM5_Init();
+  MX_TIM4_Init();
+  MX_TIM9_Init();
+  MX_TIM2_Init();
+  MX_TIM3_Init();
+  MX_TIM12_Init();
   /* USER CODE BEGIN 2 */
   OLED_Init();
   OLED_ShowString(10, 5, "System Ready"); // show message on OLED display at line 10
@@ -332,6 +352,167 @@ static void MX_I2C2_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_Encoder_InitTypeDef sConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 65535;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC1Filter = 10;
+  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC2Filter = 10;
+  if (HAL_TIM_Encoder_Init(&htim2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_Encoder_InitTypeDef sConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC1Filter = 10;
+  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC2Filter = 10;
+  if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 0;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 7199;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
+
+}
+
+/**
   * @brief TIM5 Initialization Function
   * @param None
   * @retval None
@@ -428,6 +609,114 @@ static void MX_TIM6_Init(void)
 }
 
 /**
+  * @brief TIM9 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM9_Init(void)
+{
+
+  /* USER CODE BEGIN TIM9_Init 0 */
+
+  /* USER CODE END TIM9_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM9_Init 1 */
+
+  /* USER CODE END TIM9_Init 1 */
+  htim9.Instance = TIM9;
+  htim9.Init.Prescaler = 0;
+  htim9.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim9.Init.Period = 7199;
+  htim9.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim9.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim9) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim9, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim9) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim9, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim9, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM9_Init 2 */
+
+  /* USER CODE END TIM9_Init 2 */
+  HAL_TIM_MspPostInit(&htim9);
+
+}
+
+/**
+  * @brief TIM12 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM12_Init(void)
+{
+
+  /* USER CODE BEGIN TIM12_Init 0 */
+
+  /* USER CODE END TIM12_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM12_Init 1 */
+
+  /* USER CODE END TIM12_Init 1 */
+  htim12.Instance = TIM12;
+  htim12.Init.Prescaler = 160-1;
+  htim12.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim12.Init.Period = 2000-1;
+  htim12.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim12.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim12) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim12, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim12) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim12, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM12_Init 2 */
+
+  /* USER CODE END TIM12_Init 2 */
+  HAL_TIM_MspPostInit(&htim12);
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -470,8 +759,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
@@ -569,11 +858,14 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
+  char debugBuf[100];
+
   /* Infinite loop */
   for(;;)
   {
 	HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-	HAL_UART_Transmit(&huart3, sbuf, sizeof(sbuf), HAL_MAX_DELAY);
+	int len = sprintf(debugBuf, "Time: %lu ms | EncL: %d | EncR: %d\r\n", diag_timer, dash_encoderL, dash_encoderR);
+	HAL_UART_Transmit(&huart3, (uint8_t*)debugBuf, len, HAL_MAX_DELAY);
     osDelay(1000);
   }
   /* USER CODE END 5 */
@@ -641,10 +933,129 @@ void StartCommunicateTask(void *argument)
 void StartMotorTask(void *argument)
 {
   /* USER CODE BEGIN StartMotorTask */
+  uint16_t pwmVal_L = 0;
+  uint16_t pwmVal_R = 0;
+
+  // Encoder Variables
+  int32_t cnt1_L = 0;
+  int32_t cnt2_L = 0;
+  int32_t cnt1_R = 0;
+  int32_t cnt2_R = 0;
+  int16_t diff_L = 0;
+  int16_t diff_R = 0;
+  //uint32_t diag_timer = 0;
+
+  // Start Encoder Timer
+  HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL); // Motor A (Left) Encoder
+  HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL); // Motor B (Right) Encoder
+
+  // Start PWM Timer for Motor A (Left, PB8 & PB9 via TIM4)
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+
+  // Start PWM Timer for Motor B (Right, PE5 & PE6 via TIM9)
+  HAL_TIM_PWM_Start(&htim9, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim9, TIM_CHANNEL_2);
+
+  // Start PWM Timer for Servo Motor (PB15 vis TIM12)
+  HAL_TIM_PWM_Start(&htim12, TIM_CHANNEL_2);
+
+  // Ensure robot starts completely stationary and centered
+  __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 150); // Center Servo (1.5ms pulse)
+  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+  __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+  __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+
+  __HAL_TIM_SET_COUNTER(&htim2, 0);
+  __HAL_TIM_SET_COUNTER(&htim3, 0);
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+//    if(HAL_GetTick()-tick > 1000L)
+//    {
+//    	cnt2 = __HAL_TIM_GET_COUNTER(&htim2);
+//    	if (__HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2)) {
+//    		if(cnt2<cnt1)
+//    			diff = cnt1 - cnt2;
+//    		else
+//    			diff = (65535 - cnt2) + cnt1;
+//    	} else {
+//    		if(cnt2 > cnt1)
+//    			diff = cnt2 - cnt1;
+//    		else
+//    			diff = (65535 - cnt1) + cnt2;
+//    	}
+//
+//    	dash_encoderL = diff;
+//    	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
+//
+//    	cnt1 = __HAL_TIM_GET_COUNTER(&htim2);
+//    	tick = HAL_GetTick();
+//    }
+
+	// Step A: Read Encoders
+	cnt2_L = __HAL_TIM_GET_COUNTER(&htim2);
+	cnt2_R = __HAL_TIM_GET_COUNTER(&htim3);
+
+	diff_L = (int16_t) cnt2_L;
+	diff_R = (int16_t) cnt2_R;
+
+	__HAL_TIM_SET_COUNTER(&htim2, 0);
+	__HAL_TIM_SET_COUNTER(&htim3, 0);
+
+	dash_encoderL = (int)diff_L;
+	dash_encoderR = (int)diff_R;
+	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
+
+	// Step B: Diagnostic Loop (Changes state every 2000ms)
+	diag_timer += 10;
+
+	if (diag_timer < 2000)
+	{
+		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 100); //1.0ms pulse
+	}
+	else if (diag_timer < 4000)
+	{
+		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 200); //2.0ms pulse
+	}
+	else if (diag_timer < 6000)
+	{
+		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 150); //1.5ms pulse
+	}
+	else if (diag_timer < 8000)
+	{
+		// Drive forward
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 2500);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 2500);
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+	}
+	else if (diag_timer < 10000)
+	{
+		// Drive backward
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 2500);
+
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 2500);
+	}
+	else if (diag_timer < 12000)
+	{
+		// Drive forward
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+	}
+	else
+	{
+		diag_timer = 0;
+	}
+	osDelay(10);
   }
   /* USER CODE END StartMotorTask */
 }
@@ -659,7 +1070,7 @@ void StartMotorTask(void *argument)
 void StartOledTask(void *argument)
 {
   /* USER CODE BEGIN StartOledTask */
-  char textBuffer[20];	// Temp buffer to format numbers into text
+  char textBuffer[32];	// Temp buffer to format numbers into text
 
   /* Infinite loop */
   for(;;)
@@ -671,16 +1082,18 @@ void StartOledTask(void *argument)
 	OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
 
 	// 2. Motor Speed
-	sprintf(textBuffer, "L:%d R:%d", dash_speedL, dash_speedR);
-	OLED_ShowString(0, 15, (uint8_t*) textBuffer);
+	sprintf(textBuffer, "Spd L:%d R:%d", dash_speedL, dash_speedR);
+	OLED_ShowString(0, 12, (uint8_t*) textBuffer);
 
 	// 3. Gyroscope Angle
-	sprintf(textBuffer, "Gyro: %.1f", dash_gyroZ);
-	OLED_ShowString(0, 30, (uint8_t*) textBuffer);
+	sprintf(textBuffer, "G: %.1f D: %.1fcm", (float)dash_gyroZ, dash_ultraDist);
+	OLED_ShowString(0, 24, (uint8_t*) textBuffer);
 
-	// 4. Ultrasonic Distance
-	sprintf(textBuffer, "Dist: %5.1fcm", dash_ultraDist);
-	OLED_ShowString(0, 45, (uint8_t*) textBuffer);
+	sprintf(textBuffer, "Enc L: %d R: %d", dash_encoderL, dash_encoderR);
+	OLED_ShowString(0, 36, (uint8_t *) textBuffer);
+
+	sprintf(textBuffer, "Dir: %d", dash_direction);
+	OLED_ShowString(0, 48, (uint8_t *) textBuffer);
 
 	OLED_Refresh_Gram();
 

@@ -49,6 +49,8 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -57,6 +59,10 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define MOTOR_BIN1_Pin GPIO_PIN_5
+#define MOTOR_BIN1_GPIO_Port GPIOE
+#define MOTOR_BIN2_Pin GPIO_PIN_6
+#define MOTOR_BIN2_GPIO_Port GPIOE
 #define ULTRASONIC_ECHO_Pin GPIO_PIN_2
 #define ULTRASONIC_ECHO_GPIO_Port GPIOA
 #define ULTRASONIC_TRIG_Pin GPIO_PIN_3
@@ -65,6 +71,8 @@ void Error_Handler(void);
 #define LED3_GPIO_Port GPIOE
 #define IMU_INT_Pin GPIO_PIN_12
 #define IMU_INT_GPIO_Port GPIOB
+#define SERVO_TIM12_CH2_Pin GPIO_PIN_15
+#define SERVO_TIM12_CH2_GPIO_Port GPIOB
 #define OLED_DC_Pin GPIO_PIN_11
 #define OLED_DC_GPIO_Port GPIOD
 #define OLED_RESET__Pin GPIO_PIN_12
@@ -73,6 +81,10 @@ void Error_Handler(void);
 #define OLED_SDIN_GPIO_Port GPIOD
 #define OLED_SCLK_Pin GPIO_PIN_14
 #define OLED_SCLK_GPIO_Port GPIOD
+#define MOTOR_AIN2_Pin GPIO_PIN_8
+#define MOTOR_AIN2_GPIO_Port GPIOB
+#define MOTOR_AIN1_Pin GPIO_PIN_9
+#define MOTOR_AIN1_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
