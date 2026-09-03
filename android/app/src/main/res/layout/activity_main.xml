@@ -372,6 +372,7 @@
                         android:layout_marginEnd="3dp">
 
                         <ImageView
+                            android:id="@+id/revLeftIcon"
                             android:layout_width="22dp"
                             android:layout_height="16dp"
                             android:src="@drawable/reverse_left_button"
@@ -379,6 +380,7 @@
                             app:tint="@color/cyan" />
 
                         <TextView
+                            android:id="@+id/revLeftLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Rev ◀"
@@ -401,6 +403,7 @@
                         android:paddingBottom="4dp">
 
                         <ImageView
+                            android:id="@+id/revRightIcon"
                             android:layout_width="22dp"
                             android:layout_height="16dp"
                             android:src="@drawable/reverse_right_button"
@@ -408,6 +411,7 @@
                             app:tint="@color/cyan" />
 
                         <TextView
+                            android:id="@+id/revRightLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Rev ▶"

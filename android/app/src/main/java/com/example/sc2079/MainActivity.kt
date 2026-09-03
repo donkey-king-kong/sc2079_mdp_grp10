@@ -471,19 +471,30 @@ class MainActivity : AppCompatActivity() {
         val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
         val reverseLeft = findViewById<android.widget.LinearLayout>(R.id.reverse_left_button)
         val reverseRight = findViewById<android.widget.LinearLayout>(R.id.reverse_right_button)
+        val revLeftIcon = findViewById<android.widget.ImageView>(R.id.revLeftIcon)
+        val revLeftLabel = findViewById<android.widget.TextView>(R.id.revLeftLabel)
+        val revRightIcon = findViewById<android.widget.ImageView>(R.id.revRightIcon)
+        val revRightLabel = findViewById<android.widget.TextView>(R.id.revRightLabel)
         val coordText = findViewById<android.widget.TextView>(R.id.give_vehicle_coord_now)
         val dirText = findViewById<android.widget.TextView>(R.id.give_vehicle_direction_now)
         val statusText = findViewById<android.widget.TextView>(R.id.give_vehicle_status_now)
 
+        // Bottom bar buttons — declared here so applyTheme can reach them
+        val btnGridSize = findViewById<MaterialButton>(R.id.btn_grid_size)
+        val btnReset = findViewById<MaterialButton>(R.id.reset_map_button)
+        val saveGridMapButton = findViewById<MaterialButton>(R.id.save_map_button)
+        val loadGridMapButton = findViewById<MaterialButton>(R.id.load_map_button)
+        val tabs = findViewById<TabLayout>(R.id.tabs)
+
         fun applyTheme(day: Boolean) {
-            val csl = android.content.res.ColorStateList::class.java
             fun tint(color: String) = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(color))
+            fun col(color: String) = android.graphics.Color.parseColor(color)
             if (day) {
                 btnThemeToggle.text = "🌙"
-                rootContainer.setBackgroundColor(android.graphics.Color.parseColor("#EDF1F7"))
-                rightPanel.setBackgroundColor(android.graphics.Color.parseColor("#EDF1F7"))
-                gridArea.setBackgroundColor(android.graphics.Color.parseColor("#EDF1F7"))
-                subNavContainer.setBackgroundColor(android.graphics.Color.parseColor("#EDF1F7"))
+                rootContainer.setBackgroundColor(col("#EDF1F7"))
+                rightPanel.setBackgroundColor(col("#EDF1F7"))
+                gridArea.setBackgroundColor(col("#EDF1F7"))
+                subNavContainer.setBackgroundColor(col("#EDF1F7"))
                 headerRow.backgroundTintList = tint("#D6DEF0")
                 bottomRow.backgroundTintList = tint("#D6DEF0")
                 coordCard.backgroundTintList = tint("#C2CEDF")
@@ -491,20 +502,42 @@ class MainActivity : AppCompatActivity() {
                 btnAddCoordinate.backgroundTintList = tint("#C2CEDF")
                 btnThemeToggle.backgroundTintList = tint("#C2CEDF")
                 btnBluetooth.backgroundTintList = tint("#C2CEDF")
-                dpadUp.backgroundTintList = tint("#B0C2D8")
-                dpadDown.backgroundTintList = tint("#B0C2D8")
-                dpadLeft.backgroundTintList = tint("#B0C2D8")
-                dpadRight.backgroundTintList = tint("#B0C2D8")
-                reverseLeft.backgroundTintList = tint("#B0C2D8")
-                reverseRight.backgroundTintList = tint("#B0C2D8")
+                // D-pad: darker blue bg so the navy arrow text pops
+                dpadUp.backgroundTintList = tint("#7A9BBF")
+                dpadDown.backgroundTintList = tint("#7A9BBF")
+                dpadLeft.backgroundTintList = tint("#7A9BBF")
+                dpadRight.backgroundTintList = tint("#7A9BBF")
+                dpadUp.setTextColor(col("#FFFFFF"))
+                dpadDown.setTextColor(col("#FFFFFF"))
+                dpadLeft.setTextColor(col("#FFFFFF"))
+                dpadRight.setTextColor(col("#FFFFFF"))
+                reverseLeft.backgroundTintList = tint("#7A9BBF")
+                reverseRight.backgroundTintList = tint("#7A9BBF")
+                revLeftIcon.imageTintList = tint("#FFFFFF")
+                revLeftLabel.setTextColor(col("#FFFFFF"))
+                revRightIcon.imageTintList = tint("#FFFFFF")
+                revRightLabel.setTextColor(col("#FFFFFF"))
                 dpadCenter.backgroundTintList = tint("#C5D5E8")
-                coordText.setTextColor(android.graphics.Color.parseColor("#1A2A4A"))
-                dirText.setTextColor(android.graphics.Color.parseColor("#3A5A8A"))
-                statusText.setTextColor(android.graphics.Color.parseColor("#1A2A4A"))
+                coordText.setTextColor(col("#1A2A4A"))
+                dirText.setTextColor(col("#3A5A8A"))
+                statusText.setTextColor(col("#1A2A4A"))
+                // Bottom bar buttons: dark text on light bar
+                val darkNavy = col("#1A2A4A")
+                btnManual.setTextColor(darkNavy)
+                btnAuto.setTextColor(darkNavy)
+                btnGridSize.setTextColor(darkNavy)
+                btnReset.setTextColor(darkNavy)
+                saveGridMapButton.setTextColor(darkNavy)
+                loadGridMapButton.setTextColor(darkNavy)
+                btnLogClear.setTextColor(darkNavy)
+                // Tab bar: match panel background
+                tabs.setBackgroundColor(col("#EDF1F7"))
+                tabs.setSelectedTabIndicatorColor(col("#2563A8"))
+                tabs.setTabIconTint(android.content.res.ColorStateList.valueOf(col("#1A2A4A")))
                 updateAxisTextColor(false)
             } else {
                 btnThemeToggle.text = "☀"
-                rootContainer.setBackgroundColor(android.graphics.Color.parseColor("#0F1C3A"))
+                rootContainer.setBackgroundColor(col("#0F1C3A"))
                 rightPanel.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 gridArea.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 subNavContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -519,12 +552,34 @@ class MainActivity : AppCompatActivity() {
                 dpadDown.backgroundTintList = tint("#1E4A65")
                 dpadLeft.backgroundTintList = tint("#1E4A65")
                 dpadRight.backgroundTintList = tint("#1E4A65")
+                dpadUp.setTextColor(col("#4AD8F0"))
+                dpadDown.setTextColor(col("#4AD8F0"))
+                dpadLeft.setTextColor(col("#4AD8F0"))
+                dpadRight.setTextColor(col("#4AD8F0"))
                 reverseLeft.backgroundTintList = tint("#1E4A65")
                 reverseRight.backgroundTintList = tint("#1E4A65")
+                revLeftIcon.imageTintList = tint("#26B5CB")
+                revLeftLabel.setTextColor(col("#4AD8F0"))
+                revRightIcon.imageTintList = tint("#26B5CB")
+                revRightLabel.setTextColor(col("#4AD8F0"))
                 dpadCenter.backgroundTintList = tint("#2A4A6A")
                 coordText.setTextColor(android.graphics.Color.WHITE)
-                dirText.setTextColor(android.graphics.Color.parseColor("#7AAFCB"))
+                dirText.setTextColor(col("#7AAFCB"))
                 statusText.setTextColor(android.graphics.Color.WHITE)
+                // Bottom bar buttons: restore original light-blue text
+                val cyanText = col("#26B5CB")
+                val paleText = col("#A8C8E8")
+                btnManual.setTextColor(cyanText)
+                btnAuto.setTextColor(cyanText)
+                btnGridSize.setTextColor(paleText)
+                btnReset.setTextColor(paleText)
+                saveGridMapButton.setTextColor(paleText)
+                loadGridMapButton.setTextColor(paleText)
+                btnLogClear.setTextColor(paleText)
+                // Tab bar: restore dark background
+                tabs.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                tabs.setSelectedTabIndicatorColor(col("#F137A5"))
+                tabs.setTabIconTint(null)
                 updateAxisTextColor(true)
             }
         }
@@ -570,20 +625,20 @@ class MainActivity : AppCompatActivity() {
             gridMapObj.reverseRightVehicle(true)
         }
 
-        val saveGridMapButton: MaterialButton = findViewById(R.id.save_map_button)
-
         saveGridMapButton.setOnClickListener {
             saveGridMapData(gridMapObj.returnGridMap())
         }
 
-        val loadGridMapButton: MaterialButton = findViewById(R.id.load_map_button)
         loadGridMapButton.setOnClickListener {
             loadGridMapData()
         }
 
-        val btnGridSize = findViewById<MaterialButton>(R.id.btn_grid_size)
         btnGridSize.setOnClickListener {
             showGridSizeDialog()
+        }
+
+        btnReset.setOnClickListener {
+            gridMapObj.clearGridMap()
         }
 
         // Initalize navigation tabz
@@ -591,12 +646,10 @@ class MainActivity : AppCompatActivity() {
         customNavigatorBar.addFragment(commsToRobot(gridMapObj), "")
         customNavigatorBar.addFragment(startTask(gridMapObj), "")
 
-
         // Initializes Navigation Bar
         val subNavigationBar = findViewById<ViewPager?>(R.id.sub_navigation_bar)
         subNavigationBar?.setAdapter(customNavigatorBar)
         subNavigationBar?.setOffscreenPageLimit(2)
-        val tabs = findViewById<TabLayout>(R.id.tabs)
         tabs.setupWithViewPager(subNavigationBar)
 
         tabs.getTabAt(0)?.setIcon(R.drawable.plus_for_enter)
