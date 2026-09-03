@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "ICM20948.h"
+#include <stdlib.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,7 +36,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define SERVOCENTER 150
+#define SERVOLEFT 	100
+#define SERVORIGHT 	200
+#define TURNLEFT_TH 115
+#define TURNRIGHT_TH 195
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -106,15 +111,34 @@ const osMessageQueueAttr_t uartQueue_attributes = {
 /* USER CODE BEGIN PV */
 
 // Global variables safely accessed by FreeRTOS tasks
-uint8_t sbuf[15] = "Hello World!\n\r";
-
 /* --- SERIAL COMMUNICATION VARIABLES --- */
 uint8_t rxByte;									// UART receive buffer
+int flag_done = 0;
+int magnitude = 0;
+
+/* --- MOTOR VARIABLES --- */
+uint16_t pwmVal_servo = SERVOCENTER;
+uint16_t pwmVal_R = 0;
+uint16_t pwmVal_L = 0;
+int times_acceptable = 0;
+int e_brake = 0;
+
+/* --- ENCODER VARIABLES --- */
+int32_t left_encoder_val = 0;
+int32_t right_encoder_val = 0;
+int32_t left_target = 0;
+int32_t right_target = 0;
+double target_angle = 0;
+
+/* --- GYROSCOPE VARIABLES --- */
+double total_angle = 0;
+uint8_t gyroBuffer[20];
+uint8_t ICMAddress = 0x68;
+double error_angle = 0;
 
 /* --- OLED DISPLAY VARIABLES --- */
+char oled_status_msg[32] = "Booting...";		// For boot/status message
 char dash_lastCmd[15] = "None";					// RPi command
-int dash_speedL = 0;							// Left motor speed
-int dash_speedR = 0;							// Right motor speed
 double dash_gyroZ = 0.0;						// Gyroscope angle
 float dash_ultraDist = 0.0;						// Ultrasonic distance
 int dash_encoderL = 0;							// Encoder Left Speed
@@ -127,6 +151,8 @@ uint32_t tc1 = 0;
 uint32_t tc2 = 0;
 uint32_t echo = 0;
 uint8_t first_captured = 0;
+uint16_t distance = 0;
+int k = 0;
 
 /* USER CODE END PV */
 
@@ -197,11 +223,18 @@ int main(void)
   MX_TIM12_Init();
   /* USER CODE BEGIN 2 */
   OLED_Init();
-  OLED_ShowString(10, 5, "System Ready"); // show message on OLED display at line 10
-  OLED_Refresh_Gram();
+  strcpy(oled_status_msg, "System Init OK");
+  osDelay(500);
 
   // Initialize IMU
-  ICM20948_Init();
+  if (ICM20948_Init() == HAL_OK)
+  {
+	  strcpy(oled_status_msg, "IMU Found");
+	  osDelay(500);
+  } else {
+	  strcpy(oled_status_msg, "IMU ERROR!");
+	  while(1);
+  }
 
   // Start UART Interrupt Listener
   HAL_UART_Receive_IT(&huart3, &rxByte, 1);
@@ -425,7 +458,7 @@ static void MX_TIM3_Init(void)
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
-  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_FALLING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
   sConfig.IC1Filter = 10;
@@ -846,6 +879,194 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 		}
 	}
 }
+
+int PID_Angle(double errord) {
+	// 1. Calculate the error
+	int error = (int)(errord * 10);
+
+	// 2. Get absolute value
+	error = abs(error);
+
+	// 3. Return PWM Magnitude (stepped proportional control)
+    if (error > 300) {
+        return 3000;
+    } else if (error > 200) {
+        return 2000;
+    } else if (error > 150) {
+        return 1600;
+    } else if (error > 100) {
+        return 1400;
+    } else if (error > 10) {
+        return 1000;
+    } else if (error >= 2) {
+        times_acceptable++;
+        return 900;
+    } else {
+        times_acceptable++;
+        return 0;
+    }
+}
+
+int PID_Control(int error) {
+    // 1. Get the absolute error since direction is handled in StartMotorTask
+    error = abs(error);
+
+    // 2. Return the stepped proportional PWM speed magnitude based on your senior's tuned steps
+    if (error > 2000) {
+        return 3000;
+    } else if (error > 500) {
+        return 2000;
+    } else if (error > 200) {
+        return 1400;
+    } else if (error > 100) {
+        return 1000;
+    } else if (error > 2) {
+        times_acceptable++;
+        return 900;
+    } else if (error >= 1) {
+        times_acceptable++;
+        return 0;
+    } else {
+        times_acceptable++;
+        return 0;
+    }
+}
+
+int finishCheck() {
+    // If PID error has been minimal for ~20 ticks (approx 200ms)
+    if (times_acceptable > 20) {
+        e_brake = 1; // Signal motor task to cut PWM
+        times_acceptable = 0;
+        pwmVal_servo = SERVOCENTER;
+        osDelay(300); // Wait for servo to physically recenter
+        return 0; // 0 means "Finished"
+    }
+    return 1; // 1 means "Still moving"
+}
+
+void moveCarStraight(double distance) {
+    // Convert cm to encoder ticks (75 is a calibration multiplier you will tune later)
+    int tick_distance = (int)(distance * 75.0);
+
+    pwmVal_servo = SERVOCENTER;
+    osDelay(300); // Allow physical servo to center itself
+
+    e_brake = 0;
+    times_acceptable = 0;
+
+    // Set a high baseline to prevent negative underflow
+    left_encoder_val = 75000;
+    right_encoder_val = 75000;
+    left_target = 75000 + tick_distance;
+    right_target = 75000 + tick_distance;
+
+    // Wait until the robot reaches the target
+    while (finishCheck()) {
+        osDelay(10); // CRITICAL: Yields CPU so StartMotorTask can actually run!
+    }
+}
+
+void moveCarRight(double angle) {
+    pwmVal_servo = SERVORIGHT;
+    osDelay(300);
+
+    e_brake = 0;
+    times_acceptable = 0;
+
+    // Subtract from target angle (assuming right turn decreases Z-axis angle)
+    target_angle -= angle;
+
+    while (finishCheck()) {
+        osDelay(10);
+    }
+}
+
+void moveCarLeft(double angle) {
+    pwmVal_servo = SERVOLEFT;
+    osDelay(300);
+
+    e_brake = 0;
+    times_acceptable = 0;
+
+    // Add to target angle (assuming left turn increases Z-axis angle)
+    target_angle += angle;
+
+    while (finishCheck()) {
+        osDelay(10);
+    }
+}
+
+void moveCarSlideRight(int forward) {
+    int sign = (forward == 1) ? 1 : -1;
+    e_brake = 0;
+    times_acceptable = 0;
+
+    // Step 1: Drive Straight to clear obstacle
+    if (sign > 0) {
+        moveCarStraight((450.0 / 75.19) * sign);
+    } else {
+        moveCarStraight((540.0 / 75.19) * sign);
+    }
+
+    // Wait for the straight segment to finish
+    while (finishCheck()) {
+        osDelay(10);
+    }
+    osDelay(50); // Small pause to stabilize physical inertia
+    times_acceptable = 0;
+
+    // Step 2: Turn Right
+    moveCarRight(29.0 * sign);
+    while (finishCheck()) {
+        osDelay(10);
+    }
+    osDelay(50);
+    times_acceptable = 0;
+
+    // Step 3: Counter-steer Left to re-align heading
+    moveCarLeft(29.0 * sign);
+    while (finishCheck()) {
+        osDelay(10);
+    }
+    osDelay(50);
+}
+
+void moveCarSlideLeft(int forward) {
+    int sign = (forward == 1) ? 1 : -1;
+    e_brake = 0;
+    times_acceptable = 0;
+
+    // Step 1: Drive Straight to clear obstacle
+    if (sign > 0) {
+        moveCarStraight((560.0 / 75.19) * sign);
+    } else {
+        moveCarStraight((700.0 / 75.19) * sign);
+    }
+
+    // Wait for the straight segment to finish
+    while (finishCheck()) {
+        osDelay(10);
+    }
+    osDelay(50);
+    times_acceptable = 0;
+
+    // Step 2: Turn Left
+    moveCarLeft(29.0 * sign);
+    while (finishCheck()) {
+        osDelay(10);
+    }
+    osDelay(50);
+    times_acceptable = 0;
+
+    // Step 3: Counter-steer Right to re-align heading
+    moveCarRight(29.0 * sign);
+    while (finishCheck()) {
+        osDelay(10);
+    }
+    osDelay(50);
+}
+
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -858,14 +1079,14 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  char debugBuf[100];
+  //char debugBuf[100];
 
   /* Infinite loop */
   for(;;)
   {
 	HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-	int len = sprintf(debugBuf, "Time: %lu ms | EncL: %d | EncR: %d\r\n", diag_timer, dash_encoderL, dash_encoderR);
-	HAL_UART_Transmit(&huart3, (uint8_t*)debugBuf, len, HAL_MAX_DELAY);
+	//int len = sprintf(debugBuf, "Time: %lu ms | EncL: %d | EncR: %d\r\n", diag_timer, dash_encoderL, dash_encoderR);
+	//HAL_UART_Transmit(&huart3, (uint8_t*)debugBuf, len, HAL_MAX_DELAY);
     osDelay(1000);
   }
   /* USER CODE END 5 */
@@ -899,13 +1120,65 @@ void StartCommunicateTask(void *argument)
 			{
 				cmdBuffer[cmdIndex] = '\0'; // Add null-terminator to make a valid C-string
 
-				// --- SEND ACK TO RPi ---
+				// 1. PARSE THE COMMAND
+				char command_char1 = ' ';
+				char command_char2 = ' ';
+				int value = 0;
+				int items_parsed = 0;
+
+				// Check if the second character (index 1) is a letter (A-Z or a-z)
+				// We use cmdBuffer because index 0 is the first letter (e.g., 'F' or 'S')
+				if ((cmdBuffer[1] >= 'A' && cmdBuffer[1] <= 'Z') || (cmdBuffer[1] >= 'a' && cmdBuffer[1] <= 'z'))
+				{
+					// It's a 2-letter command like "SL50"
+					items_parsed = sscanf(cmdBuffer, "%c%c%d", &command_char1, &command_char2, &value);
+				}
+				else
+				{
+					// It's a 1-letter command like "F50"
+					items_parsed = sscanf(cmdBuffer, "%c%d", &command_char1, &value);
+				}
+
+				// 2. EXECUTE THE MOVEMENT FUNCTION
+				if (items_parsed > 0)
+				{
+					switch (command_char1)
+					{
+						case 'S': 							// Straight or Slide
+							if (command_char2 == 'L') 		// "SL" command for Slide Left
+								moveCarSlideLeft(value); 	// value is 1 for fwd, -1 for bwd
+							else if (command_char2 == 'R') 	// "SR" command for Slide Right
+								moveCarSlideRight(value);
+							else
+								moveCarStraight(value);		// "S" command for Straight
+							break;
+
+						case 'F':							// Forward (can be an alias for Straight)
+							moveCarStraight(value);
+							break;
+
+						case 'B':							// Backward (can be an alias for Straight with negative value
+							moveCarStraight(-value);
+							break;
+
+						case 'R':							// Right Turn
+							moveCarRight(value);
+							break;
+
+						case 'L':							// Left Turn
+							moveCarLeft(value);
+							break;
+
+						/* Can add more cases here */
+					}
+				}
+
+				// 3. SEND ACK TO RPI
 				uint8_t ackMsg[] = "A\n";
 				HAL_UART_Transmit(&huart3, ackMsg, sizeof(ackMsg)-1, 100);
 
-				// --- UPDATE OLED RPI COMMAND VARIABLE ---
+				// 4. UPDATE OLED RPI COMMAND VARIABLE & RESET
 				strcpy(dash_lastCmd, cmdBuffer);
-
 				cmdIndex = 0; // Reset command index to 0 to prepare for next command
 			}
 		} else {
@@ -918,7 +1191,6 @@ void StartCommunicateTask(void *argument)
 			}
 		}
 	}
-	osDelay(1);
   }
   /* USER CODE END StartCommunicateTask */
 }
@@ -933,17 +1205,15 @@ void StartCommunicateTask(void *argument)
 void StartMotorTask(void *argument)
 {
   /* USER CODE BEGIN StartMotorTask */
-  uint16_t pwmVal_L = 0;
-  uint16_t pwmVal_R = 0;
 
   // Encoder Variables
-  int32_t cnt1_L = 0;
-  int32_t cnt2_L = 0;
-  int32_t cnt1_R = 0;
-  int32_t cnt2_R = 0;
-  int16_t diff_L = 0;
-  int16_t diff_R = 0;
-  //uint32_t diag_timer = 0;
+  int16_t cnt_L = 0;
+  int16_t cnt_R = 0;
+  int straight_correction = 0;
+  pwmVal_L = 0;
+  pwmVal_R = 0;
+  left_encoder_val = 0;
+  right_encoder_val = 0;
 
   // Start Encoder Timer
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL); // Motor A (Left) Encoder
@@ -961,101 +1231,168 @@ void StartMotorTask(void *argument)
   HAL_TIM_PWM_Start(&htim12, TIM_CHANNEL_2);
 
   // Ensure robot starts completely stationary and centered
-  __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 150); // Center Servo (1.5ms pulse)
+  __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, SERVOCENTER); // Center Servo (1.5ms pulse)
   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
   __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
   __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
 
+  osDelay(1000);
+
+  // Reset Encoder Count
   __HAL_TIM_SET_COUNTER(&htim2, 0);
   __HAL_TIM_SET_COUNTER(&htim3, 0);
 
   /* Infinite loop */
   for(;;)
   {
-//    if(HAL_GetTick()-tick > 1000L)
-//    {
-//    	cnt2 = __HAL_TIM_GET_COUNTER(&htim2);
-//    	if (__HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2)) {
-//    		if(cnt2<cnt1)
-//    			diff = cnt1 - cnt2;
-//    		else
-//    			diff = (65535 - cnt2) + cnt1;
-//    	} else {
-//    		if(cnt2 > cnt1)
-//    			diff = cnt2 - cnt1;
-//    		else
-//    			diff = (65535 - cnt1) + cnt2;
-//    	}
-//
-//    	dash_encoderL = diff;
-//    	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
-//
-//    	cnt1 = __HAL_TIM_GET_COUNTER(&htim2);
-//    	tick = HAL_GetTick();
-//    }
-
 	// Step A: Read Encoders
-	cnt2_L = __HAL_TIM_GET_COUNTER(&htim2);
-	cnt2_R = __HAL_TIM_GET_COUNTER(&htim3);
-
-	diff_L = (int16_t) cnt2_L;
-	diff_R = (int16_t) cnt2_R;
+	cnt_L = (int16_t)__HAL_TIM_GET_COUNTER(&htim2);
+	cnt_R = (int16_t)__HAL_TIM_GET_COUNTER(&htim3);
 
 	__HAL_TIM_SET_COUNTER(&htim2, 0);
 	__HAL_TIM_SET_COUNTER(&htim3, 0);
 
-	dash_encoderL = (int)diff_L;
-	dash_encoderR = (int)diff_R;
+	left_encoder_val += cnt_L;
+	right_encoder_val += cnt_R;
+
+	dash_encoderL = left_encoder_val;
+	dash_encoderR = right_encoder_val;
+	// Speed calibration
+	//dash_encoderL = cnt_L;
+	//dash_encoderR = cnt_R;
 	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
 
-	// Step B: Diagnostic Loop (Changes state every 2000ms)
-	diag_timer += 10;
+	// Step B: Move Servo Motor
+	__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
+	error_angle = target_angle - total_angle;
 
-	if (diag_timer < 2000)
+	if (pwmVal_servo < TURNLEFT_TH) // Turn left
 	{
-		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 100); //1.0ms pulse
-	}
-	else if (diag_timer < 4000)
-	{
-		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 200); //2.0ms pulse
-	}
-	else if (diag_timer < 6000)
-	{
-		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 150); //1.5ms pulse
-	}
-	else if (diag_timer < 8000)
-	{
-		// Drive forward
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 2500);
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+		// 1. Calculate base speeds
+		pwmVal_R = PID_Angle(error_angle) * 1.072;	// Master Wheel: Right
+		pwmVal_L = pwmVal_R * (0.59);					// Slave Wheel: Left
 
-		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 2500);
-		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
-	}
-	else if (diag_timer < 10000)
-	{
-		// Drive backward
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 2500);
+		// 2. Apply speeds to 2-pin H-Bridge based on error direction
+		if (error_angle > 0) {
+			// --- Forward Movement ---
+			// Left Motor (TIM4) Forward
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
 
-		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
-		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 2500);
-	}
-	else if (diag_timer < 12000)
-	{
-		// Drive forward
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+			// Right Motor (TIM9) Forward
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
+		} else {
+			// --- Backward Movement ---
+			// Left Motor (TIM4) Backward
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
 
-		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
-		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+			// Right Motor (TIM9) Backward
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+		}
 	}
-	else
+
+	else if (pwmVal_servo > TURNRIGHT_TH) // Turn right
 	{
-		diag_timer = 0;
+		pwmVal_L = PID_Angle(error_angle); // Master Wheel: Left
+		pwmVal_R = pwmVal_L * (0.59);	   // Slave Wheel: Right
+
+		// 2. Apply speeds to 2-pin H-Bridge based on error direction
+		if (error_angle < 0) {
+			// --- Forward Movement ---
+			// Left Motor (TIM4) Forward
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
+
+			// Right Motor (TIM9) Forward
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
+		} else {
+			// --- Backward Movement ---
+			// Left Motor (TIM4) Backward
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+
+			// Right Motor (TIM9) Backward
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+		}
 	}
+
+	else // Straight
+	{
+		// 1. Calculate base speeds (Master = Right Motor, Slave = Left Motor)
+		pwmVal_R = PID_Control(right_target - right_encoder_val) * 1.072;
+
+		// 2. Perform drift compensation (straightCorrection)
+		if (abs(left_target - left_encoder_val) > abs(right_target - right_encoder_val))
+			straight_correction++;
+		else
+			straight_correction--;
+
+		// Reset correction if close to target to avoid oscillating
+		if (abs(left_target - left_encoder_val) < 100)
+			straight_correction = 0;
+
+		pwmVal_L = PID_Control(left_target - left_encoder_val) + straight_correction; // Slave wheel (TIM4)
+
+		// 3. Servo Fine-Tuning (Micro-steering using Gyro to stay on course)
+		int error_sign = (right_target - right_encoder_val < 0) ? -1 : 1;
+
+		if (error_angle > 5)
+			pwmVal_servo = (error_sign * -19 * 5) / 5 + SERVOCENTER;
+		else if (error_angle < -5)
+			pwmVal_servo = (error_sign * 19 * 5) / 5 + SERVOCENTER;
+		else
+			pwmVal_servo = (error_sign * -19 * error_angle) /5 + SERVOCENTER;
+
+		// Write micro-adjustments to TIM12 servo
+		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
+
+		// 4. Apply speed to 2-Pin Dual-PWM H-Bridge based on Direction
+		// Check if moving forward or backward based on target direction
+		if((right_target - right_encoder_val) > 0) {
+			// --- Forward Movement ---
+			// Left Motor (TIM4) Forward
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
+
+			// Right Motor (TIM9) Forward
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
+		} else {
+			// --- Backward Movement ---
+			// Left Motor (TIM4) Backward
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+
+			// Right Motor (TIM9) Backward
+			__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
+			__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+		}
+
+	}
+
+	if (e_brake) {
+		pwmVal_L = 0;
+		pwmVal_R = 0;
+		left_target = left_encoder_val;
+		right_target = right_encoder_val;
+
+        // Instantly cut PWM to your 2-pin setup
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+        __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+        __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+	}
+
 	osDelay(10);
+
+	if (times_acceptable > 1000)
+		times_acceptable = 1001;
   }
   /* USER CODE END StartMotorTask */
 }
@@ -1077,26 +1414,34 @@ void StartOledTask(void *argument)
   {
 	OLED_Clear();
 
-	// 1. RPi Instructions
-	OLED_ShowString(0, 0, "CMD: ");
-	OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
+	if (strlen(oled_status_msg) > 0)
+	{
+		OLED_ShowString(0, 24, (uint8_t*)oled_status_msg);
+	}
+	else
+	{
+		// Line 1: RPi Instructions
+		OLED_ShowString(0, 0, (uint8_t*) "CMD: ");
+		OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
 
-	// 2. Motor Speed
-	sprintf(textBuffer, "Spd L:%d R:%d", dash_speedL, dash_speedR);
-	OLED_ShowString(0, 12, (uint8_t*) textBuffer);
+		// Line 2: Gyroscope Angle & Ultrasonic Distance
+		sprintf(textBuffer, "G: %.1f D: %.1fcm", (float)dash_gyroZ, dash_ultraDist);
+		OLED_ShowString(0, 12, (uint8_t*) textBuffer);
 
-	// 3. Gyroscope Angle
-	sprintf(textBuffer, "G: %.1f D: %.1fcm", (float)dash_gyroZ, dash_ultraDist);
-	OLED_ShowString(0, 24, (uint8_t*) textBuffer);
+		// Line 3: Left Encoder Value
+		sprintf(textBuffer, "Enc L: %d", dash_encoderL);
+		OLED_ShowString(0, 24, (uint8_t *) textBuffer);
 
-	sprintf(textBuffer, "Enc L: %d R: %d", dash_encoderL, dash_encoderR);
-	OLED_ShowString(0, 36, (uint8_t *) textBuffer);
+		// Line 4: Right Encoder Value
+		sprintf(textBuffer, "Enc R: %d", dash_encoderR);
+		OLED_ShowString(0, 36, (uint8_t *) textBuffer);
 
-	sprintf(textBuffer, "Dir: %d", dash_direction);
-	OLED_ShowString(0, 48, (uint8_t *) textBuffer);
+		// Line 5: Encoder Direction
+		sprintf(textBuffer, "Dir: %d", dash_direction);
+		OLED_ShowString(0, 48, (uint8_t *) textBuffer);
+	}
 
 	OLED_Refresh_Gram();
-
     osDelay(100);
   }
   /* USER CODE END StartOledTask */
@@ -1113,17 +1458,49 @@ void StartGyroTask(void *argument)
 {
   /* USER CODE BEGIN StartGyroTask */
   ICM20948_Data IMU_Data;
+  double offset = 0.0;
+  uint32_t tick = 0;
+  int i = 0;
+
+  // 1. START-UP CALIBRATION PHASE
+  // KEEP ROBOT STILL DURING FIRST 5 SECONDS!
+  strcpy(oled_status_msg, "Calibrating Gyro...");
+  osDelay(500);
+
+  while (i < 100)
+  {
+	  osDelay(30); // Get sample every 30ms
+	  ICM_ReadData(&IMU_Data);
+	  offset += (double)IMU_Data.z_gyro;
+	  i++;
+  }
+  offset = offset / 100.0; // Calculate average drift bias
+
+  // Show on OLED that calibration is complete
+  strcpy(oled_status_msg, "Calib Done!");
+  osDelay(500);
+  strcpy(oled_status_msg, "");
+
+  tick = HAL_GetTick();
 
   /* Infinite loop */
   for(;;)
   {
-    // Fetch IMU data
+    osDelay(10); // High-frequency 100Hz loop for accurate Euler integration
+
+	// 1. Fetch IMU data
 	ICM_ReadData(&IMU_Data);
 
-	// Update gyro dashboard variable
-	dash_gyroZ = (int)IMU_Data.z_gyro;
+	// 2. Calculate time elapsed (delta t) in seconds
+	uint32_t current_tick = HAL_GetTick();
+	double dt = (double)(current_tick - tick) / 1000.0;
+	tick = current_tick;
 
-	osDelay(100);
+	// 3. Subtract baseline offset and integrate angular velocity to get absolute degrees
+	total_angle += ((double)IMU_Data.z_gyro - offset) * dt;
+
+	// 4. Update gyro dashboard variable
+	dash_gyroZ = total_angle;
   }
   /* USER CODE END StartGyroTask */
 }

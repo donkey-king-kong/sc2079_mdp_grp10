@@ -1,8 +1,4 @@
 #include "ICM20948.h"
-#include "main.h"
-#include <string.h>   // for sprintf
-#include <stdio.h>
-#include <stdbool.h>   // to support boolean data type
 
 /*
 HAL_StatusTypeDef HAL_I2C_Mem_Write(
@@ -29,6 +25,8 @@ accel_range ACCEL_RANGE_VALUE = _accel_4g;		// Acc range
 
 float GYRO_SCALE = 65.5;
 float ACCEL_SCALE = 8192.0;
+
+void ICM_SelBank(uint8_t bank);
 
 static HAL_StatusTypeDef ICM_WriteReg(uint8_t reg, uint8_t dat) {
 	return HAL_I2C_Mem_Write(&hi2c2, ICM20948_I2C_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &dat, 1, 10);
