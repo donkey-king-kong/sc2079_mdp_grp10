@@ -1331,6 +1331,15 @@ public partial class MainWindow : Window
                     rectangle.Height = targetGridButton.ActualWidth;
                     targetGridButton.Content = (object) rectangle;
                   }
+                  else if (parsedData.Type == "RemoveObstacle")
+                  {
+                    int amdY = 19 - parsedData.Y;
+                    this._localGridLayout[parsedData.X, amdY] = 0;
+
+                    Grid innerGrid = (Grid) this.ArenaGrid.Children[0];
+                    Button targetGridButton = (Button) innerGrid.Children.Cast<UIElement>().First(f => Grid.GetRow(f) == amdY && Grid.GetColumn(f) == parsedData.X);
+                    targetGridButton.Content = (object) "";
+                  }
                   else if (parsedData.Type == "Robot")
                   {
                     this._robotPosition[0] = parsedData.X;
@@ -1343,6 +1352,10 @@ public partial class MainWindow : Window
                     this._robot.Margin = new Thickness((double) (0 + parsedData.X * 50), (double) (0 + amdY * 50), 0.0, 0.0);
                     this._robot.Opacity = 1.0;
                     this.DirectionTextBox.Text = parsedData.Direction.ToString();
+                  }
+                  else if (parsedData.Type == "RemoveRobot")
+                  {
+                    this._robot.Opacity = 0.0;
                   }
                 }));
             }

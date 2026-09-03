@@ -852,6 +852,7 @@ public class GridMapClass extends View {
                     if(updatePlacedObstacle){
                         rearrangeObstacleData(x_coord, y_coord);
                     }
+                    sendTabletUpdateToAMD("RemoveObstacle", x_coord, y_coord, ObstacleData.Direction.NORTH);
                 }
                 changeObstacleData(x_coord, y_coord, false, ObstacleData.Direction.EMPTY, ObstacleData.OBSTACLETYPE.EMPTY, false, 0);
                 invalidate();
@@ -865,6 +866,7 @@ public class GridMapClass extends View {
     }
 
     public int removeVehicleFromGrid() {
+        sendTabletUpdateToAMD("RemoveRobot", 0, 0, ObstacleData.Direction.NORTH);
         for (int y = 0; y < hardLimit; y++) {
             for (int x = 0; x < hardLimit; x++) {
                 if (gridMapData.get(y).get(x).getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle) {
@@ -898,6 +900,7 @@ public class GridMapClass extends View {
                     invalidate();
                 }
             }
+            sendTabletUpdateToAMD("Robot", x_coord, y_coord, ObstacleData.Direction.NORTH);
             return 1;
         }
     }
