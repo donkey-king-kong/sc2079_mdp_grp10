@@ -110,38 +110,12 @@
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="40dp"
-                        android:text="Remove Obstacle"
+                        android:text="Remove"
                         app:icon="@drawable/obstacle_icon"
                         app:iconGravity="textEnd"
                         app:iconPadding="8dp"
                         android:textColor="@color/white"
                         app:iconTint="@android:color/white"
-                        app:iconSize="35dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/remove_vehicle_button"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:text="Remove Vehicle Starting Point"
-                        app:icon="@drawable/vehicle_icon"
-                        app:iconGravity="textEnd"
-                        app:iconPadding="8dp"
-                        android:textColor="@color/white"
-                        app:iconTint="@android:color/white"
-                        app:iconSize="35dp" />
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/change_direction_button"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="45dp"
-                        android:textColor="@color/white"
-                        android:text="Change Direction"
-                        app:icon="@drawable/turning_bar_icon"
-                        app:iconTint="@android:color/white"
-                        app:iconGravity="textEnd"
-                        app:iconPadding="8dp"
-                        android:orientation="vertical"
                         app:iconSize="35dp" />
                 </com.google.android.material.button.MaterialButtonToggleGroup>
 

@@ -33,7 +33,7 @@ import java.util.Comparator;
 
 public class GridMapClass extends View {
     public enum GridMode {
-        NONE, ADD_VEHICLE, ADD_OBSTACLE, REMOVE, CHANGE_DIRECTION
+        NONE, ADD_VEHICLE, ADD_OBSTACLE, REMOVE
     }
     private GridMode currentMode = GridMode.NONE;
     private int gridColumns, gridRows;
@@ -136,12 +136,28 @@ public class GridMapClass extends View {
                     case REMOVE:
                         removeFromGrid(x_coord, y_coord, true);
                         break;
-                    case CHANGE_DIRECTION:
-                        changeDirectionOfObstacle(x_coord, y_coord, true);
-                        break;
                     case NONE:
                     default:
-                        // Do nothing by default
+                        // Tap cycles direction: N→E→S→W→N for obstacles and vehicle
+                        ObstacleData tappedCell = gridMapData.get(y_coord).get(x_coord);
+                        if (tappedCell.getOccupied()) {
+                            if (tappedCell.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle) {
+                                changeDirectionOfObstacle(x_coord, y_coord, true);
+                            } else if (tappedCell.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle) {
+                                int[] bl = findVehicleBottomLeftObstacle();
+                                if (bl[0] != -2) {
+                                    ObstacleData.Direction cur = gridMapData.get(bl[1]).get(bl[0]).getDirection();
+                                    ObstacleData.Direction next;
+                                    switch (cur) {
+                                        case NORTH: next = ObstacleData.Direction.EAST;  break;
+                                        case EAST:  next = ObstacleData.Direction.SOUTH; break;
+                                        case SOUTH: next = ObstacleData.Direction.WEST;  break;
+                                        default:    next = ObstacleData.Direction.NORTH; break;
+                                    }
+                                    changeVehicleDirection(next);
+                                }
+                            }
+                        }
                         break;
                 }
                 invalidate();
