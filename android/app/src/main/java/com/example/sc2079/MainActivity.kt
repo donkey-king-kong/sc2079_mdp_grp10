@@ -459,15 +459,48 @@ class MainActivity : AppCompatActivity() {
         val subNavContainer = findViewById<android.widget.LinearLayout>(R.id.sub_navigation_container)
         val dpadCenter = findViewById<android.view.View>(R.id.dpadCenterSquare)
 
-        btnThemeToggle.setOnClickListener {
-            isDayMode = !isDayMode
-            if (isDayMode) {
+        val headerRow = findViewById<android.widget.LinearLayout>(R.id.headerRow)
+        val bottomRow = findViewById<android.widget.LinearLayout>(R.id.bottomRow)
+        val coordCard = findViewById<android.widget.LinearLayout>(R.id.coordCard)
+        val statusCard = findViewById<android.widget.LinearLayout>(R.id.statusCard)
+        val btnAddCoordinate = findViewById<android.widget.ImageButton>(R.id.btnAddCoordinate)
+        val btnBluetooth = findViewById<android.widget.ImageButton>(R.id.btnBluetooth)
+        val dpadUp = findViewById<android.widget.Button>(R.id.dpad_up)
+        val dpadDown = findViewById<android.widget.Button>(R.id.dpad_down)
+        val dpadLeft = findViewById<android.widget.Button>(R.id.dpad_left)
+        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
+        val reverseLeft = findViewById<android.widget.LinearLayout>(R.id.reverse_left_button)
+        val reverseRight = findViewById<android.widget.LinearLayout>(R.id.reverse_right_button)
+        val coordText = findViewById<android.widget.TextView>(R.id.give_vehicle_coord_now)
+        val dirText = findViewById<android.widget.TextView>(R.id.give_vehicle_direction_now)
+        val statusText = findViewById<android.widget.TextView>(R.id.give_vehicle_status_now)
+
+        fun applyTheme(day: Boolean) {
+            val csl = android.content.res.ColorStateList::class.java
+            fun tint(color: String) = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(color))
+            if (day) {
                 btnThemeToggle.text = "🌙"
-                rootContainer.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
-                rightPanel.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
-                gridArea.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
-                subNavContainer.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
-                dpadCenter.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#C5D5E8"))
+                rootContainer.setBackgroundColor(android.graphics.Color.parseColor("#EDF1F7"))
+                rightPanel.setBackgroundColor(android.graphics.Color.parseColor("#EDF1F7"))
+                gridArea.setBackgroundColor(android.graphics.Color.parseColor("#EDF1F7"))
+                subNavContainer.setBackgroundColor(android.graphics.Color.parseColor("#EDF1F7"))
+                headerRow.backgroundTintList = tint("#D6DEF0")
+                bottomRow.backgroundTintList = tint("#D6DEF0")
+                coordCard.backgroundTintList = tint("#C2CEDF")
+                statusCard.backgroundTintList = tint("#C2CEDF")
+                btnAddCoordinate.backgroundTintList = tint("#C2CEDF")
+                btnThemeToggle.backgroundTintList = tint("#C2CEDF")
+                btnBluetooth.backgroundTintList = tint("#C2CEDF")
+                dpadUp.backgroundTintList = tint("#B0C2D8")
+                dpadDown.backgroundTintList = tint("#B0C2D8")
+                dpadLeft.backgroundTintList = tint("#B0C2D8")
+                dpadRight.backgroundTintList = tint("#B0C2D8")
+                reverseLeft.backgroundTintList = tint("#B0C2D8")
+                reverseRight.backgroundTintList = tint("#B0C2D8")
+                dpadCenter.backgroundTintList = tint("#C5D5E8")
+                coordText.setTextColor(android.graphics.Color.parseColor("#1A2A4A"))
+                dirText.setTextColor(android.graphics.Color.parseColor("#3A5A8A"))
+                statusText.setTextColor(android.graphics.Color.parseColor("#1A2A4A"))
                 updateAxisTextColor(false)
             } else {
                 btnThemeToggle.text = "☀"
@@ -475,9 +508,30 @@ class MainActivity : AppCompatActivity() {
                 rightPanel.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 gridArea.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 subNavContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                dpadCenter.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#2A4A6A"))
+                headerRow.backgroundTintList = tint("#182D4B")
+                bottomRow.backgroundTintList = tint("#1E3A5F")
+                coordCard.backgroundTintList = tint("#1A3A5C")
+                statusCard.backgroundTintList = tint("#1A3A5C")
+                btnAddCoordinate.backgroundTintList = tint("#1A3A5C")
+                btnThemeToggle.backgroundTintList = tint("#1A3A5C")
+                btnBluetooth.backgroundTintList = tint("#1A3A5C")
+                dpadUp.backgroundTintList = tint("#1E4A65")
+                dpadDown.backgroundTintList = tint("#1E4A65")
+                dpadLeft.backgroundTintList = tint("#1E4A65")
+                dpadRight.backgroundTintList = tint("#1E4A65")
+                reverseLeft.backgroundTintList = tint("#1E4A65")
+                reverseRight.backgroundTintList = tint("#1E4A65")
+                dpadCenter.backgroundTintList = tint("#2A4A6A")
+                coordText.setTextColor(android.graphics.Color.WHITE)
+                dirText.setTextColor(android.graphics.Color.parseColor("#7AAFCB"))
+                statusText.setTextColor(android.graphics.Color.WHITE)
                 updateAxisTextColor(true)
             }
+        }
+
+        btnThemeToggle.setOnClickListener {
+            isDayMode = !isDayMode
+            applyTheme(isDayMode)
         }
 
         // Initializes gridmap
@@ -489,11 +543,6 @@ class MainActivity : AppCompatActivity() {
         setupGraphAxes(this, true)
 
         // D-pad buttons
-        val dpadUp = findViewById<android.widget.Button>(R.id.dpad_up)
-        val dpadDown = findViewById<android.widget.Button>(R.id.dpad_down)
-        val dpadLeft = findViewById<android.widget.Button>(R.id.dpad_left)
-        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
-
         dpadUp.setOnClickListener {
             activateJoyStickBool = true
             gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true)
@@ -511,15 +560,12 @@ class MainActivity : AppCompatActivity() {
             gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
         }
 
-        val reverseLeftButton = findViewById<android.widget.LinearLayout>(R.id.reverse_left_button)
-        val reverseRightButton = findViewById<android.widget.LinearLayout>(R.id.reverse_right_button)
-
-        reverseLeftButton.setOnClickListener {
+        reverseLeft.setOnClickListener {
             Log.d("JoystickButtons", "Reverse Left clicked")
             gridMapObj.reverseLeftVehicle(true)
         }
 
-        reverseRightButton.setOnClickListener {
+        reverseRight.setOnClickListener {
             Log.d("JoystickButtons", "Reverse Right clicked")
             gridMapObj.reverseRightVehicle(true)
         }
