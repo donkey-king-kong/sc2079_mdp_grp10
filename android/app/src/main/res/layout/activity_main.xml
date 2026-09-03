@@ -472,6 +472,26 @@
                 android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_grid_size"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="Size"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
+                android:singleLine="true"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
+                app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#3A6A9B" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/auto_update_button"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"

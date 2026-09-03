@@ -36,6 +36,8 @@ import com.google.android.material.tabs.TabLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import android.util.Base64
+import android.widget.NumberPicker
+import androidx.appcompat.app.AlertDialog
 import com.example.sc2079.ui.coordinates.AddCoordinateFragment
 import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment
 import com.example.sc2079.ui.coordinates.SharedViewModel
@@ -49,7 +51,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnBluetooth: ImageButton
     private lateinit var btnAddCoordinate: ImageButton
     private lateinit var bluetoothStatus: ImageView
-    private var activateJoyStickBool = false;
+    private var activateJoyStickBool = false
+    private var isDayMode = false
 
     private val sharedViewModel: SharedViewModel by viewModels()
 
@@ -455,7 +458,6 @@ class MainActivity : AppCompatActivity() {
         val gridArea = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.constraintGridMapView)
         val subNavContainer = findViewById<android.widget.LinearLayout>(R.id.sub_navigation_container)
         val dpadCenter = findViewById<android.view.View>(R.id.dpadCenterSquare)
-        var isDayMode = false
 
         btnThemeToggle.setOnClickListener {
             isDayMode = !isDayMode
@@ -531,6 +533,11 @@ class MainActivity : AppCompatActivity() {
         val loadGridMapButton: MaterialButton = findViewById(R.id.load_map_button)
         loadGridMapButton.setOnClickListener {
             loadGridMapData()
+        }
+
+        val btnGridSize = findViewById<MaterialButton>(R.id.btn_grid_size)
+        btnGridSize.setOnClickListener {
+            showGridSizeDialog()
         }
 
         // Initalize navigation tabz
@@ -683,6 +690,46 @@ class MainActivity : AppCompatActivity() {
             (xAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
         }
     }
+    private fun showGridSizeDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_grid_size, null)
+        val colPicker = dialogView.findViewById<NumberPicker>(R.id.picker_cols)
+        val rowPicker = dialogView.findViewById<NumberPicker>(R.id.picker_rows)
+        colPicker.minValue = 5; colPicker.maxValue = 20; colPicker.value = gridMapObj.getGridColumns()
+        rowPicker.minValue = 5; rowPicker.maxValue = 20; rowPicker.value = gridMapObj.getGridRows()
+        AlertDialog.Builder(this)
+            .setTitle("Arena Size")
+            .setView(dialogView)
+            .setPositiveButton("Apply") { _, _ ->
+                applyGridSize(colPicker.value, rowPicker.value)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun applyGridSize(cols: Int, rows: Int) {
+        gridMapObj.setGridColumns(cols)
+        gridMapObj.setGridRows(rows)
+        gridMapObj.clearGridMap()
+
+        val cellSizePx = (28 * resources.displayMetrics.density).toInt()
+        val targetW = cols * cellSizePx
+        val targetH = rows * cellSizePx
+
+        val gridView = findViewById<LinearLayout>(R.id.gridMapView)
+        val params = gridView.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+        params.width = targetW
+        params.height = targetH
+        params.dimensionRatio = ""
+        gridView.layoutParams = params
+        gridView.requestLayout()
+
+        val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
+        val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
+        yAxis.removeAllViews()
+        xAxis.removeAllViews()
+        setupGraphAxes(this, !isDayMode)
+    }
+
     private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {
         val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
         val editor = sharedPreferences.edit()
