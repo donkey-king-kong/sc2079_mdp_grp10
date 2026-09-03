@@ -251,8 +251,7 @@
         <!-- Row 2: Joystick + Tabs -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_height="wrap_content"
             android:orientation="horizontal">
 
             <!-- D-pad + reverse buttons -->
@@ -419,7 +418,7 @@
             <LinearLayout
                 android:id="@+id/sub_navigation_container"
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -433,8 +432,7 @@
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/sub_navigation_bar"
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1" />
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
         </LinearLayout>
@@ -451,6 +449,7 @@
             android:paddingTop="3dp"
             android:paddingBottom="3dp">
 
+            <!-- Manual + Auto grouped together -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/manual_update_button"
                 style="@style/Widget.Material3.Button.TextButton"
@@ -458,6 +457,21 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Manual"
+                android:textSize="10sp"
+                android:textColor="@color/cyan"
+                android:singleLine="true"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_bold"
+                app:iconPadding="0dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/auto_update_button"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="Auto"
                 android:textSize="10sp"
                 android:textColor="@color/cyan"
                 android:singleLine="true"
@@ -484,26 +498,6 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/auto_update_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Auto"
-                android:textSize="10sp"
-                android:textColor="@color/cyan"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_bold"
                 app:iconPadding="0dp" />
 
             <View
