@@ -207,10 +207,10 @@
                     android:id="@+id/joystickView"
                     android:layout_width="140dp"
                     android:layout_height="140dp"
-                    app:JV_backgroundColor="@color/cyan"
-                    app:JV_borderColor="@color/white"
-                    app:JV_borderWidth="4dp"
-                    app:JV_buttonColor="@color/magenta"
+                    app:JV_backgroundColor="#1A3A50"
+                    app:JV_borderColor="#26B5CB"
+                    app:JV_borderWidth="2dp"
+                    app:JV_buttonColor="#26B5CB"
                     app:JV_buttonSizeRatio="15%"
                     app:JV_fixedCenter="false" />
 
@@ -226,18 +226,19 @@
                         android:layout_width="55dp"
                         android:layout_height="34dp"
                         android:background="@drawable/button_rounded_square_background"
+                        android:backgroundTint="#1A3A50"
                         android:src="@drawable/reverse_left_button"
                         android:layout_marginEnd="4dp"
-                        app:tint="@android:color/white" />
+                        app:tint="@color/cyan" />
 
                     <ImageButton
                         android:id="@+id/reverse_right_button"
                         android:layout_width="55dp"
                         android:layout_height="34dp"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/magenta"
+                        android:backgroundTint="#1A3A50"
                         android:src="@drawable/reverse_right_button"
-                        app:tint="@android:color/white" />
+                        app:tint="@color/cyan" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -270,96 +271,126 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginTop="4dp">
+            android:gravity="center_vertical"
+            android:background="@drawable/rounded_status_background"
+            android:backgroundTint="#111D35"
+            android:layout_marginTop="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/manual_update_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Manual"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="8sp"
+                android:textColor="@color/cyan"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_bold"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#2A4A6B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/auto_update_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Auto"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="8sp"
+                android:textColor="@color/cyan"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_bold"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#2A4A6B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/reset_map_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Reset"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="8sp"
+                android:textColor="#7A9AB8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#2A4A6B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/save_map_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Save"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="8sp"
+                android:textColor="#7A9AB8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#2A4A6B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/load_map_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Load"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="8sp"
+                android:textColor="#7A9AB8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#2A4A6B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clear_logs_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Clear"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="8sp"
+                android:textColor="#7A9AB8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
                 app:iconPadding="0dp" />
 
         </LinearLayout>
