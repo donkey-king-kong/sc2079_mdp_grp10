@@ -579,7 +579,7 @@ class MainActivity : AppCompatActivity() {
                 // Tab bar: restore dark background
                 tabs.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 tabs.setSelectedTabIndicatorColor(col("#F137A5"))
-                tabs.setTabIconTint(null)
+                tabs.setTabIconTint(android.content.res.ColorStateList.valueOf(col("#FFFFFF")))
                 updateAxisTextColor(true)
             }
         }
