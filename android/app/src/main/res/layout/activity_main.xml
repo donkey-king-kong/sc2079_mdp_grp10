@@ -195,7 +195,7 @@
             android:layout_weight="1"
             android:orientation="horizontal">
 
-            <!-- Joystick + reverse buttons -->
+            <!-- D-pad + reverse buttons -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
@@ -203,37 +203,108 @@
                 android:gravity="center"
                 android:layout_marginEnd="6dp">
 
-                <io.github.controlwear.virtual.joystick.android.JoystickView
-                    android:id="@+id/joystickView"
-                    android:layout_width="140dp"
-                    android:layout_height="140dp"
-                    app:JV_backgroundColor="#1E4A65"
-                    app:JV_borderColor="#4AD8F0"
-                    app:JV_borderWidth="3dp"
-                    app:JV_buttonColor="#4AD8F0"
-                    app:JV_buttonSizeRatio="15%"
-                    app:JV_fixedCenter="false" />
+                <!-- D-pad cross -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center">
 
+                    <!-- Up -->
+                    <Button
+                        android:id="@+id/dpad_up"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="▲"
+                        android:textSize="18sp"
+                        android:textColor="#4AD8F0"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:backgroundTint="#1E4A65"
+                        android:padding="0dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:layout_marginBottom="3dp" />
+
+                    <!-- Middle row: Left + Center spacer + Right -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginBottom="3dp">
+
+                        <Button
+                            android:id="@+id/dpad_left"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:text="◀"
+                            android:textSize="18sp"
+                            android:textColor="#4AD8F0"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:backgroundTint="#1E4A65"
+                            android:padding="0dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:layout_marginEnd="3dp" />
+
+                        <!-- Center gap -->
+                        <View
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:backgroundTint="#0F1C3A" />
+
+                        <Button
+                            android:id="@+id/dpad_right"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:text="▶"
+                            android:textSize="18sp"
+                            android:textColor="#4AD8F0"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:backgroundTint="#1E4A65"
+                            android:padding="0dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:layout_marginStart="3dp" />
+                    </LinearLayout>
+
+                    <!-- Down -->
+                    <Button
+                        android:id="@+id/dpad_down"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="▼"
+                        android:textSize="18sp"
+                        android:textColor="#4AD8F0"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:backgroundTint="#1E4A65"
+                        android:padding="0dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp" />
+                </LinearLayout>
+
+                <!-- Reverse buttons below d-pad -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center"
-                    android:layout_marginTop="4dp">
+                    android:layout_marginTop="6dp">
 
                     <ImageButton
                         android:id="@+id/reverse_left_button"
-                        android:layout_width="55dp"
+                        android:layout_width="48dp"
                         android:layout_height="34dp"
                         android:background="@drawable/button_rounded_square_background"
                         android:backgroundTint="#1E4A65"
                         android:src="@drawable/reverse_left_button"
-                        android:layout_marginEnd="4dp"
+                        android:layout_marginEnd="3dp"
                         app:tint="@color/cyan" />
 
                     <ImageButton
                         android:id="@+id/reverse_right_button"
-                        android:layout_width="55dp"
+                        android:layout_width="48dp"
                         android:layout_height="34dp"
                         android:background="@drawable/button_rounded_square_background"
                         android:backgroundTint="#1E4A65"

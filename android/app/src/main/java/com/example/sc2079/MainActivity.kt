@@ -35,7 +35,6 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.tabs.TabLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import io.github.controlwear.virtual.joystick.android.JoystickView
 import android.util.Base64
 import com.example.sc2079.ui.coordinates.AddCoordinateFragment
 import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment
@@ -447,44 +446,29 @@ class MainActivity : AppCompatActivity() {
         gridMapView.addView(gridMapObj)
         setupGraphAxes(this)
 
-        val joystick = findViewById<JoystickView>(R.id.joystickView)
-        joystick.setOnMoveListener({ angle, strength ->
-            // angle: 0–360 degrees (counterclockwise from the right)
-            // strength: 0–100% (distance from center)
-            Log.d("Joystick", "Angle: $angle°, Strength: $strength%")
-            // Find the top 3 stuff to update
-            activateJoyStickBool = true;
-            //givevehicleDirectionNow.setText(gridMapObj.getImmediateVehicleDirection());
-            //givevehicleCoordinatesNow.setText(gridMapObj.getImmediateVehicleCoord());
-            //givevehicleStatusNow.setText(gridMapObj.getImmediateVehicleStatus());
-            // Process joystick input here
-            if(strength > 80){
-                when(angle){
-                    in 0..30 -> {
-                        Log.d("Joystick", "East!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
-                    }
-                    in 60..120 -> {
-                        Log.d("Joystick", "North!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true)
-                    }
-                    in 150..210 -> {
-                        Log.d("Joystick","West!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.WEST, true)
-                    }
-                    in 240..320 -> {
-                        Log.d("Joystick","South!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.SOUTH, true)
-                    }
+        // D-pad buttons
+        val dpadUp = findViewById<android.widget.Button>(R.id.dpad_up)
+        val dpadDown = findViewById<android.widget.Button>(R.id.dpad_down)
+        val dpadLeft = findViewById<android.widget.Button>(R.id.dpad_left)
+        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
 
-                    in 330..360 -> {
-                        Log.d("Joystick","East!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
-                    }
-                }
+        dpadUp.setOnClickListener {
+            activateJoyStickBool = true
+            gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true)
+        }
+        dpadDown.setOnClickListener {
+            activateJoyStickBool = true
+            gridMapObj.moveVehicleStraight(ObstacleData.Direction.SOUTH, true)
+        }
+        dpadLeft.setOnClickListener {
+            activateJoyStickBool = true
+            gridMapObj.moveVehicleStraight(ObstacleData.Direction.WEST, true)
+        }
+        dpadRight.setOnClickListener {
+            activateJoyStickBool = true
+            gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
+        }
 
-            }
-        }, 1000)  // update interval in ms (50ms ≈ 20 updates/second)
         val reverseLeftButton = findViewById<ImageButton>(R.id.reverse_left_button)
         val reverseRightButton = findViewById<ImageButton>(R.id.reverse_right_button)
 
