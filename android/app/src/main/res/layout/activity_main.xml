@@ -207,10 +207,10 @@
                     android:id="@+id/joystickView"
                     android:layout_width="140dp"
                     android:layout_height="140dp"
-                    app:JV_backgroundColor="#1A3A50"
-                    app:JV_borderColor="#26B5CB"
-                    app:JV_borderWidth="2dp"
-                    app:JV_buttonColor="#26B5CB"
+                    app:JV_backgroundColor="#1E4A65"
+                    app:JV_borderColor="#4AD8F0"
+                    app:JV_borderWidth="3dp"
+                    app:JV_buttonColor="#4AD8F0"
                     app:JV_buttonSizeRatio="15%"
                     app:JV_fixedCenter="false" />
 
@@ -226,7 +226,7 @@
                         android:layout_width="55dp"
                         android:layout_height="34dp"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1A3A50"
+                        android:backgroundTint="#1E4A65"
                         android:src="@drawable/reverse_left_button"
                         android:layout_marginEnd="4dp"
                         app:tint="@color/cyan" />
@@ -236,7 +236,7 @@
                         android:layout_width="55dp"
                         android:layout_height="34dp"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1A3A50"
+                        android:backgroundTint="#1E4A65"
                         android:src="@drawable/reverse_right_button"
                         app:tint="@color/cyan" />
                 </LinearLayout>
@@ -273,10 +273,10 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="#111D35"
+            android:backgroundTint="#1E3A5F"
             android:layout_marginTop="6dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp">
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/manual_update_button"
@@ -285,7 +285,7 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Manual"
-                android:textSize="8sp"
+                android:textSize="10sp"
                 android:textColor="@color/cyan"
                 android:singleLine="true"
                 android:insetTop="0dp"
@@ -296,7 +296,7 @@
             <View
                 android:layout_width="1dp"
                 android:layout_height="16dp"
-                android:background="#2A4A6B" />
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/auto_update_button"
@@ -305,7 +305,7 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Auto"
-                android:textSize="8sp"
+                android:textSize="10sp"
                 android:textColor="@color/cyan"
                 android:singleLine="true"
                 android:insetTop="0dp"
@@ -316,7 +316,7 @@
             <View
                 android:layout_width="1dp"
                 android:layout_height="16dp"
-                android:background="#2A4A6B" />
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/reset_map_button"
@@ -325,8 +325,8 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Reset"
-                android:textSize="8sp"
-                android:textColor="#7A9AB8"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
@@ -336,7 +336,7 @@
             <View
                 android:layout_width="1dp"
                 android:layout_height="16dp"
-                android:background="#2A4A6B" />
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/save_map_button"
@@ -345,8 +345,8 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Save"
-                android:textSize="8sp"
-                android:textColor="#7A9AB8"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
@@ -356,7 +356,7 @@
             <View
                 android:layout_width="1dp"
                 android:layout_height="16dp"
-                android:background="#2A4A6B" />
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/load_map_button"
@@ -365,8 +365,8 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Load"
-                android:textSize="8sp"
-                android:textColor="#7A9AB8"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
@@ -376,7 +376,7 @@
             <View
                 android:layout_width="1dp"
                 android:layout_height="16dp"
-                android:background="#2A4A6B" />
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clear_logs_button"
@@ -385,8 +385,8 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Clear"
-                android:textSize="8sp"
-                android:textColor="#7A9AB8"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
