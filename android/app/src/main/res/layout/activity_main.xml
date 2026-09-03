@@ -62,142 +62,168 @@
         android:orientation="vertical"
         android:padding="6dp">
 
-        <!-- Row 1: Status cards + action buttons -->
+        <!-- Row 1: Header — info cards + action buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
+            android:background="@drawable/rounded_status_background"
+            android:backgroundTint="@color/dark_blue_200"
+            android:paddingStart="8dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:layout_marginBottom="6dp">
 
-            <!-- Coordinates card -->
+            <!-- Coordinates card: primary info, accented left border -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:padding="6dp"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/dark_blue_200"
-                android:layout_marginEnd="4dp">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginEnd="6dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Coordinates"
-                    android:textSize="10sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_bold" />
+                <!-- Cyan accent bar -->
+                <View
+                    android:layout_width="3dp"
+                    android:layout_height="36dp"
+                    android:background="@color/cyan"
+                    android:layout_marginEnd="6dp" />
 
-                <TextView
-                    android:id="@+id/give_vehicle_coord_now"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="(x,y)"
-                    android:textSize="12sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_regular" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/give_vehicle_direction_now"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="EMPTY"
-                    android:textSize="12sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_regular" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="POSITION"
+                        android:textSize="7sp"
+                        android:letterSpacing="0.12"
+                        android:textColor="#5A8AAA"
+                        android:fontFamily="@font/poppins_bold" />
+
+                    <TextView
+                        android:id="@+id/give_vehicle_coord_now"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="— , —"
+                        android:textSize="13sp"
+                        android:textColor="@color/white"
+                        android:fontFamily="@font/poppins_bold" />
+
+                    <TextView
+                        android:id="@+id/give_vehicle_direction_now"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No vehicle"
+                        android:textSize="9sp"
+                        android:textColor="#7AAFCB"
+                        android:fontFamily="@font/poppins_regular" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Status card -->
+            <!-- Divider -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="32dp"
+                android:background="#2A4A6B"
+                android:layout_marginEnd="8dp" />
+
+            <!-- Status card: secondary info -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical"
-                android:padding="6dp"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/dark_blue_200"
-                android:layout_marginEnd="4dp">
+                android:layout_marginEnd="8dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Status"
-                    android:textSize="10sp"
-                    android:textColor="@color/white"
+                    android:text="STATUS"
+                    android:textSize="7sp"
+                    android:letterSpacing="0.12"
+                    android:textColor="#5A8AAA"
                     android:fontFamily="@font/poppins_bold" />
 
                 <TextView
                     android:id="@+id/give_vehicle_status_now"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Inactive"
-                    android:textSize="10sp"
+                    android:text="Idle"
+                    android:textSize="11sp"
                     android:textColor="@color/white"
                     android:fontFamily="@font/poppins_regular" />
             </LinearLayout>
 
-            <!-- Icon buttons -->
-            <ImageButton
-                android:id="@+id/btnAddCoordinate"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/button_rounded_square_background"
-                android:backgroundTint="@color/cyan"
-                android:contentDescription="Add Coordinate"
-                android:padding="8dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/plus_for_enter"
-                android:layout_marginEnd="4dp"
-                app:tint="@android:color/white" />
-
-            <!-- Day/Night theme toggle -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnThemeToggle"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:text="☀"
-                android:textSize="16sp"
-                android:textColor="@color/cyan"
-                android:padding="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:layout_marginEnd="4dp"
-                app:iconPadding="0dp" />
-
-            <!-- Bluetooth button + status indicator -->
-            <FrameLayout
-                android:layout_width="40dp"
-                android:layout_height="40dp">
+            <!-- Action buttons group -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
                 <ImageButton
-                    android:id="@+id/btnBluetooth"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:id="@+id/btnAddCoordinate"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:background="@drawable/button_rounded_square_background"
                     android:backgroundTint="@color/cyan"
-                    android:contentDescription="Bluetooth"
-                    android:padding="8dp"
+                    android:contentDescription="Place obstacle or vehicle"
+                    android:padding="7dp"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/ic_bluetooth_24dp"
+                    android:src="@drawable/plus_for_enter"
+                    android:layout_marginEnd="4dp"
                     app:tint="@android:color/white" />
 
-                <ImageView
-                    android:id="@+id/bluetoothStatus"
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:layout_gravity="end|bottom"
-                    android:background="@drawable/circle_background"
-                    android:backgroundTint="@color/status_disconnected"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_status_disconnected_24dp" />
-            </FrameLayout>
+                <!-- Day/Night theme toggle -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnThemeToggle"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:text="☀"
+                    android:textSize="15sp"
+                    android:textColor="@color/cyan"
+                    android:padding="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:layout_marginEnd="4dp"
+                    app:iconPadding="0dp" />
+
+                <!-- Bluetooth button + status dot -->
+                <FrameLayout
+                    android:layout_width="36dp"
+                    android:layout_height="36dp">
+
+                    <ImageButton
+                        android:id="@+id/btnBluetooth"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:backgroundTint="@color/cyan"
+                        android:contentDescription="Bluetooth"
+                        android:padding="7dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_bluetooth_24dp"
+                        app:tint="@android:color/white" />
+
+                    <ImageView
+                        android:id="@+id/bluetoothStatus"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:layout_gravity="end|bottom"
+                        android:background="@drawable/circle_background"
+                        android:backgroundTint="@color/status_disconnected"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_status_disconnected_24dp" />
+                </FrameLayout>
+            </LinearLayout>
 
         </LinearLayout>
 
