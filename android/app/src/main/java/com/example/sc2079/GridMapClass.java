@@ -126,39 +126,40 @@ public class GridMapClass extends View {
                     return false;
                 }
 
-                switch (currentMode) {
-                    case ADD_VEHICLE:
-                        addVehicleToMap(x_coord, y_coord);
-                        break;
-                    case ADD_OBSTACLE:
-                        addNewObstacleToGrid(x_coord, y_coord);
-                        break;
-                    case REMOVE:
-                        removeFromGrid(x_coord, y_coord, true);
-                        break;
-                    case NONE:
-                    default:
-                        // Tap cycles direction: N→E→S→W→N for obstacles and vehicle
-                        ObstacleData tappedCell = gridMapData.get(y_coord).get(x_coord);
-                        if (tappedCell.getOccupied()) {
-                            if (tappedCell.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle) {
-                                changeDirectionOfObstacle(x_coord, y_coord, true);
-                            } else if (tappedCell.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle) {
-                                int[] bl = findVehicleBottomLeftObstacle();
-                                if (bl[0] != -2) {
-                                    ObstacleData.Direction cur = gridMapData.get(bl[1]).get(bl[0]).getDirection();
-                                    ObstacleData.Direction next;
-                                    switch (cur) {
-                                        case NORTH: next = ObstacleData.Direction.EAST;  break;
-                                        case EAST:  next = ObstacleData.Direction.SOUTH; break;
-                                        case SOUTH: next = ObstacleData.Direction.WEST;  break;
-                                        default:    next = ObstacleData.Direction.NORTH; break;
-                                    }
-                                    changeVehicleDirection(next);
-                                }
+                ObstacleData tappedCell = gridMapData.get(y_coord).get(x_coord);
+                if (currentMode == GridMode.REMOVE) {
+                    // Remove mode always removes whatever is tapped
+                    removeFromGrid(x_coord, y_coord, true);
+                } else if (tappedCell.getOccupied()) {
+                    // Tap on occupied cell cycles direction regardless of active mode
+                    if (tappedCell.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle) {
+                        changeDirectionOfObstacle(x_coord, y_coord, true);
+                    } else if (tappedCell.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle) {
+                        int[] bl = findVehicleBottomLeftObstacle();
+                        if (bl[0] != -2) {
+                            ObstacleData.Direction cur = gridMapData.get(bl[1]).get(bl[0]).getDirection();
+                            ObstacleData.Direction next;
+                            switch (cur) {
+                                case NORTH: next = ObstacleData.Direction.EAST;  break;
+                                case EAST:  next = ObstacleData.Direction.SOUTH; break;
+                                case SOUTH: next = ObstacleData.Direction.WEST;  break;
+                                default:    next = ObstacleData.Direction.NORTH; break;
                             }
+                            changeVehicleDirection(next);
                         }
-                        break;
+                    }
+                } else {
+                    // Empty cell — apply placement mode
+                    switch (currentMode) {
+                        case ADD_VEHICLE:
+                            addVehicleToMap(x_coord, y_coord);
+                            break;
+                        case ADD_OBSTACLE:
+                            addNewObstacleToGrid(x_coord, y_coord);
+                            break;
+                        default:
+                            break;
+                    }
                 }
                 invalidate();
                 return true;
