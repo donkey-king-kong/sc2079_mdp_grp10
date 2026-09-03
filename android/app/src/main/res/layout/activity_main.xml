@@ -260,7 +260,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center"
+                android:gravity="top|center_horizontal"
+                android:layout_marginTop="8dp"
                 android:layout_marginEnd="6dp">
 
                 <!-- D-pad cross -->
@@ -309,10 +310,11 @@
 
                         <!-- Center gap -->
                         <View
+                            android:id="@+id/dpadCenterSquare"
                             android:layout_width="48dp"
                             android:layout_height="48dp"
                             android:background="@drawable/button_rounded_square_background"
-                            android:backgroundTint="#0F1C3A" />
+                            android:backgroundTint="#2A4A6A" />
 
                         <Button
                             android:id="@+id/dpad_right"
