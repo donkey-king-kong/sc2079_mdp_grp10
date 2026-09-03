@@ -495,18 +495,39 @@ public class GridMapClass extends View {
         // 1. Draw Green Body
         canvas.drawRect(left, top, right, bottom, greenPaint);
 
-        // 2. Draw Red Outline
-        Paint outlinePaint = new Paint(redPaint);
+        // 2. Draw Cyan Outline (neutral — direction shown by bar, not border color)
+        Paint outlinePaint = new Paint();
         outlinePaint.setStyle(Paint.Style.STROKE);
-        outlinePaint.setStrokeWidth(10f);
+        outlinePaint.setStrokeWidth(6f);
+        outlinePaint.setColor(Color.parseColor("#26B5CB"));
+        outlinePaint.setAntiAlias(true);
         canvas.drawRect(left, top, right, bottom, outlinePaint);
 
-        // 3. Draw Blue Arrow in the center cell
+        // 3. Draw direction bar spanning the full facing edge of the 3x3 block
+        Paint dirPaint = new Paint();
+        dirPaint.setStyle(Paint.Style.STROKE);
+        dirPaint.setStrokeWidth(10f);
+        dirPaint.setColor(Color.RED);
+        dirPaint.setAntiAlias(true);
+        float sx, sy, ex, ey;
+        switch (robotData.getDirection()) {
+            case NORTH: sx = left;  sy = top;    ex = right; ey = top;    break;
+            case SOUTH: sx = left;  sy = bottom; ex = right; ey = bottom; break;
+            case EAST:  sx = right; sy = top;    ex = right; ey = bottom; break;
+            case WEST:  sx = left;  sy = top;    ex = left;  ey = bottom; break;
+            default:    sx = left;  sy = top;    ex = right; ey = top;    break;
+        }
+        canvas.drawLine(sx, sy, ex, ey, dirPaint);
+
+        // 4. Draw White Arrow in the center cell
         float centerX = left + 1.5f * cellWidth;
         float centerY = top + 1.5f * cellHeight;
         float arrowSize = Math.min(cellWidth, cellHeight) * 0.8f;
 
-        drawArrow(canvas, centerX, centerY, arrowSize, robotData.getDirection(), bluePaint);
+        Paint arrowPaint = new Paint();
+        arrowPaint.setColor(Color.WHITE);
+        arrowPaint.setAntiAlias(true);
+        drawArrow(canvas, centerX, centerY, arrowSize, robotData.getDirection(), arrowPaint);
     }
 
     private void drawArrow(Canvas canvas, float cx, float cy, float size, ObstacleData.Direction direction, Paint paint) {
