@@ -452,6 +452,9 @@ class MainActivity : AppCompatActivity() {
         val btnThemeToggle = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnThemeToggle)
         val rootContainer = findViewById<android.widget.LinearLayout>(R.id.container)
         val rightPanel = findViewById<android.widget.LinearLayout>(R.id.rightPanel)
+        val gridArea = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.constraintGridMapView)
+        val subNavContainer = findViewById<android.widget.LinearLayout>(R.id.sub_navigation_container)
+        val dpadCenter = findViewById<android.view.View>(R.id.dpadCenterSquare)
         var isDayMode = false
 
         btnThemeToggle.setOnClickListener {
@@ -460,10 +463,18 @@ class MainActivity : AppCompatActivity() {
                 btnThemeToggle.text = "🌙"
                 rootContainer.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
                 rightPanel.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
+                gridArea.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
+                subNavContainer.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
+                dpadCenter.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#C5D5E8"))
+                updateAxisTextColor(false)
             } else {
                 btnThemeToggle.text = "☀"
                 rootContainer.setBackgroundColor(android.graphics.Color.parseColor("#0F1C3A"))
                 rightPanel.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                gridArea.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                subNavContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                dpadCenter.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#2A4A6A"))
+                updateAxisTextColor(true)
             }
         }
 
@@ -473,7 +484,7 @@ class MainActivity : AppCompatActivity() {
         gridMapObj.setGridColumns(20)
         gridMapObj.setGridRows(20)
         gridMapView.addView(gridMapObj)
-        setupGraphAxes(this)
+        setupGraphAxes(this, true)
 
         // D-pad buttons
         val dpadUp = findViewById<android.widget.Button>(R.id.dpad_up)
@@ -629,15 +640,17 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(updateTask) // Stop updating when activity is hidden
     }
 
-    fun setupGraphAxes(context: Context) {
+    fun setupGraphAxes(context: Context, isDark: Boolean) {
         val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
         val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
+        val axisColor = if (isDark) Color.WHITE else Color.BLACK
+        val rows = gridMapObj.getGridRows()
+        val cols = gridMapObj.getGridColumns()
 
-        // Y-axis: 19 (top) to 0 (bottom)
-        for (i in 19 downTo 0) {
+        for (i in (rows - 1) downTo 0) {
             val textView = TextView(context)
             textView.text = i.toString()
-            textView.setTextColor(Color.WHITE)
+            textView.setTextColor(axisColor)
             textView.gravity = Gravity.CENTER
             textView.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -646,17 +659,28 @@ class MainActivity : AppCompatActivity() {
             yAxis.addView(textView)
         }
 
-        // X-axis: 0 to 19
-        for (i in 0..19) {
+        for (i in 0 until cols) {
             val textView = TextView(context)
             textView.text = i.toString()
-            textView.setTextColor(Color.WHITE)
+            textView.setTextColor(axisColor)
             textView.gravity = Gravity.CENTER
             textView.layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.MATCH_PARENT, 1f
             )
             xAxis.addView(textView)
+        }
+    }
+
+    private fun updateAxisTextColor(isDark: Boolean) {
+        val axisColor = if (isDark) Color.WHITE else Color.BLACK
+        val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
+        val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
+        for (i in 0 until yAxis.childCount) {
+            (yAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
+        }
+        for (i in 0 until xAxis.childCount) {
+            (xAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
         }
     }
     private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {
