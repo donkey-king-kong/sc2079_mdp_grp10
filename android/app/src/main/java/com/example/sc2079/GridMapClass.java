@@ -698,6 +698,23 @@ public class GridMapClass extends View {
         return true;
     }
 
+    // Add obstacle received from AMD — does not echo back over Bluetooth
+    private int addObstacleFromAmd(int x_coord, int y_coord) {
+        if (checkValidObstacle(x_coord, y_coord)) {
+            ObstacleData gridMapObstacle = gridMapData.get(y_coord).get(x_coord);
+            if (!gridMapObstacle.getOccupied()) {
+                obstacleCount += 1;
+                changeObstacleData(x_coord, y_coord, true, ObstacleData.Direction.NORTH, ObstacleData.OBSTACLETYPE.Obstacle, false, obstacleCount);
+                placedObstacles.add(gridMapObstacle);
+                return 1;
+            } else {
+                return 2;
+            }
+        } else {
+            return 0;
+        }
+    }
+
     // Add new Obstacle
     public int addNewObstacleToGrid(int x_coord, int y_coord) {
         if (checkValidObstacle(x_coord, y_coord)) {
@@ -1720,7 +1737,9 @@ public class GridMapClass extends View {
                 int val = Integer.parseInt(String.valueOf(c), 16);
                 binary.append(String.format("%4s", Integer.toBinaryString(val)).replace(' ', '0'));
             }
-            // Clear existing obstacles (keep vehicle)
+            // Clear existing obstacles (keep vehicle), properly updating placedObstacles
+            placedObstacles.clear();
+            obstacleCount = 0;
             for (int y = 0; y < gridRows; y++) {
                 for (int x = 0; x < gridColumns; x++) {
                     ObstacleData cell = gridMapData.get(y).get(x);
@@ -1735,7 +1754,7 @@ public class GridMapClass extends View {
                 for (int col = 0; col < gridColumns && idx < binary.length(); col++) {
                     if (binary.charAt(idx) == '1') {
                         int tabletY = gridRows - 1 - row;
-                        addNewObstacleToGrid(col, tabletY);
+                        addObstacleFromAmd(col, tabletY);
                     }
                     idx++;
                 }
@@ -1894,7 +1913,6 @@ public class GridMapClass extends View {
             stringBuilder.append("{\"obstacles\":");
             stringBuilder.append("[");
 
-            // For obstacle
             if(placedObstacles.size() == 0){
                 stringBuilder.append("]");
                 utilitiesClass.arenaData = stringBuilder.toString();
@@ -1903,7 +1921,6 @@ public class GridMapClass extends View {
             }
             reformatObstacleDataArray();
             for(int i=0; i< placedObstacles.size(); i++){
-                // change direction to number
                 stringBuilder.append("{\"x\": "+placedObstacles.get(i).getXCoord()+",");
                 stringBuilder.append("\"y\": "+placedObstacles.get(i).getYCoord()+",");
                 stringBuilder.append("\"d\": "+placedObstacles.get(i).getDirection().getIntFromDirection()+",");
@@ -1920,8 +1937,6 @@ public class GridMapClass extends View {
 
             utilitiesClass.arenaData = stringBuilder.toString();
             btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
-            // {cat: 'sendArena', 'value': [{}]}
-            // 1st value is vehicle origin left, the rest are obstacle data
         } else {
             Log.d("Sending Message", "Unable to send Message to send Arena Data to Bluetooth!");
         }
