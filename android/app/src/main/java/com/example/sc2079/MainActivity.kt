@@ -417,19 +417,29 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Requested arena update", Toast.LENGTH_SHORT).show()
         }
 
-        btnAuto.setOnClickListener {
-            if (btnAuto.text == "Auto") {
-                btnAuto.text = "Auto: ON"
-                btnAuto.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                    android.graphics.Color.parseColor("#2E7D32") // green when active
-                )
-                autoHandler.post(autoRunnable)
-                Toast.makeText(this, "Auto update ON (every 2s)", Toast.LENGTH_SHORT).show()
+        var autoActive = false
+        val autoCyan = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#26B5CB"))
+        val autoGreen = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#4CCB67"))
+
+        fun updateAutoVisual() {
+            if (autoActive) {
+                btnAuto.setTextColor(android.graphics.Color.parseColor("#4CCB67"))
+                btnAuto.strokeColor = autoGreen
+                btnAuto.strokeWidth = resources.getDimensionPixelSize(com.google.android.material.R.dimen.mtrl_btn_stroke_size).coerceAtLeast(2)
             } else {
-                btnAuto.text = "Auto"
-                btnAuto.backgroundTintList = null // restore default outline style
+                btnAuto.setTextColor(android.graphics.Color.parseColor("#26B5CB"))
+                btnAuto.strokeColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
+                btnAuto.strokeWidth = 0
+            }
+        }
+
+        btnAuto.setOnClickListener {
+            autoActive = !autoActive
+            updateAutoVisual()
+            if (autoActive) {
+                autoHandler.post(autoRunnable)
+            } else {
                 autoHandler.removeCallbacks(autoRunnable)
-                Toast.makeText(this, "Auto update OFF", Toast.LENGTH_SHORT).show()
             }
         }
 
