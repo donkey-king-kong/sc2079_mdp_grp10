@@ -711,15 +711,13 @@ class MainActivity : AppCompatActivity() {
         gridMapObj.setGridRows(rows)
         gridMapObj.clearGridMap()
 
-        val cellSizePx = (28 * resources.displayMetrics.density).toInt()
-        val targetW = cols * cellSizePx
-        val targetH = rows * cellSizePx
-
+        // Keep the grid view filling the full area with the correct col:row ratio
+        // so cells are always as large as possible without overflowing.
         val gridView = findViewById<LinearLayout>(R.id.gridMapView)
         val params = gridView.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
-        params.width = targetW
-        params.height = targetH
-        params.dimensionRatio = ""
+        params.width = 0
+        params.height = 0
+        params.dimensionRatio = "$cols:$rows"
         gridView.layoutParams = params
         gridView.requestLayout()
 
