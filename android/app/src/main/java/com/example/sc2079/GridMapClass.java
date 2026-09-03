@@ -1514,15 +1514,24 @@ public class GridMapClass extends View {
 
     public boolean changeVehicleDirection(ObstacleData.Direction newDirection) {
         int countVehicleObstacle = 0;
+        int firstX = -1;
+        int firstY = -1;
         for (int y = 0; y < hardLimit; y++) {
             for (int x = 0; x < hardLimit; x++) {
                 ObstacleData gridMapObstacle = gridMapData.get(y).get(x);
                 if (gridMapObstacle.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle) {
+                    if (firstX == -1) {
+                        firstX = x;
+                        firstY = y;
+                    }
                     if (vehicleHardLimitSize > countVehicleObstacle) {
                         changeObstacleData(x, y, gridMapObstacle.getOccupied(), newDirection, gridMapObstacle.getObstacleType(), gridMapObstacle.getVerified(), gridMapObstacle.getObstacleNumber());
                     }
                 }
             }
+        }
+        if (firstX != -1) {
+            sendTabletUpdateToAMD("Robot", firstX, firstY, newDirection);
         }
         invalidate();
         return true;
@@ -2139,11 +2148,27 @@ public class GridMapClass extends View {
         FINDetected = updateFIN;
     }
 
+    public void sendTabletUpdateToAMD(String type, int x, int y, ObstacleData.Direction direction) {
+        if (btService != null) {
+            int degrees = 0;
+            switch (direction) {
+                case NORTH: degrees = 0; break;
+                case EAST: degrees = 90; break;
+                case SOUTH: degrees = 180; break;
+                case WEST: degrees = 270; break;
+                default: degrees = 0; break;
+            }
+            String msg = "{\"Type\": \"" + type + "\", \"X\": " + x + ", \"Y\": " + y + ", \"Direction\": " + degrees + "}";
+            btService.write(msg.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
     public void sendObstacleDirectionBluetooth(int x, int y) {
         if (btService != null) {
             ObstacleData obs = gridMapData.get(y).get(x);
             String msg = "{\"cat\": \"obstacle\", \"value\": {\"x\": " + x + ", \"y\": " + y + ", \"d\": " + obs.getDirection().getIntFromDirection() + ", \"id\": " + obs.getObstacleNumber() + "}}";
             btService.write(msg.getBytes(StandardCharsets.UTF_8));
+            sendTabletUpdateToAMD("Obstacle", x, y, obs.getDirection());
         }
     }
 
