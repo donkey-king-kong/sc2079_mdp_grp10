@@ -156,7 +156,20 @@
                 android:layout_marginEnd="4dp"
                 app:tint="@android:color/white" />
 
-
+            <!-- Day/Night theme toggle -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeToggle"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="☀"
+                android:textSize="16sp"
+                android:textColor="@color/cyan"
+                android:padding="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:layout_marginEnd="4dp"
+                app:iconPadding="0dp" />
 
             <!-- Bluetooth button + status indicator -->
             <FrameLayout

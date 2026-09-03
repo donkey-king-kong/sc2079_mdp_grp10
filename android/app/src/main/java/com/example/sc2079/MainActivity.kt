@@ -448,6 +448,25 @@ class MainActivity : AppCompatActivity() {
             FragmentPagerAdapter.BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT
         )
 
+        // Day/Night theme toggle
+        val btnThemeToggle = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnThemeToggle)
+        val rootContainer = findViewById<android.widget.LinearLayout>(R.id.container)
+        val rightPanel = findViewById<android.widget.LinearLayout>(R.id.rightPanel)
+        var isDayMode = false
+
+        btnThemeToggle.setOnClickListener {
+            isDayMode = !isDayMode
+            if (isDayMode) {
+                btnThemeToggle.text = "🌙"
+                rootContainer.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
+                rightPanel.setBackgroundColor(android.graphics.Color.parseColor("#F0F4F8"))
+            } else {
+                btnThemeToggle.text = "☀"
+                rootContainer.setBackgroundColor(android.graphics.Color.parseColor("#0F1C3A"))
+                rightPanel.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            }
+        }
+
         // Initializes gridmap
         val gridMapView = findViewById<LinearLayout>(R.id.gridMapView)
         gridMapObj = GridMapClass(this)
