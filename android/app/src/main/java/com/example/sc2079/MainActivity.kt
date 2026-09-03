@@ -418,17 +418,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         var autoActive = false
-        val autoCyan = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#26B5CB"))
-        val autoGreen = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#4CCB67"))
+        val colorGreenFill = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#2E7D32"))
+        val colorTransparent = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
 
         fun updateAutoVisual() {
             if (autoActive) {
-                btnAuto.setTextColor(android.graphics.Color.parseColor("#4CCB67"))
-                btnAuto.strokeColor = autoGreen
-                btnAuto.strokeWidth = resources.getDimensionPixelSize(com.google.android.material.R.dimen.mtrl_btn_stroke_size).coerceAtLeast(2)
+                btnAuto.backgroundTintList = colorGreenFill
+                btnAuto.setTextColor(android.graphics.Color.WHITE)
+                btnAuto.strokeWidth = 0
             } else {
+                btnAuto.backgroundTintList = colorTransparent
                 btnAuto.setTextColor(android.graphics.Color.parseColor("#26B5CB"))
-                btnAuto.strokeColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
                 btnAuto.strokeWidth = 0
             }
         }
@@ -498,18 +498,18 @@ class MainActivity : AppCompatActivity() {
             gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
         }
 
-        val reverseLeftButton = findViewById<ImageButton>(R.id.reverse_left_button)
-        val reverseRightButton = findViewById<ImageButton>(R.id.reverse_right_button)
+        val reverseLeftButton = findViewById<android.widget.LinearLayout>(R.id.reverse_left_button)
+        val reverseRightButton = findViewById<android.widget.LinearLayout>(R.id.reverse_right_button)
 
-        reverseLeftButton.setOnClickListener({
+        reverseLeftButton.setOnClickListener {
             Log.d("JoystickButtons", "Reverse Left clicked")
-            gridMapObj.reverseLeftVehicle(true);
-        })
+            gridMapObj.reverseLeftVehicle(true)
+        }
 
-        reverseRightButton.setOnClickListener({
+        reverseRightButton.setOnClickListener {
             Log.d("JoystickButtons", "Reverse Right clicked")
-            gridMapObj.reverseRightVehicle(true);
-        })
+            gridMapObj.reverseRightVehicle(true)
+        }
 
         val saveGridMapButton: MaterialButton = findViewById(R.id.save_map_button)
 

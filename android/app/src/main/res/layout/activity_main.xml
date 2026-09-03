@@ -65,31 +65,36 @@
         <!-- Row 1: Header — info cards + action buttons -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="52dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@drawable/rounded_status_background"
             android:backgroundTint="@color/dark_blue_200"
-            android:paddingStart="8dp"
-            android:paddingEnd="6dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
             android:layout_marginBottom="6dp">
 
-            <!-- Coordinates card: primary info, accented left border -->
+            <!-- Coordinates pill card -->
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginEnd="6dp">
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#1A3A5C"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:layout_marginEnd="5dp">
 
-                <!-- Cyan accent bar -->
+                <!-- Cyan accent dot -->
                 <View
-                    android:layout_width="3dp"
-                    android:layout_height="36dp"
-                    android:background="@color/cyan"
+                    android:layout_width="5dp"
+                    android:layout_height="5dp"
+                    android:background="@drawable/circle_background"
+                    android:backgroundTint="@color/cyan"
                     android:layout_marginEnd="6dp" />
 
                 <LinearLayout
@@ -102,128 +107,144 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="POSITION"
-                        android:textSize="7sp"
-                        android:letterSpacing="0.12"
+                        android:textSize="6sp"
+                        android:letterSpacing="0.10"
+                        android:textColor="#5A8AAA"
+                        android:fontFamily="@font/poppins_bold" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/give_vehicle_coord_now"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="—,—"
+                            android:textSize="12sp"
+                            android:textColor="@color/white"
+                            android:fontFamily="@font/poppins_bold" />
+
+                        <TextView
+                            android:id="@+id/give_vehicle_direction_now"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=" · —"
+                            android:textSize="9sp"
+                            android:textColor="#7AAFCB"
+                            android:fontFamily="@font/poppins_regular"
+                            android:layout_marginStart="3dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Status pill card -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#1A3A5C"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:layout_marginEnd="8dp">
+
+                <!-- Amber accent dot -->
+                <View
+                    android:layout_width="5dp"
+                    android:layout_height="5dp"
+                    android:background="@drawable/circle_background"
+                    android:backgroundTint="#F5A623"
+                    android:layout_marginEnd="6dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="STATUS"
+                        android:textSize="6sp"
+                        android:letterSpacing="0.10"
                         android:textColor="#5A8AAA"
                         android:fontFamily="@font/poppins_bold" />
 
                     <TextView
-                        android:id="@+id/give_vehicle_coord_now"
+                        android:id="@+id/give_vehicle_status_now"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="— , —"
-                        android:textSize="13sp"
+                        android:text="Idle"
+                        android:textSize="11sp"
                         android:textColor="@color/white"
-                        android:fontFamily="@font/poppins_bold" />
-
-                    <TextView
-                        android:id="@+id/give_vehicle_direction_now"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="No vehicle"
-                        android:textSize="9sp"
-                        android:textColor="#7AAFCB"
                         android:fontFamily="@font/poppins_regular" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Divider -->
-            <View
-                android:layout_width="1dp"
-                android:layout_height="32dp"
-                android:background="#2A4A6B"
-                android:layout_marginEnd="8dp" />
+            <!-- Action buttons group: same 36dp height, same pill background, evenly spaced -->
+            <ImageButton
+                android:id="@+id/btnAddCoordinate"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#1A3A5C"
+                android:contentDescription="Place obstacle or vehicle"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/plus_for_enter"
+                android:layout_marginEnd="5dp"
+                app:tint="@color/cyan" />
 
-            <!-- Status card: secondary info -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginEnd="8dp">
+            <!-- Day/Night theme toggle -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeToggle"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:text="☀"
+                android:textSize="14sp"
+                android:textColor="@color/cyan"
+                android:padding="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:layout_marginEnd="5dp"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#1A3A5C"
+                app:iconPadding="0dp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="STATUS"
-                    android:textSize="7sp"
-                    android:letterSpacing="0.12"
-                    android:textColor="#5A8AAA"
-                    android:fontFamily="@font/poppins_bold" />
-
-                <TextView
-                    android:id="@+id/give_vehicle_status_now"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Idle"
-                    android:textSize="11sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_regular" />
-            </LinearLayout>
-
-            <!-- Action buttons group -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+            <!-- Bluetooth button + status dot -->
+            <FrameLayout
+                android:layout_width="36dp"
+                android:layout_height="36dp">
 
                 <ImageButton
-                    android:id="@+id/btnAddCoordinate"
+                    android:id="@+id/btnBluetooth"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:backgroundTint="@color/cyan"
-                    android:contentDescription="Place obstacle or vehicle"
-                    android:padding="7dp"
+                    android:background="@drawable/rounded_status_background"
+                    android:backgroundTint="#1A3A5C"
+                    android:contentDescription="Bluetooth"
+                    android:padding="8dp"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/plus_for_enter"
-                    android:layout_marginEnd="4dp"
-                    app:tint="@android:color/white" />
+                    android:src="@drawable/ic_bluetooth_24dp"
+                    app:tint="@color/cyan" />
 
-                <!-- Day/Night theme toggle -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnThemeToggle"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:text="☀"
-                    android:textSize="15sp"
-                    android:textColor="@color/cyan"
-                    android:padding="0dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:layout_marginEnd="4dp"
-                    app:iconPadding="0dp" />
-
-                <!-- Bluetooth button + status dot -->
-                <FrameLayout
-                    android:layout_width="36dp"
-                    android:layout_height="36dp">
-
-                    <ImageButton
-                        android:id="@+id/btnBluetooth"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/cyan"
-                        android:contentDescription="Bluetooth"
-                        android:padding="7dp"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/ic_bluetooth_24dp"
-                        app:tint="@android:color/white" />
-
-                    <ImageView
-                        android:id="@+id/bluetoothStatus"
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:layout_gravity="end|bottom"
-                        android:background="@drawable/circle_background"
-                        android:backgroundTint="@color/status_disconnected"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/ic_status_disconnected_24dp" />
-                </FrameLayout>
-            </LinearLayout>
+                <ImageView
+                    android:id="@+id/bluetoothStatus"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_gravity="end|bottom"
+                    android:background="@drawable/circle_background"
+                    android:backgroundTint="@color/status_disconnected"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_status_disconnected_24dp" />
+            </FrameLayout>
 
         </LinearLayout>
 
@@ -331,24 +352,64 @@
                     android:gravity="center"
                     android:layout_marginTop="6dp">
 
-                    <ImageButton
+                    <!-- Reverse Left: icon + label -->
+                    <LinearLayout
                         android:id="@+id/reverse_left_button"
-                        android:layout_width="48dp"
-                        android:layout_height="34dp"
+                        android:layout_width="52dp"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
                         android:background="@drawable/button_rounded_square_background"
                         android:backgroundTint="#1E4A65"
-                        android:src="@drawable/reverse_left_button"
-                        android:layout_marginEnd="3dp"
-                        app:tint="@color/cyan" />
+                        android:paddingTop="5dp"
+                        android:paddingBottom="4dp"
+                        android:layout_marginEnd="3dp">
 
-                    <ImageButton
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/reverse_left_button"
+                            android:scaleType="fitCenter"
+                            app:tint="@color/cyan" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Rev ◀"
+                            android:textSize="7sp"
+                            android:textColor="#4AD8F0"
+                            android:fontFamily="@font/poppins_bold"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <!-- Reverse Right: icon + label -->
+                    <LinearLayout
                         android:id="@+id/reverse_right_button"
-                        android:layout_width="48dp"
-                        android:layout_height="34dp"
+                        android:layout_width="52dp"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
                         android:background="@drawable/button_rounded_square_background"
                         android:backgroundTint="#1E4A65"
-                        android:src="@drawable/reverse_right_button"
-                        app:tint="@color/cyan" />
+                        android:paddingTop="5dp"
+                        android:paddingBottom="4dp">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/reverse_right_button"
+                            android:scaleType="fitCenter"
+                            app:tint="@color/cyan" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Rev ▶"
+                            android:textSize="7sp"
+                            android:textColor="#4AD8F0"
+                            android:fontFamily="@font/poppins_bold"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
