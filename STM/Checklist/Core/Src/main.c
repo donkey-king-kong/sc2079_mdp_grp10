@@ -36,11 +36,40 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SERVOCENTER 150
-#define SERVOLEFT 	100
-#define SERVORIGHT 	200
-#define TURNLEFT_TH 115
-#define TURNRIGHT_TH 195
+/* ==========================================
+ *        CALIBRATION CONTROL PANEL
+ * ========================================== */
+
+// --- 1. DISTANCE & GYRO CALIBRATION ---
+#define TICKS_PER_CM         68.0   // Tweak if "S10" travels more or less than 10cm
+#define SLIDE_TICKS_PER_CM   75.19  // Specific tuning multiplier used in slide maneuvers
+
+// --- 2. MOTOR BIAS (HARDWARE OFFSETS) ---
+#define RIGHT_MOTOR_BIAS     1.072  // Multiplier for right motor to match left motor speed (Fixes straight-line drift)
+#define TURN_SLAVE_RATIO     0.59   // Inner wheel speed multiplier during arc turns
+
+// --- 3. SERVO CALIBRATION ---
+#define SERVOCENTER          150
+#define SERVOLEFT            100
+#define SERVORIGHT           200
+#define TURNLEFT_TH          115
+#define TURNRIGHT_TH         195
+
+// --- 4. PID POWER STEPS (Max Power = 7199) ---
+// Straight Driving Speeds
+#define PID_STR_MAX          5500   // ~76% speed (Leave headroom so PID has room to adjust!)
+#define PID_STR_HIGH         4500   // ~62% speed
+#define PID_STR_MED          3000   // ~41% speed
+#define PID_STR_LOW          2000   // ~27% speed
+#define PID_STR_MIN          1500   // Minimum power to break static floor friction
+
+// Turning Speeds
+#define PID_ANG_MAX          5000   // ~70% speed
+#define PID_ANG_HIGH         4000   // ~55% speed
+#define PID_ANG_MED          3000   // ~41% speed
+#define PID_ANG_LOW          2200   // ~30% speed
+#define PID_ANG_FINE         1600   // ~22% speed
+#define PID_ANG_MIN          1300   // Minimum power for turning frictions
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -888,23 +917,18 @@ int PID_Angle(double errord) {
 	error = abs(error);
 
 	// 3. Return PWM Magnitude (stepped proportional control)
-    if (error > 300) {
-        return 3000;
-    } else if (error > 200) {
-        return 2000;
-    } else if (error > 150) {
-        return 1600;
-    } else if (error > 100) {
-        return 1400;
-    } else if (error > 10) {
-        return 1000;
-    } else if (error >= 2) {
-        times_acceptable++;
-        return 900;
-    } else {
-        times_acceptable++;
-        return 0;
-    }
+	if (error > 300) return PID_ANG_MAX;
+	else if (error > 200) return PID_ANG_HIGH;
+	else if (error > 150) return PID_ANG_MED;
+	else if (error > 100) return PID_ANG_LOW;
+	else if (error > 10) return PID_ANG_FINE;
+	else if (error >= 2) {
+		times_acceptable++;
+		return PID_ANG_MIN;
+	} else {
+		times_acceptable++;
+		return 0;
+	}
 }
 
 int PID_Control(int error) {
@@ -912,19 +936,15 @@ int PID_Control(int error) {
     error = abs(error);
 
     // 2. Return the stepped proportional PWM speed magnitude based on your senior's tuned steps
-    if (error > 2000) {
-        return 3000;
-    } else if (error > 500) {
-        return 2000;
-    } else if (error > 200) {
-        return 1400;
-    } else if (error > 100) {
-        return 1000;
-    } else if (error > 2) {
+    if (error > 2000) return PID_STR_MAX;
+    else if (error > 500) return PID_STR_HIGH;
+    else if (error > 200) return PID_STR_MED;
+    else if (error > 100) return PID_STR_LOW;
+    else if (error > 2) {
         times_acceptable++;
-        return 900;
+        return PID_STR_MIN;
     } else if (error >= 1) {
-        times_acceptable++;
+    	times_acceptable++;
         return 0;
     } else {
         times_acceptable++;
@@ -946,7 +966,7 @@ int finishCheck() {
 
 void moveCarStraight(double distance) {
     // Convert cm to encoder ticks (75 is a calibration multiplier you will tune later)
-    int tick_distance = (int)(distance * 75.0);
+    int tick_distance = (int)(distance * TICKS_PER_CM);
 
     pwmVal_servo = SERVOCENTER;
     osDelay(300); // Allow physical servo to center itself
@@ -1003,9 +1023,9 @@ void moveCarSlideRight(int forward) {
 
     // Step 1: Drive Straight to clear obstacle
     if (sign > 0) {
-        moveCarStraight((450.0 / 75.19) * sign);
+        moveCarStraight((450.0 / SLIDE_TICKS_PER_CM) * sign);
     } else {
-        moveCarStraight((540.0 / 75.19) * sign);
+        moveCarStraight((540.0 / SLIDE_TICKS_PER_CM) * sign);
     }
 
     // Wait for the straight segment to finish
@@ -1038,9 +1058,9 @@ void moveCarSlideLeft(int forward) {
 
     // Step 1: Drive Straight to clear obstacle
     if (sign > 0) {
-        moveCarStraight((560.0 / 75.19) * sign);
+        moveCarStraight((560.0 / SLIDE_TICKS_PER_CM) * sign);
     } else {
-        moveCarStraight((700.0 / 75.19) * sign);
+        moveCarStraight((700.0 / SLIDE_TICKS_PER_CM) * sign);
     }
 
     // Wait for the straight segment to finish
@@ -1270,8 +1290,8 @@ void StartMotorTask(void *argument)
 	if (pwmVal_servo < TURNLEFT_TH) // Turn left
 	{
 		// 1. Calculate base speeds
-		pwmVal_R = PID_Angle(error_angle) * 1.072;	// Master Wheel: Right
-		pwmVal_L = pwmVal_R * (0.59);					// Slave Wheel: Left
+		pwmVal_R = PID_Angle(error_angle) * RIGHT_MOTOR_BIAS;	// Master Wheel: Right
+		pwmVal_L = pwmVal_R * TURN_SLAVE_RATIO;					// Slave Wheel: Left
 
 		// 2. Apply speeds to 2-pin H-Bridge based on error direction
 		if (error_angle > 0) {
@@ -1298,7 +1318,7 @@ void StartMotorTask(void *argument)
 	else if (pwmVal_servo > TURNRIGHT_TH) // Turn right
 	{
 		pwmVal_L = PID_Angle(error_angle); // Master Wheel: Left
-		pwmVal_R = pwmVal_L * (0.59);	   // Slave Wheel: Right
+		pwmVal_R = pwmVal_L * TURN_SLAVE_RATIO;	   // Slave Wheel: Right
 
 		// 2. Apply speeds to 2-pin H-Bridge based on error direction
 		if (error_angle < 0) {
@@ -1325,7 +1345,7 @@ void StartMotorTask(void *argument)
 	else // Straight
 	{
 		// 1. Calculate base speeds (Master = Right Motor, Slave = Left Motor)
-		pwmVal_R = PID_Control(right_target - right_encoder_val) * 1.072;
+		pwmVal_R = PID_Control(right_target - right_encoder_val) * RIGHT_MOTOR_BIAS;
 
 		// 2. Perform drift compensation (straightCorrection)
 		if (abs(left_target - left_encoder_val) > abs(right_target - right_encoder_val))
