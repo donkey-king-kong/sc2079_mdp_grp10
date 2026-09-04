@@ -197,7 +197,7 @@ public class utilities {
             case 40:
                 return "O";
             default:
-                return null;
+                return String.valueOf(idToConvert);
         }
     }
 }

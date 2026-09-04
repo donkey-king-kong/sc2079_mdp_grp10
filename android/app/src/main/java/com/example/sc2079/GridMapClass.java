@@ -107,8 +107,8 @@ public class GridMapClass extends View {
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setTextSize(Math.min(cellWidth, cellHeight) / 2f); // scale with cell size
         textPaint.setAntiAlias(true);
-        verifiedPaint.setColor(Color.GRAY);
-        verifiedPaint.setStrokeWidth(6f);
+        verifiedPaint.setColor(Color.parseColor("#FFA500")); // Distinguishing Orange
+        verifiedPaint.setStrokeWidth(15f); // Thick line
         paintObstacleVerified.setColor(Color.rgb(255, 165, 0));
         gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener(){
             @Override
@@ -2123,7 +2123,6 @@ public class GridMapClass extends View {
                     } catch (NumberFormatException e) {
                         Log.e("GridMapClass", "Non-numeric Target ID: " + targetId);
                     }
-                    rearrangeObstacleData(x, y);
                     postInvalidate();
                     return;
                 }
