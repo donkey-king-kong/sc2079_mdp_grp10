@@ -45,6 +45,7 @@
             android:layout_height="0dp"
             android:orientation="vertical"
             app:layout_constraintVertical_chainStyle="packed"
+            app:layout_constraintHorizontal_bias="0"
             app:layout_constraintBottom_toTopOf="@id/x_axis_numbers"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/y_axis_numbers"
@@ -62,123 +63,186 @@
         android:orientation="vertical"
         android:padding="6dp">
 
-        <!-- Row 1: Status cards + action buttons -->
+        <!-- Row 1: Header — info cards + action buttons -->
         <LinearLayout
+            android:id="@+id/headerRow"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="52dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
+            android:background="@drawable/rounded_status_background"
+            android:backgroundTint="@color/dark_blue_200"
+            android:paddingStart="10dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
             android:layout_marginBottom="6dp">
 
-            <!-- Coordinates card -->
+            <!-- Coordinates pill card -->
             <LinearLayout
+                android:id="@+id/coordCard"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:padding="6dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/dark_blue_200"
-                android:layout_marginEnd="4dp">
+                android:backgroundTint="#1A3A5C"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:layout_marginEnd="5dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Coordinates"
-                    android:textSize="10sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_bold" />
+                <!-- Cyan accent dot -->
+                <View
+                    android:layout_width="5dp"
+                    android:layout_height="5dp"
+                    android:background="@drawable/circle_background"
+                    android:backgroundTint="@color/cyan"
+                    android:layout_marginEnd="6dp" />
 
-                <TextView
-                    android:id="@+id/give_vehicle_coord_now"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="(x,y)"
-                    android:textSize="12sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_regular" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/give_vehicle_direction_now"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="EMPTY"
-                    android:textSize="12sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_regular" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="POSITION"
+                        android:textSize="6sp"
+                        android:letterSpacing="0.10"
+                        android:textColor="#5A8AAA"
+                        android:fontFamily="@font/poppins_bold" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/give_vehicle_coord_now"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="—,—"
+                            android:textSize="12sp"
+                            android:textColor="@color/white"
+                            android:fontFamily="@font/poppins_bold" />
+
+                        <TextView
+                            android:id="@+id/give_vehicle_direction_now"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=" · —"
+                            android:textSize="9sp"
+                            android:textColor="#7AAFCB"
+                            android:fontFamily="@font/poppins_regular"
+                            android:layout_marginStart="3dp" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Status card -->
+            <!-- Status pill card -->
             <LinearLayout
+                android:id="@+id/statusCard"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:padding="6dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/dark_blue_200"
-                android:layout_marginEnd="4dp">
+                android:backgroundTint="#1A3A5C"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:layout_marginEnd="8dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Status"
-                    android:textSize="10sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_bold" />
+                <!-- Amber accent dot -->
+                <View
+                    android:layout_width="5dp"
+                    android:layout_height="5dp"
+                    android:background="@drawable/circle_background"
+                    android:backgroundTint="#F5A623"
+                    android:layout_marginEnd="6dp" />
 
-                <TextView
-                    android:id="@+id/give_vehicle_status_now"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Inactive"
-                    android:textSize="10sp"
-                    android:textColor="@color/white"
-                    android:fontFamily="@font/poppins_regular" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="STATUS"
+                        android:textSize="6sp"
+                        android:letterSpacing="0.10"
+                        android:textColor="#5A8AAA"
+                        android:fontFamily="@font/poppins_bold" />
+
+                    <TextView
+                        android:id="@+id/give_vehicle_status_now"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Idle"
+                        android:textSize="11sp"
+                        android:textColor="@color/white"
+                        android:fontFamily="@font/poppins_regular" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Icon buttons -->
+            <!-- Action buttons group: same 36dp height, same pill background, evenly spaced -->
             <ImageButton
                 android:id="@+id/btnAddCoordinate"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/button_rounded_square_background"
-                android:backgroundTint="@color/cyan"
-                android:contentDescription="Add Coordinate"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#1A3A5C"
+                android:contentDescription="Place obstacle or vehicle"
                 android:padding="8dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/plus_for_enter"
-                android:layout_marginEnd="4dp"
-                app:tint="@android:color/white" />
+                android:layout_marginEnd="5dp"
+                app:tint="@color/cyan" />
 
+            <!-- Day/Night theme toggle -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeToggle"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:text="☀"
+                android:textSize="14sp"
+                android:textColor="@color/cyan"
+                android:padding="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:layout_marginEnd="5dp"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#1A3A5C"
+                app:iconPadding="0dp" />
 
-
-            <!-- Bluetooth button + status indicator -->
+            <!-- Bluetooth button + status dot -->
             <FrameLayout
-                android:layout_width="40dp"
-                android:layout_height="40dp">
+                android:layout_width="36dp"
+                android:layout_height="36dp">
 
                 <ImageButton
                     android:id="@+id/btnBluetooth"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:backgroundTint="@color/cyan"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/rounded_status_background"
+                    android:backgroundTint="#1A3A5C"
                     android:contentDescription="Bluetooth"
                     android:padding="8dp"
                     android:scaleType="fitCenter"
                     android:src="@drawable/ic_bluetooth_24dp"
-                    app:tint="@android:color/white" />
+                    app:tint="@color/cyan" />
 
                 <ImageView
                     android:id="@+id/bluetoothStatus"
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
                     android:layout_gravity="end|bottom"
                     android:background="@drawable/circle_background"
                     android:backgroundTint="@color/status_disconnected"
@@ -195,49 +259,167 @@
             android:layout_weight="1"
             android:orientation="horizontal">
 
-            <!-- Joystick + reverse buttons -->
+            <!-- D-pad + reverse buttons -->
             <LinearLayout
                 android:layout_width="wrap_content"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:gravity="center"
+                android:gravity="top|center_horizontal"
+                android:layout_marginTop="8dp"
                 android:layout_marginEnd="6dp">
 
-                <io.github.controlwear.virtual.joystick.android.JoystickView
-                    android:id="@+id/joystickView"
-                    android:layout_width="140dp"
-                    android:layout_height="140dp"
-                    app:JV_backgroundColor="@color/cyan"
-                    app:JV_borderColor="@color/white"
-                    app:JV_borderWidth="4dp"
-                    app:JV_buttonColor="@color/magenta"
-                    app:JV_buttonSizeRatio="15%"
-                    app:JV_fixedCenter="false" />
+                <!-- D-pad cross -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center">
 
+                    <!-- Up -->
+                    <Button
+                        android:id="@+id/dpad_up"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="▲"
+                        android:textSize="18sp"
+                        android:textColor="#4AD8F0"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:backgroundTint="#1E4A65"
+                        android:padding="0dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:layout_marginBottom="3dp" />
+
+                    <!-- Middle row: Left + Center spacer + Right -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginBottom="3dp">
+
+                        <Button
+                            android:id="@+id/dpad_left"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:text="◀"
+                            android:textSize="18sp"
+                            android:textColor="#4AD8F0"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:backgroundTint="#1E4A65"
+                            android:padding="0dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:layout_marginEnd="3dp" />
+
+                        <!-- Center gap -->
+                        <View
+                            android:id="@+id/dpadCenterSquare"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:backgroundTint="#2A4A6A" />
+
+                        <Button
+                            android:id="@+id/dpad_right"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:text="▶"
+                            android:textSize="18sp"
+                            android:textColor="#4AD8F0"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:backgroundTint="#1E4A65"
+                            android:padding="0dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:layout_marginStart="3dp" />
+                    </LinearLayout>
+
+                    <!-- Down -->
+                    <Button
+                        android:id="@+id/dpad_down"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="▼"
+                        android:textSize="18sp"
+                        android:textColor="#4AD8F0"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:backgroundTint="#1E4A65"
+                        android:padding="0dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp" />
+                </LinearLayout>
+
+                <!-- Reverse buttons below d-pad -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center"
-                    android:layout_marginTop="4dp">
+                    android:layout_marginTop="6dp">
 
-                    <ImageButton
+                    <!-- Reverse Left: icon + label -->
+                    <LinearLayout
                         android:id="@+id/reverse_left_button"
-                        android:layout_width="55dp"
-                        android:layout_height="34dp"
+                        android:layout_width="52dp"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
                         android:background="@drawable/button_rounded_square_background"
-                        android:src="@drawable/reverse_left_button"
-                        android:layout_marginEnd="4dp"
-                        app:tint="@android:color/white" />
+                        android:backgroundTint="#1E4A65"
+                        android:paddingTop="5dp"
+                        android:paddingBottom="4dp"
+                        android:layout_marginEnd="3dp">
 
-                    <ImageButton
+                        <ImageView
+                            android:id="@+id/revLeftIcon"
+                            android:layout_width="22dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/reverse_left_button"
+                            android:scaleType="fitCenter"
+                            app:tint="@color/cyan" />
+
+                        <TextView
+                            android:id="@+id/revLeftLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Rev ◀"
+                            android:textSize="7sp"
+                            android:textColor="#4AD8F0"
+                            android:fontFamily="@font/poppins_bold"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <!-- Reverse Right: icon + label -->
+                    <LinearLayout
                         android:id="@+id/reverse_right_button"
-                        android:layout_width="55dp"
-                        android:layout_height="34dp"
+                        android:layout_width="52dp"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/magenta"
-                        android:src="@drawable/reverse_right_button"
-                        app:tint="@android:color/white" />
+                        android:backgroundTint="#1E4A65"
+                        android:paddingTop="5dp"
+                        android:paddingBottom="4dp">
+
+                        <ImageView
+                            android:id="@+id/revRightIcon"
+                            android:layout_width="22dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/reverse_right_button"
+                            android:scaleType="fitCenter"
+                            app:tint="@color/cyan" />
+
+                        <TextView
+                            android:id="@+id/revRightLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Rev ▶"
+                            android:textSize="7sp"
+                            android:textColor="#4AD8F0"
+                            android:fontFamily="@font/poppins_bold"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
@@ -254,7 +436,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     app:tabMode="fixed"
-                    app:tabGravity="fill" />
+                    app:tabGravity="fill"
+                    app:tabMinWidth="0dp"
+                    app:tabPaddingStart="0dp"
+                    app:tabPaddingEnd="0dp" />
 
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/sub_navigation_bar"
@@ -267,102 +452,150 @@
 
         <!-- Row 3: Bottom buttons -->
         <LinearLayout
+            android:id="@+id/bottomRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginTop="4dp">
+            android:gravity="center_vertical"
+            android:background="@drawable/rounded_status_background"
+            android:backgroundTint="#1E3A5F"
+            android:layout_marginTop="6dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp">
 
+            <!-- Manual + Auto grouped together -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/manual_update_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Manual"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textColor="@color/cyan"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_bold"
                 app:iconPadding="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/auto_update_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Auto"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textColor="@color/cyan"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_bold"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#3A6A9B" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_grid_size"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="Size"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
+                android:singleLine="true"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
+                app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/reset_map_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Reset"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/save_map_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Save"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/load_map_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
                 android:text="Load"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
                 app:iconPadding="0dp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:background="#3A6A9B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clear_logs_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="Clear"
-                android:textSize="7sp"
-                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textColor="#A8C8E8"
                 android:singleLine="true"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:fontFamily="@font/poppins_regular"
                 app:iconPadding="0dp" />
 
         </LinearLayout>
+
     </LinearLayout>
 
 </LinearLayout>

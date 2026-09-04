@@ -35,8 +35,9 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.tabs.TabLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import io.github.controlwear.virtual.joystick.android.JoystickView
 import android.util.Base64
+import android.widget.NumberPicker
+import androidx.appcompat.app.AlertDialog
 import com.example.sc2079.ui.coordinates.AddCoordinateFragment
 import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment
 import com.example.sc2079.ui.coordinates.SharedViewModel
@@ -50,7 +51,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnBluetooth: ImageButton
     private lateinit var btnAddCoordinate: ImageButton
     private lateinit var bluetoothStatus: ImageView
-    private var activateJoyStickBool = false;
+    private var activateJoyStickBool = false
+    private var isDayMode = false
 
     private val sharedViewModel: SharedViewModel by viewModels()
 
@@ -418,19 +420,29 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Requested arena update", Toast.LENGTH_SHORT).show()
         }
 
-        btnAuto.setOnClickListener {
-            if (btnAuto.text == "Auto") {
-                btnAuto.text = "Auto: ON"
-                btnAuto.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                    android.graphics.Color.parseColor("#2E7D32") // green when active
-                )
-                autoHandler.post(autoRunnable)
-                Toast.makeText(this, "Auto update ON (every 2s)", Toast.LENGTH_SHORT).show()
+        var autoActive = false
+        val colorGreenFill = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#2E7D32"))
+        val colorTransparent = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
+
+        fun updateAutoVisual() {
+            if (autoActive) {
+                btnAuto.backgroundTintList = colorGreenFill
+                btnAuto.setTextColor(android.graphics.Color.WHITE)
+                btnAuto.strokeWidth = 0
             } else {
-                btnAuto.text = "Auto"
-                btnAuto.backgroundTintList = null // restore default outline style
+                btnAuto.backgroundTintList = colorTransparent
+                btnAuto.setTextColor(android.graphics.Color.parseColor("#26B5CB"))
+                btnAuto.strokeWidth = 0
+            }
+        }
+
+        btnAuto.setOnClickListener {
+            autoActive = !autoActive
+            updateAutoVisual()
+            if (autoActive) {
+                autoHandler.post(autoRunnable)
+            } else {
                 autoHandler.removeCallbacks(autoRunnable)
-                Toast.makeText(this, "Auto update OFF", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -439,74 +451,194 @@ class MainActivity : AppCompatActivity() {
             FragmentPagerAdapter.BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT
         )
 
+        // Day/Night theme toggle
+        val btnThemeToggle = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnThemeToggle)
+        val rootContainer = findViewById<android.widget.LinearLayout>(R.id.container)
+        val rightPanel = findViewById<android.widget.LinearLayout>(R.id.rightPanel)
+        val gridArea = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.constraintGridMapView)
+        val subNavContainer = findViewById<android.widget.LinearLayout>(R.id.sub_navigation_container)
+        val dpadCenter = findViewById<android.view.View>(R.id.dpadCenterSquare)
+
+        val headerRow = findViewById<android.widget.LinearLayout>(R.id.headerRow)
+        val bottomRow = findViewById<android.widget.LinearLayout>(R.id.bottomRow)
+        val coordCard = findViewById<android.widget.LinearLayout>(R.id.coordCard)
+        val statusCard = findViewById<android.widget.LinearLayout>(R.id.statusCard)
+        val btnAddCoordinate = findViewById<android.widget.ImageButton>(R.id.btnAddCoordinate)
+        val btnBluetooth = findViewById<android.widget.ImageButton>(R.id.btnBluetooth)
+        val dpadUp = findViewById<android.widget.Button>(R.id.dpad_up)
+        val dpadDown = findViewById<android.widget.Button>(R.id.dpad_down)
+        val dpadLeft = findViewById<android.widget.Button>(R.id.dpad_left)
+        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
+        val reverseLeft = findViewById<android.widget.LinearLayout>(R.id.reverse_left_button)
+        val reverseRight = findViewById<android.widget.LinearLayout>(R.id.reverse_right_button)
+        val revLeftIcon = findViewById<android.widget.ImageView>(R.id.revLeftIcon)
+        val revLeftLabel = findViewById<android.widget.TextView>(R.id.revLeftLabel)
+        val revRightIcon = findViewById<android.widget.ImageView>(R.id.revRightIcon)
+        val revRightLabel = findViewById<android.widget.TextView>(R.id.revRightLabel)
+        val coordText = findViewById<android.widget.TextView>(R.id.give_vehicle_coord_now)
+        val dirText = findViewById<android.widget.TextView>(R.id.give_vehicle_direction_now)
+        val statusText = findViewById<android.widget.TextView>(R.id.give_vehicle_status_now)
+
+        // Bottom bar buttons — declared here so applyTheme can reach them
+        val btnGridSize = findViewById<MaterialButton>(R.id.btn_grid_size)
+        val btnReset = findViewById<MaterialButton>(R.id.reset_map_button)
+        val saveGridMapButton = findViewById<MaterialButton>(R.id.save_map_button)
+        val loadGridMapButton = findViewById<MaterialButton>(R.id.load_map_button)
+        val tabs = findViewById<TabLayout>(R.id.tabs)
+
+        fun applyTheme(day: Boolean) {
+            fun tint(color: String) = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(color))
+            fun col(color: String) = android.graphics.Color.parseColor(color)
+            if (day) {
+                btnThemeToggle.text = "🌙"
+                rootContainer.setBackgroundColor(col("#EDF1F7"))
+                rightPanel.setBackgroundColor(col("#EDF1F7"))
+                gridArea.setBackgroundColor(col("#EDF1F7"))
+                subNavContainer.setBackgroundColor(col("#EDF1F7"))
+                headerRow.backgroundTintList = tint("#D6DEF0")
+                bottomRow.backgroundTintList = tint("#D6DEF0")
+                coordCard.backgroundTintList = tint("#C2CEDF")
+                statusCard.backgroundTintList = tint("#C2CEDF")
+                btnAddCoordinate.backgroundTintList = tint("#C2CEDF")
+                btnThemeToggle.backgroundTintList = tint("#C2CEDF")
+                btnBluetooth.backgroundTintList = tint("#C2CEDF")
+                // D-pad: darker blue bg so the navy arrow text pops
+                dpadUp.backgroundTintList = tint("#7A9BBF")
+                dpadDown.backgroundTintList = tint("#7A9BBF")
+                dpadLeft.backgroundTintList = tint("#7A9BBF")
+                dpadRight.backgroundTintList = tint("#7A9BBF")
+                dpadUp.setTextColor(col("#FFFFFF"))
+                dpadDown.setTextColor(col("#FFFFFF"))
+                dpadLeft.setTextColor(col("#FFFFFF"))
+                dpadRight.setTextColor(col("#FFFFFF"))
+                reverseLeft.backgroundTintList = tint("#7A9BBF")
+                reverseRight.backgroundTintList = tint("#7A9BBF")
+                revLeftIcon.imageTintList = tint("#FFFFFF")
+                revLeftLabel.setTextColor(col("#FFFFFF"))
+                revRightIcon.imageTintList = tint("#FFFFFF")
+                revRightLabel.setTextColor(col("#FFFFFF"))
+                dpadCenter.backgroundTintList = tint("#C5D5E8")
+                coordText.setTextColor(col("#1A2A4A"))
+                dirText.setTextColor(col("#3A5A8A"))
+                statusText.setTextColor(col("#1A2A4A"))
+                // Bottom bar buttons: dark text on light bar
+                val darkNavy = col("#1A2A4A")
+                btnManual.setTextColor(darkNavy)
+                btnAuto.setTextColor(darkNavy)
+                btnGridSize.setTextColor(darkNavy)
+                btnReset.setTextColor(darkNavy)
+                saveGridMapButton.setTextColor(darkNavy)
+                loadGridMapButton.setTextColor(darkNavy)
+                btnLogClear.setTextColor(darkNavy)
+                // Tab bar: match panel background
+                tabs.setBackgroundColor(col("#EDF1F7"))
+                tabs.setSelectedTabIndicatorColor(col("#2563A8"))
+                tabs.setTabIconTint(android.content.res.ColorStateList.valueOf(col("#1A2A4A")))
+                updateAxisTextColor(false)
+            } else {
+                btnThemeToggle.text = "☀"
+                rootContainer.setBackgroundColor(col("#0F1C3A"))
+                rightPanel.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                gridArea.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                subNavContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                headerRow.backgroundTintList = tint("#182D4B")
+                bottomRow.backgroundTintList = tint("#1E3A5F")
+                coordCard.backgroundTintList = tint("#1A3A5C")
+                statusCard.backgroundTintList = tint("#1A3A5C")
+                btnAddCoordinate.backgroundTintList = tint("#1A3A5C")
+                btnThemeToggle.backgroundTintList = tint("#1A3A5C")
+                btnBluetooth.backgroundTintList = tint("#1A3A5C")
+                dpadUp.backgroundTintList = tint("#1E4A65")
+                dpadDown.backgroundTintList = tint("#1E4A65")
+                dpadLeft.backgroundTintList = tint("#1E4A65")
+                dpadRight.backgroundTintList = tint("#1E4A65")
+                dpadUp.setTextColor(col("#4AD8F0"))
+                dpadDown.setTextColor(col("#4AD8F0"))
+                dpadLeft.setTextColor(col("#4AD8F0"))
+                dpadRight.setTextColor(col("#4AD8F0"))
+                reverseLeft.backgroundTintList = tint("#1E4A65")
+                reverseRight.backgroundTintList = tint("#1E4A65")
+                revLeftIcon.imageTintList = tint("#26B5CB")
+                revLeftLabel.setTextColor(col("#4AD8F0"))
+                revRightIcon.imageTintList = tint("#26B5CB")
+                revRightLabel.setTextColor(col("#4AD8F0"))
+                dpadCenter.backgroundTintList = tint("#2A4A6A")
+                coordText.setTextColor(android.graphics.Color.WHITE)
+                dirText.setTextColor(col("#7AAFCB"))
+                statusText.setTextColor(android.graphics.Color.WHITE)
+                // Bottom bar buttons: restore original light-blue text
+                val cyanText = col("#26B5CB")
+                val paleText = col("#A8C8E8")
+                btnManual.setTextColor(cyanText)
+                btnAuto.setTextColor(cyanText)
+                btnGridSize.setTextColor(paleText)
+                btnReset.setTextColor(paleText)
+                saveGridMapButton.setTextColor(paleText)
+                loadGridMapButton.setTextColor(paleText)
+                btnLogClear.setTextColor(paleText)
+                // Tab bar: restore dark background
+                tabs.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                tabs.setSelectedTabIndicatorColor(col("#F137A5"))
+                tabs.setTabIconTint(android.content.res.ColorStateList.valueOf(col("#FFFFFF")))
+                updateAxisTextColor(true)
+            }
+        }
+
+        btnThemeToggle.setOnClickListener {
+            isDayMode = !isDayMode
+            applyTheme(isDayMode)
+        }
+
         // Initializes gridmap
         val gridMapView = findViewById<LinearLayout>(R.id.gridMapView)
         gridMapObj = GridMapClass(this)
         gridMapObj.setGridColumns(20)
         gridMapObj.setGridRows(20)
         gridMapView.addView(gridMapObj)
-        setupGraphAxes(this)
+        setupGraphAxes(this, true)
 
-        val joystick = findViewById<JoystickView>(R.id.joystickView)
-        joystick.setOnMoveListener({ angle, strength ->
-            // angle: 0–360 degrees (counterclockwise from the right)
-            // strength: 0–100% (distance from center)
-            Log.d("Joystick", "Angle: $angle°, Strength: $strength%")
-            // Find the top 3 stuff to update
-            activateJoyStickBool = true;
-            //givevehicleDirectionNow.setText(gridMapObj.getImmediateVehicleDirection());
-            //givevehicleCoordinatesNow.setText(gridMapObj.getImmediateVehicleCoord());
-            //givevehicleStatusNow.setText(gridMapObj.getImmediateVehicleStatus());
-            // Process joystick input here
-            if(strength > 80){
-                when(angle){
-                    in 0..30 -> {
-                        Log.d("Joystick", "East!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
-                    }
-                    in 60..120 -> {
-                        Log.d("Joystick", "North!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true)
-                    }
-                    in 150..210 -> {
-                        Log.d("Joystick","West!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.WEST, true)
-                    }
-                    in 240..320 -> {
-                        Log.d("Joystick","South!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.SOUTH, true)
-                    }
+        // D-pad buttons
+        dpadUp.setOnClickListener {
+            activateJoyStickBool = true
+            gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true)
+        }
+        dpadDown.setOnClickListener {
+            activateJoyStickBool = true
+            gridMapObj.moveVehicleStraight(ObstacleData.Direction.SOUTH, true)
+        }
+        dpadLeft.setOnClickListener {
+            activateJoyStickBool = true
+            gridMapObj.moveVehicleStraight(ObstacleData.Direction.WEST, true)
+        }
+        dpadRight.setOnClickListener {
+            activateJoyStickBool = true
+            gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
+        }
 
-                    in 330..360 -> {
-                        Log.d("Joystick","East!")
-                        gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
-                    }
-                }
-
-            }
-        }, 1000)  // update interval in ms (50ms ≈ 20 updates/second)
-        val reverseLeftButton = findViewById<ImageButton>(R.id.reverse_left_button)
-        val reverseRightButton = findViewById<ImageButton>(R.id.reverse_right_button)
-
-        reverseLeftButton.setOnClickListener({
+        reverseLeft.setOnClickListener {
             Log.d("JoystickButtons", "Reverse Left clicked")
-            gridMapObj.reverseLeftVehicle(true);
-        })
+            gridMapObj.reverseLeftVehicle(true)
+        }
 
-        reverseRightButton.setOnClickListener({
+        reverseRight.setOnClickListener {
             Log.d("JoystickButtons", "Reverse Right clicked")
-            gridMapObj.reverseRightVehicle(true);
-        })
-
-        val saveGridMapButton: MaterialButton = findViewById(R.id.save_map_button)
+            gridMapObj.reverseRightVehicle(true)
+        }
 
         saveGridMapButton.setOnClickListener {
             saveGridMapData(gridMapObj.returnGridMap())
         }
 
-        val loadGridMapButton: MaterialButton = findViewById(R.id.load_map_button)
         loadGridMapButton.setOnClickListener {
             loadGridMapData()
+        }
+
+        btnGridSize.setOnClickListener {
+            showGridSizeDialog()
+        }
+
+        btnReset.setOnClickListener {
+            gridMapObj.clearGridMap()
         }
 
         // Initalize navigation tabz
@@ -514,12 +646,10 @@ class MainActivity : AppCompatActivity() {
         customNavigatorBar.addFragment(commsToRobot(gridMapObj), "")
         customNavigatorBar.addFragment(startTask(gridMapObj), "")
 
-
         // Initializes Navigation Bar
         val subNavigationBar = findViewById<ViewPager?>(R.id.sub_navigation_bar)
         subNavigationBar?.setAdapter(customNavigatorBar)
         subNavigationBar?.setOffscreenPageLimit(2)
-        val tabs = findViewById<TabLayout>(R.id.tabs)
         tabs.setupWithViewPager(subNavigationBar)
 
         tabs.getTabAt(0)?.setIcon(R.drawable.plus_for_enter)
@@ -616,15 +746,17 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(updateTask) // Stop updating when activity is hidden
     }
 
-    fun setupGraphAxes(context: Context) {
+    fun setupGraphAxes(context: Context, isDark: Boolean) {
         val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
         val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
+        val axisColor = if (isDark) Color.WHITE else Color.BLACK
+        val rows = gridMapObj.getGridRows()
+        val cols = gridMapObj.getGridColumns()
 
-        // Y-axis: 19 (top) to 0 (bottom)
-        for (i in 19 downTo 0) {
+        for (i in (rows - 1) downTo 0) {
             val textView = TextView(context)
             textView.text = i.toString()
-            textView.setTextColor(Color.WHITE)
+            textView.setTextColor(axisColor)
             textView.gravity = Gravity.CENTER
             textView.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -633,11 +765,10 @@ class MainActivity : AppCompatActivity() {
             yAxis.addView(textView)
         }
 
-        // X-axis: 0 to 19
-        for (i in 0..19) {
+        for (i in 0 until cols) {
             val textView = TextView(context)
             textView.text = i.toString()
-            textView.setTextColor(Color.WHITE)
+            textView.setTextColor(axisColor)
             textView.gravity = Gravity.CENTER
             textView.layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -646,6 +777,56 @@ class MainActivity : AppCompatActivity() {
             xAxis.addView(textView)
         }
     }
+
+    private fun updateAxisTextColor(isDark: Boolean) {
+        val axisColor = if (isDark) Color.WHITE else Color.BLACK
+        val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
+        val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
+        for (i in 0 until yAxis.childCount) {
+            (yAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
+        }
+        for (i in 0 until xAxis.childCount) {
+            (xAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
+        }
+    }
+    private fun showGridSizeDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_grid_size, null)
+        val colPicker = dialogView.findViewById<NumberPicker>(R.id.picker_cols)
+        val rowPicker = dialogView.findViewById<NumberPicker>(R.id.picker_rows)
+        colPicker.minValue = 5; colPicker.maxValue = 20; colPicker.value = gridMapObj.getGridColumns()
+        rowPicker.minValue = 5; rowPicker.maxValue = 20; rowPicker.value = gridMapObj.getGridRows()
+        AlertDialog.Builder(this)
+            .setTitle("Arena Size")
+            .setView(dialogView)
+            .setPositiveButton("Apply") { _, _ ->
+                applyGridSize(colPicker.value, rowPicker.value)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun applyGridSize(cols: Int, rows: Int) {
+        gridMapObj.setGridColumns(cols)
+        gridMapObj.setGridRows(rows)
+        gridMapObj.clearGridMap()
+
+        // Keep the grid view filling the full area with the correct col:row ratio
+        // so cells are always as large as possible without overflowing.
+        val gridView = findViewById<LinearLayout>(R.id.gridMapView)
+        val params = gridView.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+        params.width = 0
+        params.height = 0
+        params.dimensionRatio = "$cols:$rows"
+        gridView.layoutParams = params
+        gridView.requestLayout()
+
+        val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
+        val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
+        yAxis.removeAllViews()
+        xAxis.removeAllViews()
+        setupGraphAxes(this, !isDayMode)
+    }
+
     private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {
         val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
         val editor = sharedPreferences.edit()

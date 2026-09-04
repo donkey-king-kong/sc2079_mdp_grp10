@@ -86,21 +86,18 @@ class BluetoothService : Service() {
 
                     if (socket != null) {
                         Log.d(TAG, "Accepted connection from: ${socket.remoteDevice.name} [${socket.remoteDevice.address}]")
-                        
-                        // If we are already connected, we might want to close the new one or handle it.
-                        // For simplicity, we swap to the new connection.
+
                         synchronized(this@BluetoothService) {
-                            connectJob?.cancel() // Cancel any pending outgoing connect
+                            connectJob?.cancel()
                             bluetoothSocket?.close()
                             bluetoothSocket = socket
                             bluetoothDevice = socket.remoteDevice
                             lastConnectedDevice = socket.remoteDevice
                             reconnectAttempts = 0
                         }
-                        
+
                         sendConnState("connected", socket.remoteDevice)
-                        
-                        // We must stop any existing reader before starting a new one
+
                         readerJob?.cancel()
                         startReader(socket)
                     }
