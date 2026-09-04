@@ -6,6 +6,12 @@
 #ifndef INC_ICM20948_H_
 #define INC_ICM20948_H_
 
+// Includes
+#include "main.h"
+#include <string.h>   // for sprintf
+#include <stdio.h>
+#include <stdbool.h>   // to support boolean data type
+
 #define ICM20948_I2C_ADDR			(0x68 << 1) // 0xD0
 
 #define REG_BANK_SEL             	0x7F 			// Select USER_BANK[1:0], bits[5:4]
@@ -51,5 +57,8 @@ typedef struct {
 	float y_gyro;
 	float z_gyro;
 } ICM20948_Data;
+
+HAL_StatusTypeDef ICM20948_Init(void);
+void ICM_ReadData(ICM20948_Data* data);
 
 #endif /* INC_ICM20948_H_ */
