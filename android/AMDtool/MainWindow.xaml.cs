@@ -858,27 +858,17 @@ public partial class MainWindow : Window
       foreach (object error in (CollectionBase) compilerResults.Errors)
         Console.WriteLine(error);
       string textToSend = (string) compilerResults.CompiledAssembly.GetExportedTypes()[0].GetMethod("MainScript").Invoke((object) null, parameters);
-      try
+      this.Dispatcher.Invoke((Action) (() =>
       {
         string text = this.SendTextBox.Text;
         this.SendTextBox.Text = textToSend;
         this.SendBtn_Click((object) null, (RoutedEventArgs) null);
         this.SendTextBox.Text = text;
-      }
-      catch (InvalidOperationException ex)
-      {
-        this.Dispatcher.Invoke((Action) (() =>
-        {
-          string text = this.SendTextBox.Text;
-          this.SendTextBox.Text = textToSend;
-          this.SendBtn_Click((object) null, (RoutedEventArgs) null);
-          this.SendTextBox.Text = text;
-        }));
-      }
+      }));
     }
     catch (Exception ex)
     {
-      this.ShowToast("There might be some problems with your script. =/");
+      this.Dispatcher.Invoke((Action) (() => this.ShowToast("There might be some problems with your script. =/")));
     }
   }
 
@@ -1301,6 +1291,11 @@ public partial class MainWindow : Window
         if (this._erw.IsVisible)
           this._erw.ReceivedTextBlock.Text = this.ReceivedTextBlock.Text;
       }));
+
+      // First pass plain (non-JSON) tokens to CommandInterpreter
+      string trimmed = receivedString.Trim();
+      if (!trimmed.StartsWith("{"))
+          this.CommandInterpreter(trimmed);
 
       // Extract all JSON objects in the received string using Regex
       MatchCollection jsonMatches = Regex.Matches(receivedString, @"\{.*?\}");

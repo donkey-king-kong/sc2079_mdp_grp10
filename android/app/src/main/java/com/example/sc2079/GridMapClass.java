@@ -1148,6 +1148,11 @@ public class GridMapClass extends View {
         }
 
         // Attempt to check if above 3 coords do not have obstacle or are at the end of the vehicle
+        int[] newPos = findVehicleBottomLeftObstacle();
+        if (newPos[0] >= 0 && newPos[1] >= 0) {
+            ObstacleData newBottomLeft = gridMapData.get(newPos[1]).get(newPos[0]);
+            sendTabletUpdateToAMD("Robot", newPos[0], newPos[1], newBottomLeft.getDirection());
+        }
         return true;
     }
 
@@ -2204,7 +2209,6 @@ public class GridMapClass extends View {
                     } catch (NumberFormatException e) {
                         Log.e("GridMapClass", "Non-numeric Target ID: " + targetId);
                     }
-                    rearrangeObstacleData(x, y);
                     postInvalidate();
                     return;
                 }
