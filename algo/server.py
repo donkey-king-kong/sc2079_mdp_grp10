@@ -329,39 +329,6 @@ def api_navigate():
         },
     })
 
-@app.route("/path", methods=["POST"])
-def api_path():
-    """Direct endpoint for RPi connector requesting route commands."""
-    payload = request.get_json(silent=True) or {}
-    data = payload.get("data", payload)
-    
-    layout = _read_layout(data)
-    
-    if "robot" in data and isinstance(data["robot"], dict):
-        robot = data["robot"]
-        start = arena_module.bottom_left_to_centre(
-            arena_module.cell_to_cm(float(robot.get("x", 0))),
-            arena_module.cell_to_cm(float(robot.get("y", 0))),
-            arena_module.face_to_heading(str(robot.get("dir", robot.get("face", "N")))),
-        )
-    else:
-        start = _read_start(data)
-
-    began = time.time()
-    route = planner.plan_route(
-        layout, 
-        _read_strategy(data), 
-        start=start, 
-        metric=_read_metric(data)
-    )
-    response = _plan_response(route, layout, start, time.time() - began)
-    
-    return jsonify({
-        "status": "success",
-        "commands": response["commands"]
-    })
-
-
 @app.route("/api/drive", methods=["POST"])
 def api_drive():
     """Apply a single STM command to a pose and report where the robot ends up.
