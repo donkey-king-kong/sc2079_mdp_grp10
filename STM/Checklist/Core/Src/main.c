@@ -41,11 +41,12 @@
  * ========================================== */
 
 // --- 1. DISTANCE & GYRO CALIBRATION ---
-#define TICKS_PER_CM         68.0   // Tweak if "S10" travels more or less than 10cm
+#define TICKS_PER_CM         70.35   // Tweak if "S10" travels more or less than 10cm
 #define SLIDE_TICKS_PER_CM   75.19  // Specific tuning multiplier used in slide maneuvers
+#define BACKWARD_MULTIPLIER	 1.12f
 
 // --- 2. MOTOR BIAS (HARDWARE OFFSETS) ---
-#define RIGHT_MOTOR_BIAS     1.072  // Multiplier for right motor to match left motor speed (Fixes straight-line drift)
+#define RIGHT_MOTOR_BIAS     1.082  // Multiplier for right motor to match left motor speed (Fixes straight-line drift)
 #define TURN_SLAVE_RATIO     0.59   // Inner wheel speed multiplier during arc turns
 
 // --- 3. SERVO CALIBRATION ---
@@ -57,19 +58,26 @@
 
 // --- 4. PID POWER STEPS (Max Power = 7199) ---
 // Straight Driving Speeds
-#define PID_STR_MAX          5500   // ~76% speed (Leave headroom so PID has room to adjust!)
-#define PID_STR_HIGH         4500   // ~62% speed
-#define PID_STR_MED          3000   // ~41% speed
-#define PID_STR_LOW          2000   // ~27% speed
-#define PID_STR_MIN          1500   // Minimum power to break static floor friction
+#define PID_STR_MAX          5000   // ~55% speed (Leave headroom so PID has room to adjust!)
+#define PID_STR_HIGH         4000
+#define PID_STR_MED          3000
+#define PID_STR_LOW          3300
+#define PID_STR_MIN          1800   // Minimum power to break static floor friction
 
 // Turning Speeds
 #define PID_ANG_MAX          5000   // ~70% speed
 #define PID_ANG_HIGH         4000   // ~55% speed
 #define PID_ANG_MED          3000   // ~41% speed
-#define PID_ANG_LOW          2200   // ~30% speed
-#define PID_ANG_FINE         1600   // ~22% speed
-#define PID_ANG_MIN          1300   // Minimum power for turning frictions
+#define PID_ANG_LOW          2600   // ~30% speed
+#define PID_ANG_FINE         2200   // ~22% speed
+#define PID_ANG_MIN          1800   // Minimum power for turning frictions
+
+// --- 5. TURN BIAS CALIBRATION (DEGREES) ---
+// If the robot slightly overshoots/undershoots its physical turns on the floor,
+// tweak these offsets. (Positive value makes the turn stop slightly earlier)
+#define TURN_BIAS_DEG_L      0.54f   // Tweak to align Left turns (Average error)
+#define TURN_BIAS_DEG_R      1.58f   // Tweak to align Right turns (Average error)
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -151,6 +159,8 @@ uint16_t pwmVal_R = 0;
 uint16_t pwmVal_L = 0;
 int times_acceptable = 0;
 int e_brake = 0;
+int is_moving = 0; // (0 = Idle, 1 = Moving)
+uint32_t move_start_time = 0;
 
 /* --- ENCODER VARIABLES --- */
 int32_t left_encoder_val = 0;
@@ -921,7 +931,7 @@ int PID_Angle(double errord) {
 	else if (error > 200) return PID_ANG_HIGH;
 	else if (error > 150) return PID_ANG_MED;
 	else if (error > 100) return PID_ANG_LOW;
-	else if (error > 10) return PID_ANG_FINE;
+	else if (error > 20) return PID_ANG_FINE;
 	else if (error >= 2) {
 		times_acceptable++;
 		return PID_ANG_MIN;
@@ -937,9 +947,9 @@ int PID_Control(int error) {
 
     // 2. Return the stepped proportional PWM speed magnitude based on your senior's tuned steps
     if (error > 2000) return PID_STR_MAX;
-    else if (error > 500) return PID_STR_HIGH;
-    else if (error > 200) return PID_STR_MED;
-    else if (error > 100) return PID_STR_LOW;
+    else if (error > 1000) return PID_STR_HIGH;
+    else if (error > 500) return PID_STR_MED;
+    else if (error > 300) return PID_STR_LOW;
     else if (error > 2) {
         times_acceptable++;
         return PID_STR_MIN;
@@ -953,14 +963,30 @@ int PID_Control(int error) {
 }
 
 int finishCheck() {
+	uint32_t elapsed_time = HAL_GetTick() - move_start_time;
+
     // If PID error has been minimal for ~20 ticks (approx 200ms)
     if (times_acceptable > 20) {
+    	is_moving = 0;
         e_brake = 1; // Signal motor task to cut PWM
         times_acceptable = 0;
         pwmVal_servo = SERVOCENTER;
         osDelay(300); // Wait for servo to physically recenter
         return 0; // 0 means "Finished"
     }
+
+    // --- FAIL-SAFE 2: MAXIMUM TIMEOUT REACHED (CRITICAL) ---
+	// If the robot has been struggling/stalled for more than 4 seconds,
+	// force it to stop, brake, and proceed!
+    if (elapsed_time > 4000) {
+        is_moving = 0;
+        e_brake = 1;   // Force active brake to run
+        times_acceptable = 0;
+        pwmVal_servo = SERVOCENTER;
+        osDelay(300);
+        return 0; // Force-stop moving
+    }
+
     return 1; // 1 means "Still moving"
 }
 
@@ -973,6 +999,8 @@ void moveCarStraight(double distance) {
 
     e_brake = 0;
     times_acceptable = 0;
+    is_moving = 1;
+    move_start_time = HAL_GetTick();
 
     // Set a high baseline to prevent negative underflow
     left_encoder_val = 75000;
@@ -992,9 +1020,11 @@ void moveCarRight(double angle) {
 
     e_brake = 0;
     times_acceptable = 0;
+    is_moving = 1;
+    move_start_time = HAL_GetTick();
 
     // Subtract from target angle (assuming right turn decreases Z-axis angle)
-    target_angle -= angle;
+    target_angle -= (angle - TURN_BIAS_DEG_R);
 
     while (finishCheck()) {
         osDelay(10);
@@ -1007,9 +1037,11 @@ void moveCarLeft(double angle) {
 
     e_brake = 0;
     times_acceptable = 0;
+    is_moving = 1;
+    move_start_time = HAL_GetTick();
 
     // Add to target angle (assuming left turn increases Z-axis angle)
-    target_angle += angle;
+    target_angle += (angle - TURN_BIAS_DEG_L);
 
     while (finishCheck()) {
         osDelay(10);
@@ -1162,6 +1194,10 @@ void StartCommunicateTask(void *argument)
 				// 2. EXECUTE THE MOVEMENT FUNCTION
 				if (items_parsed > 0)
 				{
+				    // Reset Gyro baseline before starting a new movement
+				    total_angle = 0.0;
+				    target_angle = 0.0;
+
 					switch (command_char1)
 					{
 						case 'S': 							// Straight or Slide
@@ -1178,7 +1214,7 @@ void StartCommunicateTask(void *argument)
 							break;
 
 						case 'B':							// Backward (can be an alias for Straight with negative value
-							moveCarStraight(-value);
+							moveCarStraight(-value * BACKWARD_MULTIPLIER);
 							break;
 
 						case 'R':							// Right Turn
@@ -1283,130 +1319,151 @@ void StartMotorTask(void *argument)
 	//dash_encoderR = cnt_R;
 	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
 
-	// Step B: Move Servo Motor
-	__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
-	error_angle = target_angle - total_angle;
-
-	if (pwmVal_servo < TURNLEFT_TH) // Turn left
-	{
-		// 1. Calculate base speeds
-		pwmVal_R = PID_Angle(error_angle) * RIGHT_MOTOR_BIAS;	// Master Wheel: Right
-		pwmVal_L = pwmVal_R * TURN_SLAVE_RATIO;					// Slave Wheel: Left
-
-		// 2. Apply speeds to 2-pin H-Bridge based on error direction
-		if (error_angle > 0) {
-			// --- Forward Movement ---
-			// Left Motor (TIM4) Forward
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
-
-			// Right Motor (TIM9) Forward
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
-		} else {
-			// --- Backward Movement ---
-			// Left Motor (TIM4) Backward
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
-
-			// Right Motor (TIM9) Backward
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
-		}
-	}
-
-	else if (pwmVal_servo > TURNRIGHT_TH) // Turn right
-	{
-		pwmVal_L = PID_Angle(error_angle); // Master Wheel: Left
-		pwmVal_R = pwmVal_L * TURN_SLAVE_RATIO;	   // Slave Wheel: Right
-
-		// 2. Apply speeds to 2-pin H-Bridge based on error direction
-		if (error_angle < 0) {
-			// --- Forward Movement ---
-			// Left Motor (TIM4) Forward
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
-
-			// Right Motor (TIM9) Forward
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
-		} else {
-			// --- Backward Movement ---
-			// Left Motor (TIM4) Backward
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
-
-			// Right Motor (TIM9) Backward
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
-		}
-	}
-
-	else // Straight
-	{
-		// 1. Calculate base speeds (Master = Right Motor, Slave = Left Motor)
-		pwmVal_R = PID_Control(right_target - right_encoder_val) * RIGHT_MOTOR_BIAS;
-
-		// 2. Perform drift compensation (straightCorrection)
-		if (abs(left_target - left_encoder_val) > abs(right_target - right_encoder_val))
-			straight_correction++;
-		else
-			straight_correction--;
-
-		// Reset correction if close to target to avoid oscillating
-		if (abs(left_target - left_encoder_val) < 100)
-			straight_correction = 0;
-
-		pwmVal_L = PID_Control(left_target - left_encoder_val) + straight_correction; // Slave wheel (TIM4)
-
-		// 3. Servo Fine-Tuning (Micro-steering using Gyro to stay on course)
-		int error_sign = (right_target - right_encoder_val < 0) ? -1 : 1;
-
-		if (error_angle > 5)
-			pwmVal_servo = (error_sign * -19 * 5) / 5 + SERVOCENTER;
-		else if (error_angle < -5)
-			pwmVal_servo = (error_sign * 19 * 5) / 5 + SERVOCENTER;
-		else
-			pwmVal_servo = (error_sign * -19 * error_angle) /5 + SERVOCENTER;
-
-		// Write micro-adjustments to TIM12 servo
-		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
-
-		// 4. Apply speed to 2-Pin Dual-PWM H-Bridge based on Direction
-		// Check if moving forward or backward based on target direction
-		if((right_target - right_encoder_val) > 0) {
-			// --- Forward Movement ---
-			// Left Motor (TIM4) Forward
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
-
-			// Right Motor (TIM9) Forward
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
-            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
-		} else {
-			// --- Backward Movement ---
-			// Left Motor (TIM4) Backward
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
-
-			// Right Motor (TIM9) Backward
-			__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
-			__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
-		}
-
-	}
-
 	if (e_brake) {
+
 		pwmVal_L = 0;
 		pwmVal_R = 0;
 		left_target = left_encoder_val;
 		right_target = right_encoder_val;
+
+		// Active Electromagnetic Braking
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 7199);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 7199);
+        __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 7199);
+        __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 7199);
+
+        osDelay(150);
 
         // Instantly cut PWM to your 2-pin setup
         __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
         __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
         __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
         __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+
+        e_brake = 0;
+
+	} else if (is_moving) {
+
+		// Step B: Move Servo Motor
+		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
+		error_angle = target_angle - total_angle;
+
+		if (pwmVal_servo < TURNLEFT_TH) { // Turn left
+
+			// 1. Calculate base speeds
+			pwmVal_R = PID_Angle(error_angle) * RIGHT_MOTOR_BIAS;	// Master Wheel: Right
+			pwmVal_L = pwmVal_R * TURN_SLAVE_RATIO;					// Slave Wheel: Left
+
+			// 2. Apply speeds to 2-pin H-Bridge based on error direction
+			if (error_angle > 0) {
+				// --- Forward Movement ---
+				// Left Motor (TIM4) Forward
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
+
+				// Right Motor (TIM9) Forward
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
+			} else {
+				// --- Backward Movement ---
+				// Left Motor (TIM4) Backward
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+
+				// Right Motor (TIM9) Backward
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+			}
+		}
+
+		else if (pwmVal_servo > TURNRIGHT_TH) { // Turn right
+
+			pwmVal_L = PID_Angle(error_angle); // Master Wheel: Left
+			pwmVal_R = pwmVal_L * TURN_SLAVE_RATIO;	   // Slave Wheel: Right
+
+			// 2. Apply speeds to 2-pin H-Bridge based on error direction
+			if (error_angle < 0) {
+				// --- Forward Movement ---
+				// Left Motor (TIM4) Forward
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
+
+				// Right Motor (TIM9) Forward
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
+			} else {
+				// --- Backward Movement ---
+				// Left Motor (TIM4) Backward
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+
+				// Right Motor (TIM9) Backward
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+			}
+		}
+
+		else { // Straight
+
+			// 1. Calculate base speeds (Master = Right Motor, Slave = Left Motor)
+			pwmVal_R = PID_Control(right_target - right_encoder_val) * RIGHT_MOTOR_BIAS;
+
+			// 2. Perform drift compensation (straightCorrection)
+			if (abs(left_target - left_encoder_val) > abs(right_target - right_encoder_val))
+				straight_correction++;
+			else
+				straight_correction--;
+
+			// Reset correction if close to target to avoid oscillating
+			if (abs(left_target - left_encoder_val) < 100)
+				straight_correction = 0;
+
+			pwmVal_L = PID_Control(left_target - left_encoder_val) + straight_correction; // Slave wheel (TIM4)
+
+			// 3. Servo Fine-Tuning (Micro-steering using Gyro to stay on course)
+			int error_sign = (right_target - right_encoder_val < 0) ? -1 : 1;
+
+			if (error_angle > 5)
+				pwmVal_servo = (error_sign * -19 * 5) / 5 + SERVOCENTER;
+			else if (error_angle < -5)
+				pwmVal_servo = (error_sign * 19 * 5) / 5 + SERVOCENTER;
+			else
+				pwmVal_servo = (error_sign * -19 * error_angle) /5 + SERVOCENTER;
+
+			// Write micro-adjustments to TIM12 servo
+			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
+
+			// 4. Apply speed to 2-Pin Dual-PWM H-Bridge based on Direction
+			// Check if moving forward or backward based on target direction
+			if((right_target - right_encoder_val) > 0) {
+				// --- Forward Movement ---
+				// Left Motor (TIM4) Forward
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
+
+				// Right Motor (TIM9) Forward
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
+			} else {
+				// --- Backward Movement ---
+				// Left Motor (TIM4) Backward
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
+				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+
+				// Right Motor (TIM9) Backward
+				__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
+				__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+			}
+		}
+	} else {
+		// Force absolute zero to prevent whines, hums, and physical oscillations
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+
+		pwmVal_L = 0;
+		pwmVal_R = 0;
 	}
 
 	osDelay(10);
@@ -1482,6 +1539,9 @@ void StartGyroTask(void *argument)
   uint32_t tick = 0;
   int i = 0;
 
+  strcpy(oled_status_msg, "Warmup IMU...");
+  osDelay(2000); // Increased from 500ms to 2000ms
+
   // 1. START-UP CALIBRATION PHASE
   // KEEP ROBOT STILL DURING FIRST 5 SECONDS!
   strcpy(oled_status_msg, "Calibrating Gyro...");
@@ -1517,9 +1577,16 @@ void StartGyroTask(void *argument)
 	tick = current_tick;
 
 	// 3. Subtract baseline offset and integrate angular velocity to get absolute degrees
-	total_angle += ((double)IMU_Data.z_gyro - offset) * dt;
+	double gz_corrected = (double)IMU_Data.z_gyro - offset;
 
-	// 4. Update gyro dashboard variable
+	// Force gyro angle to 0.0 if rotation is less than 0.35 degrees/sec
+	if (abs(gz_corrected) < 0.35)
+		gz_corrected = 0.0;
+
+	// 4. Integrate the filtered velocity
+	total_angle += gz_corrected * dt;
+
+	// 5. Update gyro dashboard variable
 	dash_gyroZ = total_angle;
   }
   /* USER CODE END StartGyroTask */

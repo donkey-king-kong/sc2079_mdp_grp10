@@ -23,7 +23,7 @@ uint8_t dat;
 gyro_range GYRO_RANGE_VALUE = _gyro_500dps;		// Gyro range
 accel_range ACCEL_RANGE_VALUE = _accel_4g;		// Acc range
 
-float GYRO_SCALE = 65.5;
+float GYRO_SCALE = 64.95;
 float ACCEL_SCALE = 8192.0;
 
 void ICM_SelBank(uint8_t bank);
