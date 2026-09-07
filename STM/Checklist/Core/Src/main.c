@@ -41,13 +41,15 @@
  * ========================================== */
 
 // --- 1. DISTANCE & GYRO CALIBRATION ---
-#define TICKS_PER_CM         74.076   // Tweak if "S10" travels more or less than 10cm
+#define TICKS_PER_CM         74.076 // Tweak if "S10" travels more or less than 10cm
 #define SLIDE_TICKS_PER_CM   75.19  // Specific tuning multiplier used in slide maneuvers
 #define BACKWARD_MULTIPLIER	 1.12f
 
 // --- 2. MOTOR BIAS (HARDWARE OFFSETS) ---
-#define RIGHT_MOTOR_BIAS     1.182  // Multiplier for right motor to match left motor speed (Fixes straight-line drift)
-#define TURN_SLAVE_RATIO     0.59   // Inner wheel speed multiplier during arc turns
+#define RIGHT_MOTOR_BIAS     1.182  // If drifts left, decrease. If drifts right, increase.
+#define TURN_SLAVE_RATIO     0.59   // Speed ratio of inner wheel during arc turns
+#define TURN_BIAS_DEG_L      0.54f  // If over-turns left, increase. If under-turns, decrease.
+#define TURN_BIAS_DEG_R      1.58f  // If over-turns right, increase. If under-turns, decrease.
 
 // --- 3. SERVO CALIBRATION ---
 #define SERVOCENTER          150
@@ -56,15 +58,13 @@
 #define TURNLEFT_TH          115
 #define TURNRIGHT_TH         195
 
-// --- 4. PID POWER STEPS (Max Power = 7199) ---
-// Straight Driving Speeds
-#define PID_STR_MAX          5000   // ~55% speed (Leave headroom so PID has room to adjust!)
-#define PID_STR_HIGH         4000
-#define PID_STR_MED          3000
-#define PID_STR_LOW          3300
-#define PID_STR_MIN          1800   // Minimum power to break static floor friction
+// --- 4. PID GAINS (Tune for different floors!) ---
+// Straight Line Controller
+#define PID_STRAIGHT_KP		 1.8f	// Proportional Gain: How aggresively it seeks the target.
+#define PID_STRAIGHT_KI		 0.05f	// Integral Gain: How aggresively it fights getting stuck (hills/bumps).
+#define GYRO_CORRECTION_KP	 35.0f	// Proportional Gain: How aggresively it corrects straight-line drift.
 
-// Turning Speeds
+// Turning Controller
 #define PID_ANG_MAX          5000   // ~70% speed
 #define PID_ANG_HIGH         4000   // ~55% speed
 #define PID_ANG_MED          3000   // ~41% speed
@@ -72,11 +72,10 @@
 #define PID_ANG_FINE         2200   // ~22% speed
 #define PID_ANG_MIN          1800   // Minimum power for turning frictions
 
-// --- 5. TURN BIAS CALIBRATION (DEGREES) ---
-// If the robot slightly overshoots/undershoots its physical turns on the floor,
-// tweak these offsets. (Positive value makes the turn stop slightly earlier)
-#define TURN_BIAS_DEG_L      0.54f   // Tweak to align Left turns (Average error)
-#define TURN_BIAS_DEG_R      1.58f   // Tweak to align Right turns (Average error)
+// --- 5. PWM POWER LIMITS (Max Power = 7199) ---
+#define PID_STR_MAX          5000   // ~55% speed (Leave headroom so PID has room to adjust!)
+#define PID_STR_MIN          1800   // Minimum power to break static floor friction
+
 
 /* USER CODE END PD */
 
@@ -161,6 +160,7 @@ int times_acceptable = 0;
 int e_brake = 0;
 int is_moving = 0; // (0 = Idle, 1 = Moving)
 uint32_t move_start_time = 0;
+float distance_integral = 0.0;
 
 /* --- ENCODER VARIABLES --- */
 int32_t left_encoder_val = 0;
@@ -951,21 +951,32 @@ int PID_Control(int error) {
     // 1. Get the absolute error since direction is handled in StartMotorTask
     error = abs(error);
 
-    // 2. Return the stepped proportional PWM speed magnitude based on your senior's tuned steps
-    if (error > 2000) return PID_STR_MAX;
-    else if (error > 1000) return PID_STR_HIGH;
-    else if (error > 500) return PID_STR_MED;
-    else if (error > 300) return PID_STR_LOW;
-    else if (error > 2) {
-        times_acceptable++;
-        return PID_STR_MIN;
-    } else if (error >= 1) {
-    	times_acceptable++;
-        return 0;
-    } else {
-        times_acceptable++;
-        return 0;
-    }
+	// 2. Calculate Proportional Term
+	float p_term = PID_STRAIGHT_KP * error;
+
+	// 3. Calculate Integral Term (Accumulates over time)
+	distance_integral += error;
+
+	// Anti-Windup: Prevent the integral from getting dangerously huge
+	if (distance_integral > 10000) distance_integral = 10000;
+
+	float i_term = PID_STRAIGHT_KI * distance_integral;
+
+	// 4. Total Output
+	int total_pwm = (int)(p_term + i_term);
+
+	// 5. Clamp the output to your safe limits
+	if (total_pwm > PID_STR_MAX) total_pwm = PID_STR_MAX;
+	if (total_pwm < PID_STR_MIN && error > 20) total_pwm = PID_STR_MIN; // Ensure it breaks static friction
+
+	// 6. Arrival Check
+	if (error <= 20) {
+		times_acceptable++;
+		return 0; // Trigger braking sequence
+	} else {
+		times_acceptable = 0;
+		return total_pwm;
+	}
 }
 
 int finishCheck() {
@@ -984,7 +995,7 @@ int finishCheck() {
     // --- FAIL-SAFE 2: MAXIMUM TIMEOUT REACHED (CRITICAL) ---
 	// If the robot has been struggling/stalled for more than 4 seconds,
 	// force it to stop, brake, and proceed!
-    if (elapsed_time > 4000) {
+    if (elapsed_time > 5000) {
         is_moving = 0;
         e_brake = 1;   // Force active brake to run
         times_acceptable = 0;
@@ -1006,6 +1017,7 @@ void moveCarStraight(double distance) {
     e_brake = 0;
     times_acceptable = 0;
     is_moving = 1;
+    distance_integral = 0.0;
     move_start_time = HAL_GetTick();
 
     // Set a high baseline to prevent negative underflow
@@ -1027,6 +1039,7 @@ void moveCarRight(double angle) {
     e_brake = 0;
     times_acceptable = 0;
     is_moving = 1;
+    distance_integral = 0.0;
     move_start_time = HAL_GetTick();
 
     // Subtract from target angle (assuming right turn decreases Z-axis angle)
@@ -1044,6 +1057,7 @@ void moveCarLeft(double angle) {
     e_brake = 0;
     times_acceptable = 0;
     is_moving = 1;
+    distance_integral = 0.0;
     move_start_time = HAL_GetTick();
 
     // Add to target angle (assuming left turn increases Z-axis angle)
@@ -1434,20 +1448,22 @@ void StartMotorTask(void *argument)
 
 		else { // Straight
 
-			// 1. Calculate base speeds (Master = Right Motor, Slave = Left Motor)
+			// 1. Calculate base speeds
 			pwmVal_R = PID_Control(right_target - right_encoder_val) * RIGHT_MOTOR_BIAS;
+			pwmVal_L = PID_Control(left_target - left_encoder_val);
 
-			// 2. Perform drift compensation (straightCorrection)
-			if (abs(left_target - left_encoder_val) > abs(right_target - right_encoder_val))
-				straight_correction++;
-			else
-				straight_correction--;
+			// 2. Perform active gyro drift correction
+			int left_correction = (int) (total_angle * GYRO_CORRECTION_KP);
+			int right_correction = (int) (-total_angle * GYRO_CORRECTION_KP);
 
-			// Reset correction if close to target to avoid oscillating
-			if (abs(left_target - left_encoder_val) < 100)
-				straight_correction = 0;
-
-			pwmVal_L = PID_Control(left_target - left_encoder_val) + straight_correction; // Slave wheel (TIM4)
+			// Apply correction only if moving forward
+			if ((right_target - right_encoder_val) > 0) {
+				pwmVal_L += left_correction;
+				pwmVal_R += right_correction;
+			} else {
+				pwmVal_L -= left_correction;
+				pwmVal_R -= right_correction;
+			}
 
 			// 3. Servo Fine-Tuning (Micro-steering using Gyro to stay on course)
 			int error_sign = (right_target - right_encoder_val < 0) ? -1 : 1;
