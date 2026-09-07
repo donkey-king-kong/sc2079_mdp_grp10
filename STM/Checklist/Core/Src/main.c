@@ -41,12 +41,12 @@
  * ========================================== */
 
 // --- 1. DISTANCE & GYRO CALIBRATION ---
-#define TICKS_PER_CM         70.35   // Tweak if "S10" travels more or less than 10cm
+#define TICKS_PER_CM         74.076   // Tweak if "S10" travels more or less than 10cm
 #define SLIDE_TICKS_PER_CM   75.19  // Specific tuning multiplier used in slide maneuvers
 #define BACKWARD_MULTIPLIER	 1.12f
 
 // --- 2. MOTOR BIAS (HARDWARE OFFSETS) ---
-#define RIGHT_MOTOR_BIAS     1.082  // Multiplier for right motor to match left motor speed (Fixes straight-line drift)
+#define RIGHT_MOTOR_BIAS     1.182  // Multiplier for right motor to match left motor speed (Fixes straight-line drift)
 #define TURN_SLAVE_RATIO     0.59   // Inner wheel speed multiplier during arc turns
 
 // --- 3. SERVO CALIBRATION ---
@@ -872,6 +872,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PE0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
@@ -1131,15 +1137,38 @@ void moveCarSlideLeft(int forward) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  //char debugBuf[100];
+  char countBuf[16];
 
   /* Infinite loop */
   for(;;)
   {
+	  // Read the physical PE0 button.
+	  // CHANGE to '== GPIO_PIN_RESET' if your schematic pulls PE0 to GND when pressed!
+	  if (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET)
+	  {
+		  // 1. Alert user that test is armed
+		  strcpy(oled_status_msg, "Armed! Unplug now");
+		  osDelay(1000); // 1 second to unplug your wire safely
+
+		  // 2. Start a 3-second visual countdown on the OLED
+		  for (int count = 3; count > 0; count--)
+		  {
+			  sprintf(countBuf, "Starting in... %d", count);
+			  strcpy(oled_status_msg, countBuf);
+			  osDelay(1000);
+		  }
+
+		  // 3. Clear the status message to restore the dashboard
+		  strcpy(oled_status_msg, "");
+		  osDelay(100);
+
+		  // 4. Force execute S100 directly (Forward 100cm)
+		  moveCarRight(360.0);
+	  }
+
 	HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-	//int len = sprintf(debugBuf, "Time: %lu ms | EncL: %d | EncR: %d\r\n", diag_timer, dash_encoderL, dash_encoderR);
-	//HAL_UART_Transmit(&huart3, (uint8_t*)debugBuf, len, HAL_MAX_DELAY);
-    osDelay(1000);
+
+    osDelay(100);
   }
   /* USER CODE END 5 */
 }
