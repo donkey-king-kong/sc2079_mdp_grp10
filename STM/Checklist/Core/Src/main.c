@@ -50,6 +50,8 @@
 #define TURN_SLAVE_RATIO     0.59   // Speed ratio of inner wheel during arc turns
 #define TURN_BIAS_DEG_L      0.54f  // If over-turns left, increase. If under-turns, decrease.
 #define TURN_BIAS_DEG_R      1.58f  // If over-turns right, increase. If under-turns, decrease.
+#define TURN_SCALE_L		 1.00f	// If over-rotate 360, decrease. If under-rotate, increase.
+#define TURN_SCALE_R		 1.00f	// If over-rotate 360, decrease. If under-rotate, increase.
 
 // --- 3. SERVO CALIBRATION ---
 #define SERVOCENTER          150
@@ -1043,7 +1045,8 @@ void moveCarRight(double angle) {
     move_start_time = HAL_GetTick();
 
     // Subtract from target angle (assuming right turn decreases Z-axis angle)
-    target_angle -= (angle - TURN_BIAS_DEG_R);
+    double calibrated_angle = (angle * TURN_SCALE_R) - TURN_BIAS_DEG_R;
+    target_angle -= calibrated_angle;
 
     while (finishCheck()) {
         osDelay(10);
@@ -1061,7 +1064,8 @@ void moveCarLeft(double angle) {
     move_start_time = HAL_GetTick();
 
     // Add to target angle (assuming left turn increases Z-axis angle)
-    target_angle += (angle - TURN_BIAS_DEG_L);
+    double calibrated_angle = (angle * TURN_SCALE_L) - TURN_BIAS_DEG_L;
+    target_angle += calibrated_angle;
 
     while (finishCheck()) {
         osDelay(10);
@@ -1177,7 +1181,7 @@ void StartDefaultTask(void *argument)
 		  osDelay(100);
 
 		  // 4. Force execute S100 directly (Forward 100cm)
-		  moveCarRight(360.0);
+		  moveCarStraight(100.0);
 	  }
 
 	HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
