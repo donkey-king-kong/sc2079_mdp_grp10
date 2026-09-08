@@ -41,12 +41,12 @@
  * ========================================== */
 
 // --- 1. DISTANCE & GYRO CALIBRATION ---
-#define TICKS_PER_CM         74.076 // Tweak if "S10" travels more or less than 10cm
+#define TICKS_PER_CM         60.588	// Tweak if "S10" travels more or less than 10cm
 #define SLIDE_TICKS_PER_CM   75.19  // Specific tuning multiplier used in slide maneuvers
 #define BACKWARD_MULTIPLIER	 1.12f
 
 // --- 2. MOTOR BIAS (HARDWARE OFFSETS) ---
-#define RIGHT_MOTOR_BIAS     1.182  // If drifts left, decrease. If drifts right, increase.
+#define RIGHT_MOTOR_BIAS     1.223  // If drifts left, decrease. If drifts right, increase.
 #define TURN_SLAVE_RATIO     0.59   // Speed ratio of inner wheel during arc turns
 #define TURN_BIAS_DEG_L      0.54f  // If over-turns left, increase. If under-turns, decrease.
 #define TURN_BIAS_DEG_R      1.58f  // If over-turns right, increase. If under-turns, decrease.
@@ -76,7 +76,7 @@
 
 // --- 5. PWM POWER LIMITS (Max Power = 7199) ---
 #define PID_STR_MAX          5000   // ~55% speed (Leave headroom so PID has room to adjust!)
-#define PID_STR_MIN          1800   // Minimum power to break static floor friction
+#define PID_STR_MIN          2000   // Minimum power to break static floor friction
 
 
 /* USER CODE END PD */
@@ -950,35 +950,35 @@ int PID_Angle(double errord) {
 }
 
 int PID_Control(int error) {
-    // 1. Get the absolute error since direction is handled in StartMotorTask
     error = abs(error);
 
-	// 2. Calculate Proportional Term
-	float p_term = PID_STRAIGHT_KP * error;
+    // 1. Calculate Proportional Term
+    float p_term = PID_STRAIGHT_KP * error;
 
-	// 3. Calculate Integral Term (Accumulates over time)
-	distance_integral += error;
+    // 2. Calculate Integral Term (Accumulate ONLY near target to prevent saturation)
+    if (error < 1000) {
+        distance_integral += error;
+        if (distance_integral > 5000) distance_integral = 5000; // Anti-windup cap
+    } else {
+        distance_integral = 0.0;
+    }
+    float i_term = PID_STRAIGHT_KI * distance_integral;
 
-	// Anti-Windup: Prevent the integral from getting dangerously huge
-	if (distance_integral > 10000) distance_integral = 10000;
+    // 3. Total Output
+    int total_pwm = (int)(p_term + i_term);
 
-	float i_term = PID_STRAIGHT_KI * distance_integral;
+    // 4. Clamp output
+    if (total_pwm > PID_STR_MAX) total_pwm = PID_STR_MAX;
+    if (total_pwm < PID_STR_MIN && error > 20) total_pwm = PID_STR_MIN;
 
-	// 4. Total Output
-	int total_pwm = (int)(p_term + i_term);
-
-	// 5. Clamp the output to your safe limits
-	if (total_pwm > PID_STR_MAX) total_pwm = PID_STR_MAX;
-	if (total_pwm < PID_STR_MIN && error > 20) total_pwm = PID_STR_MIN; // Ensure it breaks static friction
-
-	// 6. Arrival Check
-	if (error <= 20) {
-		times_acceptable++;
-		return 0; // Trigger braking sequence
-	} else {
-		times_acceptable = 0;
-		return total_pwm;
-	}
+    // 5. Arrival Check
+    if (error <= 20) {
+        times_acceptable++;
+        return 0;
+    } else {
+        times_acceptable = 0;
+        return total_pwm;
+    }
 }
 
 int finishCheck() {
@@ -1451,58 +1451,54 @@ void StartMotorTask(void *argument)
 		}
 
 		else { // Straight
+		    // 1. Calculate base speeds
+		    pwmVal_R = PID_Control(right_target - right_encoder_val) * RIGHT_MOTOR_BIAS;
+		    pwmVal_L = PID_Control(left_target - left_encoder_val);
 
-			// 1. Calculate base speeds
-			pwmVal_R = PID_Control(right_target - right_encoder_val) * RIGHT_MOTOR_BIAS;
-			pwmVal_L = PID_Control(left_target - left_encoder_val);
+		    // 2. Perform active gyro drift correction via differential rear motors
+		    int left_correction = (int)(total_angle * GYRO_CORRECTION_KP);
+		    int right_correction = (int)(-total_angle * GYRO_CORRECTION_KP);
 
-			// 2. Perform active gyro drift correction
-			int left_correction = (int) (total_angle * GYRO_CORRECTION_KP);
-			int right_correction = (int) (-total_angle * GYRO_CORRECTION_KP);
+		    int is_forward_cmd = (right_target >= 75000);
 
-			// Apply correction only if moving forward
-			if ((right_target - right_encoder_val) > 0) {
-				pwmVal_L += left_correction;
-				pwmVal_R += right_correction;
-			} else {
-				pwmVal_L -= left_correction;
-				pwmVal_R -= right_correction;
-			}
+		    if (is_forward_cmd) {
+		        if ((right_target - right_encoder_val) > 0) {
+		            pwmVal_L += left_correction;
+		            pwmVal_R += right_correction;
 
-			// 3. Servo Fine-Tuning (Micro-steering using Gyro to stay on course)
-			int error_sign = (right_target - right_encoder_val < 0) ? -1 : 1;
+		            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
+		            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+		            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
+		        } else {
+		            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+		            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+		            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+		            times_acceptable++;
+		        }
+		    } else {
+		        if ((right_target - right_encoder_val) < 0) {
+		            pwmVal_L -= left_correction;
+		            pwmVal_R -= right_correction;
 
-			if (error_angle > 5)
-				pwmVal_servo = (error_sign * -19 * 5) / 5 + SERVOCENTER;
-			else if (error_angle < -5)
-				pwmVal_servo = (error_sign * 19 * 5) / 5 + SERVOCENTER;
-			else
-				pwmVal_servo = (error_sign * -19 * error_angle) /5 + SERVOCENTER;
+		            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
+		            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+		            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
+		            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+		        } else {
+		            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+		            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+		            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+		            times_acceptable++;
+		        }
+		    }
 
-			// Write micro-adjustments to TIM12 servo
-			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
-
-			// 4. Apply speed to 2-Pin Dual-PWM H-Bridge based on Direction
-			// Check if moving forward or backward based on target direction
-			if((right_target - right_encoder_val) > 0) {
-				// --- Forward Movement ---
-				// Left Motor (TIM4) Forward
-				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, pwmVal_L);
-
-				// Right Motor (TIM9) Forward
-	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
-	            __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, pwmVal_R);
-			} else {
-				// --- Backward Movement ---
-				// Left Motor (TIM4) Backward
-				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, pwmVal_L);
-				__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
-
-				// Right Motor (TIM9) Backward
-				__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, pwmVal_R);
-				__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
-			}
+		    // 3. Keep front steering servo centered during straight runs
+		    // Differential motor speed handles 100% of straight heading corrections smoothly!
+		    pwmVal_servo = SERVOCENTER;
+		    __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
 		}
 	} else {
 		// Force absolute zero to prevent whines, hums, and physical oscillations
