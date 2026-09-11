@@ -27,6 +27,7 @@
 #include <string.h>
 #include "ICM20948.h"
 #include <stdlib.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,8 +51,12 @@
 #define TURN_SLAVE_RATIO     0.59   // Speed ratio of inner wheel during arc turns
 #define TURN_BIAS_DEG_L      0.54f  // If over-turns left, increase. If under-turns, decrease.
 #define TURN_BIAS_DEG_R      1.58f  // If over-turns right, increase. If under-turns, decrease.
-#define TURN_SCALE_L		 1.00f	// If over-rotate 360, decrease. If under-rotate, increase.
-#define TURN_SCALE_R		 1.00f	// If over-rotate 360, decrease. If under-rotate, increase.
+/* Turn calibration values compensate for the measured left/right response and
+ * stop the drive before momentum carries the robot past its gyro target. */
+#define TURN_SCALE_L		 1.006f
+#define TURN_SCALE_R		 1.028f
+#define TURN_STOP_TOLERANCE_DEG 1.0f
+#define TURN_TIMEOUT_MS        10000U
 
 // --- 3. SERVO CALIBRATION ---
 #define SERVOCENTER          150
@@ -67,12 +72,14 @@
 #define GYRO_CORRECTION_KP	 35.0f	// Proportional Gain: How aggresively it corrects straight-line drift.
 
 // Turning Controller
-#define PID_ANG_MAX          5000   // ~70% speed
-#define PID_ANG_HIGH         4000   // ~55% speed
-#define PID_ANG_MED          3000   // ~41% speed
-#define PID_ANG_LOW          2600   // ~30% speed
-#define PID_ANG_FINE         2200   // ~22% speed
-#define PID_ANG_MIN          1800   // Minimum power for turning frictions
+#define PID_ANG_MAX          3000   // Cap startup speed to reduce turn coasting.
+#define PID_ANG_HIGH         2800
+#define PID_ANG_MED          2500
+#define PID_ANG_LOW          2200
+#define PID_ANG_FINE         1900
+#define PID_ANG_MIN          1800   // Minimum power to overcome turn friction.
+/* The right drivetrain needs this minimum PWM to keep turning near target. */
+#define TURN_RIGHT_MIN_PWM   2800
 
 // --- 5. PWM POWER LIMITS (Max Power = 7199) ---
 #define PID_STR_MAX          5000   // ~55% speed (Leave headroom so PID has room to adjust!)
@@ -101,44 +108,46 @@ UART_HandleTypeDef huart3;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
+/* Larger stacks prevent task-local buffers and formatting from exhausting the
+ * original 1 KB allocations. */
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for communicateTask */
 osThreadId_t communicateTaskHandle;
 const osThreadAttr_t communicateTask_attributes = {
   .name = "communicateTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for motorTask */
 osThreadId_t motorTaskHandle;
 const osThreadAttr_t motorTask_attributes = {
   .name = "motorTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for oledTask */
 osThreadId_t oledTaskHandle;
 const osThreadAttr_t oledTask_attributes = {
   .name = "oledTask",
-  .stack_size = 512 * 4,
+  .stack_size = 768 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for gyroTask */
 osThreadId_t gyroTaskHandle;
 const osThreadAttr_t gyroTask_attributes = {
   .name = "gyroTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for ultrasonicTask */
 osThreadId_t ultrasonicTaskHandle;
 const osThreadAttr_t ultrasonicTask_attributes = {
   .name = "ultrasonicTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityBelowNormal,
 };
 /* Definitions for uartQueue */
@@ -162,6 +171,10 @@ int times_acceptable = 0;
 int e_brake = 0;
 int is_moving = 0; // (0 = Idle, 1 = Moving)
 uint32_t move_start_time = 0;
+/* Track completion for UART telemetry and let the receive ISR request a
+ * prompt, safe motor shutdown. */
+uint8_t move_finish_reason = 0; // 1 = reached gyro/encoder target, 2 = timeout
+volatile uint8_t emergency_stop_requested = 0; // Set by UART ISR on '!'.
 float distance_integral = 0.0;
 
 /* --- ENCODER VARIABLES --- */
@@ -888,6 +901,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	/* Prevent unused argument(s) compilation warning */
 	if (huart -> Instance == USART3)
 	{
+		/* Handle emergency stop in the ISR so it is not delayed by a blocking
+		 * movement command in the communication task. */
+		if (rxByte == '!')
+		{
+			emergency_stop_requested = 1;
+			is_moving = 0;
+		}
 		osMessageQueuePut(uartQueueHandle, &rxByte, 0U, 0U);
 		HAL_UART_Receive_IT(&huart3, &rxByte, 1);
 	}
@@ -934,12 +954,14 @@ int PID_Angle(double errord) {
 	// 2. Get absolute value
 	error = abs(error);
 
+	/* Reset the arrival counter whenever the turn is still outside its settling
+	 * band, so intermittent low-error samples cannot finish a turn early. */
 	// 3. Return PWM Magnitude (stepped proportional control)
-	if (error > 300) return PID_ANG_MAX;
-	else if (error > 200) return PID_ANG_HIGH;
-	else if (error > 150) return PID_ANG_MED;
-	else if (error > 100) return PID_ANG_LOW;
-	else if (error > 20) return PID_ANG_FINE;
+	if (error > 300) { times_acceptable = 0; return PID_ANG_MAX; }
+	else if (error > 200) { times_acceptable = 0; return PID_ANG_HIGH; }
+	else if (error > 150) { times_acceptable = 0; return PID_ANG_MED; }
+	else if (error > 100) { times_acceptable = 0; return PID_ANG_LOW; }
+	else if (error > 20) { times_acceptable = 0; return PID_ANG_FINE; }
 	else if (error >= 2) {
 		times_acceptable++;
 		return PID_ANG_MIN;
@@ -983,10 +1005,20 @@ int PID_Control(int error) {
 
 int finishCheck() {
 	uint32_t elapsed_time = HAL_GetTick() - move_start_time;
+	/* Turns receive a shorter safety cap because a missed gyro target can leave
+	 * the robot rotating; straight moves retain their existing longer cap. */
+	uint32_t timeout_ms = (pwmVal_servo < TURNLEFT_TH || pwmVal_servo > TURNRIGHT_TH)
+			? TURN_TIMEOUT_MS : 12000U;
+
+    // The motor task has already reached a turn target and requested braking.
+    if (!is_moving) {
+        return 0;
+    }
 
     // If PID error has been minimal for ~20 ticks (approx 200ms)
     if (times_acceptable > 20) {
     	is_moving = 0;
+        move_finish_reason = 1;
         e_brake = 1; // Signal motor task to cut PWM
         times_acceptable = 0;
         pwmVal_servo = SERVOCENTER;
@@ -997,9 +1029,10 @@ int finishCheck() {
     // --- FAIL-SAFE 2: MAXIMUM TIMEOUT REACHED (CRITICAL) ---
 	// If the robot has been struggling/stalled for more than 4 seconds,
 	// force it to stop, brake, and proceed!
-    if (elapsed_time > 5000) {
+    if (elapsed_time > timeout_ms) {
         is_moving = 0;
-        e_brake = 1;   // Force active brake to run
+        move_finish_reason = 2;
+        e_brake = 1;   // Signal motor task to cut PWM
         times_acceptable = 0;
         pwmVal_servo = SERVOCENTER;
         osDelay(300);
@@ -1018,6 +1051,7 @@ void moveCarStraight(double distance) {
 
     e_brake = 0;
     times_acceptable = 0;
+    move_finish_reason = 0;
     is_moving = 1;
     distance_integral = 0.0;
     move_start_time = HAL_GetTick();
@@ -1040,6 +1074,7 @@ void moveCarRight(double angle) {
 
     e_brake = 0;
     times_acceptable = 0;
+    move_finish_reason = 0;
     is_moving = 1;
     distance_integral = 0.0;
     move_start_time = HAL_GetTick();
@@ -1059,6 +1094,7 @@ void moveCarLeft(double angle) {
 
     e_brake = 0;
     times_acceptable = 0;
+    move_finish_reason = 0;
     is_moving = 1;
     distance_integral = 0.0;
     move_start_time = HAL_GetTick();
@@ -1252,6 +1288,12 @@ void StartCommunicateTask(void *argument)
 								moveCarSlideLeft(value); 	// value is 1 for fwd, -1 for bwd
 							else if (command_char2 == 'R') 	// "SR" command for Slide Right
 								moveCarSlideRight(value);
+							else if (command_char2 == 'B')
+							{
+								/* Accept the RPi protocol's SB<number> form as a calibrated
+								 * backward straight movement. */
+								moveCarStraight(-value * BACKWARD_MULTIPLIER);
+							}
 							else
 								moveCarStraight(value);		// "S" command for Straight
 							break;
@@ -1276,9 +1318,20 @@ void StartCommunicateTask(void *argument)
 					}
 				}
 
-				// 3. SEND ACK TO RPI
-				uint8_t ackMsg[] = "A\n";
-				HAL_UART_Transmit(&huart3, ackMsg, sizeof(ackMsg)-1, 100);
+				/* Turn acknowledgements include measured and target angles so the
+				 * calibration client can identify target reaches versus timeouts. */
+				char ackMsg[64];
+				if (command_char1 == 'L' || command_char1 == 'R')
+				{
+					snprintf(ackMsg, sizeof(ackMsg), "A G:%.1f T:%.1f %s\n",
+							(float)total_angle, (float)target_angle,
+							move_finish_reason == 2 ? "TIMEOUT" : "TARGET");
+				}
+				else
+				{
+					snprintf(ackMsg, sizeof(ackMsg), "A\n");
+				}
+				HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
 
 				// 4. UPDATE OLED RPI COMMAND VARIABLE & RESET
 				strcpy(dash_lastCmd, cmdBuffer);
@@ -1312,7 +1365,6 @@ void StartMotorTask(void *argument)
   // Encoder Variables
   int16_t cnt_L = 0;
   int16_t cnt_R = 0;
-  int straight_correction = 0;
   pwmVal_L = 0;
   pwmVal_R = 0;
   left_encoder_val = 0;
@@ -1373,21 +1425,25 @@ void StartMotorTask(void *argument)
 		left_target = left_encoder_val;
 		right_target = right_encoder_val;
 
-		// Active Electromagnetic Braking
-        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 7199);
-        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 7199);
-        __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 7199);
-        __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 7199);
-
-        osDelay(150);
-
-        // Instantly cut PWM to your 2-pin setup
+		/* Cut PWM immediately. Driving both bridge inputs at 100% for braking
+		 * causes high current spikes and can reset the MCU/driver. */
         __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
         __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
         __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
         __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
 
         e_brake = 0;
+
+	} else if (emergency_stop_requested) {
+		/* No active brake pulse here: cut motor PWM immediately. */
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, 0);
+		__HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, 0);
+		pwmVal_servo = SERVOCENTER;
+		__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, pwmVal_servo);
+		e_brake = 0;
+		emergency_stop_requested = 0;
 
 	} else if (is_moving) {
 
@@ -1396,6 +1452,14 @@ void StartMotorTask(void *argument)
 		error_angle = target_angle - total_angle;
 
 		if (pwmVal_servo < TURNLEFT_TH) { // Turn left
+			/* Stop as the gyro reaches/crosses target to limit coasting overshoot. */
+			if (error_angle <= TURN_STOP_TOLERANCE_DEG) {
+				is_moving = 0;
+				move_finish_reason = 1;
+				e_brake = 1;
+				pwmVal_servo = SERVOCENTER;
+				continue;
+			}
 
 			// 1. Calculate base speeds
 			pwmVal_R = PID_Angle(error_angle) * RIGHT_MOTOR_BIAS;	// Master Wheel: Right
@@ -1424,8 +1488,19 @@ void StartMotorTask(void *argument)
 		}
 
 		else if (pwmVal_servo > TURNRIGHT_TH) { // Turn right
+			/* Stop as the gyro reaches/crosses target to limit coasting overshoot. */
+			if (error_angle >= -TURN_STOP_TOLERANCE_DEG) {
+				is_moving = 0;
+				move_finish_reason = 1;
+				e_brake = 1;
+				pwmVal_servo = SERVOCENTER;
+				continue;
+			}
 
 			pwmVal_L = PID_Angle(error_angle); // Master Wheel: Left
+			/* Preserve enough torque for the right-turn drivetrain near target. */
+			if (pwmVal_L < TURN_RIGHT_MIN_PWM)
+				pwmVal_L = TURN_RIGHT_MIN_PWM;
 			pwmVal_R = pwmVal_L * TURN_SLAVE_RATIO;	   // Slave Wheel: Right
 
 			// 2. Apply speeds to 2-pin H-Bridge based on error direction
@@ -1564,7 +1639,7 @@ void StartOledTask(void *argument)
 	}
 
 	OLED_Refresh_Gram();
-    osDelay(100);
+	    osDelay(100);
   }
   /* USER CODE END StartOledTask */
 }
@@ -1624,8 +1699,10 @@ void StartGyroTask(void *argument)
 	// 3. Subtract baseline offset and integrate angular velocity to get absolute degrees
 	double gz_corrected = (double)IMU_Data.z_gyro - offset;
 
+	/* Use the floating-point absolute function so the gyro deadband is evaluated
+	 * with its fractional precision rather than after integer truncation. */
 	// Force gyro angle to 0.0 if rotation is less than 0.35 degrees/sec
-	if (abs(gz_corrected) < 0.35)
+	if (fabs(gz_corrected) < 0.35)
 		gz_corrected = 0.0;
 
 	// 4. Integrate the filtered velocity
