@@ -1,192 +1,221 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:id="@+id/fragment_container_view_add_coordinates">
+    android:id="@+id/fragment_container_view_add_coordinates"
+    android:background="#0F1C3A">
 
-    <RelativeLayout
-        android:id="@+id/relativeLayout_add_coordinates"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/rounded_status_background"
-        android:backgroundTint="@color/dark_blue_700">
+        android:orientation="vertical"
+        android:padding="10dp">
 
+        <!-- Coordinate inputs -->
         <LinearLayout
-            android:id="@+id/linearLayout_wrap_add_coordinates"
+            android:id="@+id/linearLayout_add_x_y_coords"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_700"
-            android:padding="5dp">
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
 
-            <!-- Row 1: X and Y coordinates -->
             <LinearLayout
-                android:id="@+id/linearLayout_add_x_y_coords"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="start">
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginEnd="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="X"
+                    android:textColor="#7AAFCB"
+                    android:textSize="9sp"
+                    android:fontFamily="@font/poppins_bold"
+                    android:layout_marginBottom="2dp"
+                    android:letterSpacing="0.08" />
 
                 <EditText
                     android:id="@+id/addXCoords"
-                    android:layout_width="0dp"
-                    android:layout_height="50dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="10dp"
-                    android:background="@drawable/rounded_background"
-                    android:backgroundTint="@color/dark_blue_200"
-                    android:hint="Enter X-Coordinates"
-                    android:textColorHint="@color/white"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:background="@drawable/rounded_status_background"
+                    android:backgroundTint="#1A2E50"
+                    android:hint="0 – 19"
+                    android:textColorHint="#4A6A88"
                     android:textColor="@color/white"
                     android:fontFamily="@font/poppins_regular"
                     android:gravity="center"
-                    android:textSize="14sp"
-                    android:inputType="number"/>
+                    android:textSize="13sp"
+                    android:inputType="number"
+                    android:padding="4dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Y"
+                    android:textColor="#7AAFCB"
+                    android:textSize="9sp"
+                    android:fontFamily="@font/poppins_bold"
+                    android:layout_marginBottom="2dp"
+                    android:letterSpacing="0.08" />
 
                 <EditText
                     android:id="@+id/addYCoords"
-                    android:layout_width="0dp"
-                    android:layout_height="50dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/rounded_background"
-                    android:backgroundTint="@color/dark_blue_200"
-                    android:hint="Enter Y-Coordinates"
-                    android:textColorHint="@color/white"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:background="@drawable/rounded_status_background"
+                    android:backgroundTint="#1A2E50"
+                    android:hint="0 – 19"
+                    android:textColorHint="#4A6A88"
                     android:textColor="@color/white"
                     android:fontFamily="@font/poppins_regular"
                     android:gravity="center"
-                    android:textSize="14sp"
-                    android:inputType="number"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/linearLayout_add_Toogle_Group_Options"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="start"
-                android:layout_marginTop="5dp">
-
-                <!-- Left side: vertical toggle group -->
-                <com.google.android.material.button.MaterialButtonToggleGroup
-                    android:id="@+id/toggleGroup_Options"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    app:singleSelection="true">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/add_starting_point"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="50dp"
-                        android:text="Add Vehicle Starting Point"
-                        android:textColor="@color/white"
-                        app:icon="@drawable/vehicle_icon"
-                        app:iconGravity="textEnd"
-                        app:iconPadding="8dp"
-                        app:iconSize="40dp"
-                        app:iconTint="@android:color/white" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/add_obstacle_button"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:text="Add Obstacle"
-                        app:icon="@drawable/obstacle_icon"
-                        app:iconGravity="textEnd"
-                        app:iconPadding="8dp"
-                        android:textColor="@color/white"
-                        app:iconTint="@android:color/white"
-                        app:iconSize="35dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/remove_obstacle_button"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:text="Remove Obstacle"
-                        app:icon="@drawable/obstacle_icon"
-                        app:iconGravity="textEnd"
-                        app:iconPadding="8dp"
-                        android:textColor="@color/white"
-                        app:iconTint="@android:color/white"
-                        app:iconSize="35dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/remove_vehicle_button"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:text="Remove Vehicle Starting Point"
-                        app:icon="@drawable/vehicle_icon"
-                        app:iconGravity="textEnd"
-                        app:iconPadding="8dp"
-                        android:textColor="@color/white"
-                        app:iconTint="@android:color/white"
-                        app:iconSize="35dp" />
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/change_direction_button"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="45dp"
-                        android:textColor="@color/white"
-                        android:text="Change Direction"
-                        app:icon="@drawable/turning_bar_icon"
-                        app:iconTint="@android:color/white"
-                        app:iconGravity="textEnd"
-                        app:iconPadding="8dp"
-                        android:orientation="vertical"
-                        app:iconSize="35dp" />
-                </com.google.android.material.button.MaterialButtonToggleGroup>
-
-
-
-
-
-
-            </LinearLayout>
-
-            <!-- Row 4: Cancel and Add Obstacle buttons -->
-            <LinearLayout
-                android:id="@+id/linearLayout_cancel_add_buttons"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="start"
-
-                android:layout_marginTop="20dp">
-
-                <ImageButton
-                    android:id="@+id/cancelButton"
-                    android:layout_width="0dp"
-                    android:layout_height="35dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="10dp"
-                    android:foregroundGravity="center"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/cross_for_exit"
-                    android:contentDescription="Cancel"
-                    android:background="@drawable/rounded_background_red"/>
-
-                <ImageButton
-                    android:id="@+id/addObstacleButton"
-                    android:layout_width="0dp"
-                    android:layout_height="35dp"
-                    android:layout_weight="1"
-                    android:foregroundGravity="center"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/plus_for_enter"
-                    android:contentDescription="Add Obstacle"
-                    android:background="@drawable/rounded_background_green"/>
+                    android:textSize="13sp"
+                    android:inputType="number"
+                    android:padding="4dp" />
             </LinearLayout>
         </LinearLayout>
 
-    </RelativeLayout>
+        <!-- Mode label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MODE"
+            android:textColor="#4A6A88"
+            android:textSize="8sp"
+            android:fontFamily="@font/poppins_bold"
+            android:letterSpacing="0.12"
+            android:layout_marginBottom="4dp" />
+
+        <!-- Mode buttons — horizontal row -->
+        <LinearLayout
+            android:id="@+id/linearLayout_add_Toogle_Group_Options"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/toggleGroup_Options"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                app:singleSelection="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/add_starting_point"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="Vehicle"
+                    android:textSize="9sp"
+                    android:textColor="@color/white"
+                    app:icon="@drawable/vehicle_icon"
+                    app:iconGravity="top"
+                    app:iconPadding="2dp"
+                    app:iconSize="20dp"
+                    app:iconTint="@android:color/white"
+                    app:strokeColor="#2A4A6B"
+                    app:strokeWidth="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/add_obstacle_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="Obstacle"
+                    android:textSize="9sp"
+                    android:textColor="@color/white"
+                    app:icon="@drawable/obstacle_icon"
+                    app:iconGravity="top"
+                    app:iconPadding="2dp"
+                    app:iconSize="20dp"
+                    app:iconTint="@android:color/white"
+                    app:strokeColor="#2A4A6B"
+                    app:strokeWidth="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/remove_obstacle_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:text="Remove"
+                    android:textSize="9sp"
+                    android:textColor="@color/white"
+                    app:icon="@drawable/outline_delete_24dp"
+                    app:iconGravity="top"
+                    app:iconPadding="2dp"
+                    app:iconSize="20dp"
+                    app:iconTint="@android:color/white"
+                    app:strokeColor="#2A4A6B"
+                    app:strokeWidth="1dp" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        </LinearLayout>
+
+        <!-- Hint text -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tap grid to place · tap placed item to cycle direction"
+            android:textColor="#3A5A78"
+            android:textSize="8sp"
+            android:fontFamily="@font/poppins_regular"
+            android:gravity="center"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="6dp" />
+
+        <!-- Action buttons -->
+        <LinearLayout
+            android:id="@+id/linearLayout_cancel_add_buttons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <ImageButton
+                android:id="@+id/cancelButton"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:foregroundGravity="center"
+                android:scaleType="fitCenter"
+                android:src="@drawable/cross_for_exit"
+                android:contentDescription="Cancel"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#3A1A1A"
+                app:tint="#EF5252" />
+
+            <ImageButton
+                android:id="@+id/addObstacleButton"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:foregroundGravity="center"
+                android:scaleType="fitCenter"
+                android:src="@drawable/plus_for_enter"
+                android:contentDescription="Confirm"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#0D2E1A"
+                app:tint="#4CCB67" />
+        </LinearLayout>
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

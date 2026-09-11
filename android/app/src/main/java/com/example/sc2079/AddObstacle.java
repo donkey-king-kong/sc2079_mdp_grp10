@@ -19,8 +19,6 @@ import android.widget.Toast;
 import androidx.fragment.app.Fragment;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
-import android.widget.PopupMenu;
-import android.view.MenuItem;
 
 public class AddObstacle extends Fragment{
     private ImageButton addObstacleButton;
@@ -29,9 +27,7 @@ public class AddObstacle extends Fragment{
     private EditText addYCoords;
     private MaterialButton addStartingPointButton;
     private MaterialButton addObstacleToggle;
-    private MaterialButton removeObstacleButton;
-    private MaterialButton removeVehicleButton;
-    private MaterialButton changeDirectionButton;
+    private MaterialButton removeButton;
     private MaterialButton resetMapButton;
     private MaterialButton saveMapButton;
 
@@ -39,11 +35,8 @@ public class AddObstacle extends Fragment{
     View addCoordsView;
     View changeSaveView;
     private int currentSelectedButtonId = View.NO_ID;
-    ObstacleData.Direction selectedDirectionID;
-
 
     private GridMapClass gridMap;
-    private boolean activatedMap = false;
 
     public AddObstacle(GridMapClass gridMap){
         this.gridMap = gridMap;
@@ -74,9 +67,7 @@ public class AddObstacle extends Fragment{
         // Buttons that were in the toggle group
         addStartingPointButton = addCoordsView.findViewById(R.id.add_starting_point);
         addObstacleToggle = addCoordsView.findViewById(R.id.add_obstacle_button);
-        removeObstacleButton = addCoordsView.findViewById(R.id.remove_obstacle_button);
-        removeVehicleButton = addCoordsView.findViewById(R.id.remove_vehicle_button);
-        changeDirectionButton = addCoordsView.findViewById(R.id.change_direction_button);
+        removeButton = addCoordsView.findViewById(R.id.remove_obstacle_button);
         resetMapButton = getActivity().findViewById(R.id.reset_map_button);
         saveMapButton = getActivity().findViewById(R.id.save_map_button);
 
@@ -112,53 +103,7 @@ public class AddObstacle extends Fragment{
 
         addStartingPointButton.setOnClickListener(selectionListener);
         addObstacleToggle.setOnClickListener(selectionListener);
-        removeObstacleButton.setOnClickListener(selectionListener);
-        removeVehicleButton.setOnClickListener(selectionListener);
-        changeDirectionButton.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View view) {
-                if (currentSelectedButtonId == view.getId()) {
-                    currentSelectedButtonId = View.NO_ID;
-                    updateButtonState();
-                } else {
-                    currentSelectedButtonId = view.getId();
-                    updateButtonState();
-                    if (!activatedMap) {
-                        PopupMenu popup = new PopupMenu(getContext(), changeDirectionButton);
-                        popup.getMenuInflater().inflate(R.menu.direction_menu, popup.getMenu());
-                        popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-                            @Override
-                            public boolean onMenuItemClick(MenuItem item) {
-                                int id = item.getItemId();
-
-                                if (id == R.id.north) {
-                                    changeDirectionButton.setText("Change Direction to Up");
-                                    selectedDirectionID = ObstacleData.Direction.NORTH;
-                                    return true;
-                                } else if (id == R.id.south) {
-                                    changeDirectionButton.setText("Change Direction to Down");
-                                    selectedDirectionID = ObstacleData.Direction.SOUTH;
-                                    return true;
-                                } else if (id == R.id.east) {
-                                    changeDirectionButton.setText("Change Direction to Right");
-                                    selectedDirectionID = ObstacleData.Direction.EAST;
-                                    return true;
-                                } else if (id == R.id.west) {
-                                    changeDirectionButton.setText("Change Direction to Left");
-                                    selectedDirectionID = ObstacleData.Direction.WEST;
-                                    return true;
-                                }
-                                return false;
-                            }
-                        });
-                        popup.show();
-                        activatedMap = true;
-                    }else{
-                        activatedMap = false;
-                    }
-                }
-            }
-        });
+        removeButton.setOnClickListener(selectionListener);
         addObstacleButton.setOnClickListener(new View.OnClickListener()
         {
             @Override
@@ -208,17 +153,17 @@ public class AddObstacle extends Fragment{
                             break;
 
                         case "remove_obstacle_button":
-                            Log.d("add_coordinate.xml","Clicked remove_obstacle_button Button");
+                            Log.d("add_coordinate.xml","Clicked remove Button");
                             statusReturn = gridMap.removeFromGrid(x_coord_add, y_coord_add, true);
                             switch(statusReturn){
                                 case 0:
-                                    Toast.makeText(getContext(), "Invalid Coordinates added! Please reenter input", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(getContext(), "Invalid Coordinates! Please reenter input", Toast.LENGTH_SHORT).show();
                                     break;
                                 case 1:
-                                    Toast.makeText(getActivity(),"Obstacle successfully removed at (" + utilities.convertIntToString(x_coord_add) + "," + utilities.convertIntToString(y_coord_add)+")",Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(getActivity(),"Successfully removed at (" + utilities.convertIntToString(x_coord_add) + "," + utilities.convertIntToString(y_coord_add)+")",Toast.LENGTH_SHORT).show();
                                     break;
                                 case 2:
-                                    Toast.makeText(getActivity(),"Obstacle already removed at (" + utilities.convertIntToString(x_coord_add) + "," + utilities.convertIntToString(y_coord_add)+")",Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(getActivity(),"Nothing to remove at (" + utilities.convertIntToString(x_coord_add) + "," + utilities.convertIntToString(y_coord_add)+")",Toast.LENGTH_SHORT).show();
                                     break;
                                 case 3:
                                     Toast.makeText(getActivity(),"Obstacle dragged to new location",Toast.LENGTH_SHORT).show();
@@ -249,43 +194,6 @@ public class AddObstacle extends Fragment{
                                     break;
                             }
                             break;
-                        case "remove_vehicle_button":
-                            statusReturn = gridMap.removeVehicleFromGrid();
-                            switch(statusReturn){
-                                case 1:
-                                    Toast.makeText(getContext(), "Vehicle successfully removed!", Toast.LENGTH_SHORT).show();
-                                    break;
-                                case 2:
-                                    Toast.makeText(getContext(), "Vehicle already removed!", Toast.LENGTH_SHORT).show();
-                                    break;
-                                default:
-                                    Toast.makeText(getContext(), "Unknown Error Occurred!", Toast.LENGTH_SHORT).show();
-                                    break;
-                            }
-                            Log.d("add_coordinate.xml","Clicked remove_obstacle Button");
-                            break;
-                        case "change_direction_button":
-                            Log.d("add_coordinate.xml","Clicked change_direction Button");
-                            if(selectedDirectionID == null){
-                                Toast.makeText(getContext(), "No direction was specified!", Toast.LENGTH_SHORT).show();
-                                return;
-                            }
-                            statusReturn = gridMap.changeDirectionOfObstacleFlexible(x_coord_add, y_coord_add, selectedDirectionID);
-                            switch(statusReturn){
-                                case 1:
-                                    Toast.makeText(getContext(), "Obstacle direction changed to " + selectedDirectionID + " at (" + x_coord_add + "," + y_coord_add + ")", Toast.LENGTH_SHORT).show();
-                                    break;
-                                case 2:
-                                    Toast.makeText(getContext(), "Obstacle not present at (" + x_coord_add + "," + y_coord_add + ")", Toast.LENGTH_SHORT).show();
-                                    break;
-                                case 3:
-                                    Toast.makeText(getContext(), "Vehicle direction changed to " + selectedDirectionID + " at (" + x_coord_add + "," + y_coord_add + ")", Toast.LENGTH_SHORT).show();
-                                    break;
-                                case 4:
-                                    Toast.makeText(getContext(), "Unknown Error Occurred!", Toast.LENGTH_SHORT).show();
-                                    break;
-                            }
-                            break;
                     }
                 }
             }
@@ -309,18 +217,14 @@ public class AddObstacle extends Fragment{
     private void updateButtonState(){
         addStartingPointButton.setActivated(addStartingPointButton.getId() == currentSelectedButtonId);
         addObstacleToggle.setActivated(addObstacleToggle.getId() == currentSelectedButtonId);
-        removeObstacleButton.setActivated(removeObstacleButton.getId() == currentSelectedButtonId);
-        removeVehicleButton.setActivated(removeVehicleButton.getId() == currentSelectedButtonId);
-        changeDirectionButton.setActivated(changeDirectionButton.getId() == currentSelectedButtonId);
+        removeButton.setActivated(removeButton.getId() == currentSelectedButtonId);
 
         if (currentSelectedButtonId == addStartingPointButton.getId()) {
             gridMap.setGridMode(GridMapClass.GridMode.ADD_VEHICLE);
         } else if (currentSelectedButtonId == addObstacleToggle.getId()) {
             gridMap.setGridMode(GridMapClass.GridMode.ADD_OBSTACLE);
-        } else if (currentSelectedButtonId == removeObstacleButton.getId() || currentSelectedButtonId == removeVehicleButton.getId()) {
+        } else if (currentSelectedButtonId == removeButton.getId()) {
             gridMap.setGridMode(GridMapClass.GridMode.REMOVE);
-        } else if (currentSelectedButtonId == changeDirectionButton.getId()) {
-            gridMap.setGridMode(GridMapClass.GridMode.CHANGE_DIRECTION);
         } else {
             gridMap.setGridMode(GridMapClass.GridMode.NONE);
         }
