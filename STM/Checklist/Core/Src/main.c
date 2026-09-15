@@ -42,21 +42,28 @@
  * ========================================== */
 
 // --- 1. DISTANCE & GYRO CALIBRATION ---
-#define TICKS_PER_CM         60.588	// Tweak if "S10" travels more or less than 10cm
+#define TICKS_PER_CM         59.44f	// Tweak if "S10" travels more or less than 10cm
 #define SLIDE_TICKS_PER_CM   75.19  // Specific tuning multiplier used in slide maneuvers
 #define BACKWARD_MULTIPLIER	 1.12f
 
 // --- 2. MOTOR BIAS (HARDWARE OFFSETS) ---
-#define RIGHT_MOTOR_BIAS     1.223  // If drifts left, decrease. If drifts right, increase.
-#define TURN_SLAVE_RATIO     0.59   // Speed ratio of inner wheel during arc turns
-#define TURN_BIAS_DEG_L      0.54f  // If over-turns left, increase. If under-turns, decrease.
-#define TURN_BIAS_DEG_R      1.58f  // If over-turns right, increase. If under-turns, decrease.
-/* Turn calibration values compensate for the measured left/right response and
- * stop the drive before momentum carries the robot past its gyro target. */
-#define TURN_SCALE_L		 1.006f
-#define TURN_SCALE_R		 1.028f
+// Move Straight
+#define RIGHT_MOTOR_BIAS     1.18f  // If drifts left, decrease. If drifts right, increase.
+// Left Turn 90 to 360
+#define TURN_BIAS_DEG_L      37.73f  // If over-turns left, increase. If under-turns, decrease.
+#define TURN_SCALE_L		 1.00f
+// Left Turn 45
+#define TURN_BIAS_DEG_L_SMALL	5.0f
+#define TURN_SCALE_L_SMALL		0.95f
+// Right Turn 90 to 360
+#define TURN_BIAS_DEG_R		 20.83f
+#define TURN_SCALE_R		 0.9813f
+// Right Turn 45
+#define TURN_BIAS_DEG_R_SMALL 5.0f	// Proportional bias for right turns
+#define TURN_SCALE_R_SMALL	 0.95f
+// Misc Bias
+#define TURN_SLAVE_RATIO     0.59    	// Speed ratio of inner wheel during arc turns
 #define TURN_STOP_TOLERANCE_DEG 1.0f
-#define TURN_TIMEOUT_MS        10000U
 
 // --- 3. SERVO CALIBRATION ---
 #define SERVOCENTER          150
@@ -72,19 +79,17 @@
 #define GYRO_CORRECTION_KP	 35.0f	// Proportional Gain: How aggresively it corrects straight-line drift.
 
 // Turning Controller
-#define PID_ANG_MAX          3000   // Cap startup speed to reduce turn coasting.
-#define PID_ANG_HIGH         2800
-#define PID_ANG_MED          2500
-#define PID_ANG_LOW          2200
-#define PID_ANG_FINE         1900
-#define PID_ANG_MIN          1800   // Minimum power to overcome turn friction.
-/* The right drivetrain needs this minimum PWM to keep turning near target. */
-#define TURN_RIGHT_MIN_PWM   2800
+#define PID_ANG_MAX          4800   // Cruise speed for large angle turns (> 45 deg)
+#define PID_ANG_HIGH         4400	// Approaching (25 to 45 deg)
+#define PID_ANG_MED          4100	// Deceleration zone (15 to 25 deg)
+#define PID_ANG_LOW          3900	// Approach speed (6 to 15 deg)
+#define PID_ANG_FINE         3800	// Final settle speed (2 to 6 deg)
+#define PID_ANG_MIN_L        2900   // Minimum power to overcome turn friction.
+#define PID_ANG_MIN_R		 3700
 
 // --- 5. PWM POWER LIMITS (Max Power = 7199) ---
 #define PID_STR_MAX          5000   // ~55% speed (Leave headroom so PID has room to adjust!)
-#define PID_STR_MIN          2000   // Minimum power to break static floor friction
-
+#define PID_STR_MIN          2800   // Minimum power to break static floor friction
 
 /* USER CODE END PD */
 
@@ -169,13 +174,14 @@ uint16_t pwmVal_R = 0;
 uint16_t pwmVal_L = 0;
 int times_acceptable = 0;
 int e_brake = 0;
-int is_moving = 0; // (0 = Idle, 1 = Moving)
+int is_moving = 0; 							    // (0 = Idle, 1 = Moving)
 uint32_t move_start_time = 0;
 /* Track completion for UART telemetry and let the receive ISR request a
  * prompt, safe motor shutdown. */
-uint8_t move_finish_reason = 0; // 1 = reached gyro/encoder target, 2 = timeout
-volatile uint8_t emergency_stop_requested = 0; // Set by UART ISR on '!'.
+uint8_t move_finish_reason = 0; 			    // 1 = reached gyro/encoder target, 2 = timeout
+volatile uint8_t emergency_stop_requested = 0;  // Set by UART ISR on '!'.
 float distance_integral = 0.0;
+uint32_t current_cmd_timeout = 5000;
 
 /* --- ENCODER VARIABLES --- */
 int32_t left_encoder_val = 0;
@@ -199,6 +205,8 @@ int dash_encoderL = 0;							// Encoder Left Speed
 int dash_encoderR = 0;							// Encoder Right Speed
 uint16_t dash_direction = 0;					// Robot direction?
 uint32_t diag_timer = 0;
+int16_t dash_speedL = 0;
+int16_t dash_speedR = 0;
 
 /* --- ULTRASONIC VARIABLES --- */
 uint32_t tc1 = 0;
@@ -948,27 +956,52 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 }
 
 int PID_Angle(double errord) {
-	// 1. Calculate the error
+	// 1. Calculate the absolute error
 	int error = (int)(errord * 10);
-
-	// 2. Get absolute value
 	error = abs(error);
 
-	/* Reset the arrival counter whenever the turn is still outside its settling
-	 * band, so intermittent low-error samples cannot finish a turn early. */
-	// 3. Return PWM Magnitude (stepped proportional control)
-	if (error > 300) { times_acceptable = 0; return PID_ANG_MAX; }
-	else if (error > 200) { times_acceptable = 0; return PID_ANG_HIGH; }
-	else if (error > 150) { times_acceptable = 0; return PID_ANG_MED; }
-	else if (error > 100) { times_acceptable = 0; return PID_ANG_LOW; }
-	else if (error > 20) { times_acceptable = 0; return PID_ANG_FINE; }
-	else if (error >= 2) {
-		times_acceptable++;
-		return PID_ANG_MIN;
-	} else {
-		times_acceptable++;
-		return 0;
-	}
+	// 2. Return PWM Magnitude (stepped proportional control)
+    // Large angle (> 45 deg): Full cruise speed
+    if (error > 450) {
+        times_acceptable = 0;
+        return PID_ANG_MAX;
+    }
+    // Approaching (< 45 deg): Stepping down
+    else if (error > 250) {
+        times_acceptable = 0;
+        return PID_ANG_HIGH;
+    }
+    // Deceleration zone (< 25 deg)
+    else if (error > 150) {
+        times_acceptable = 0;
+        return PID_ANG_MED;
+    }
+    // Close to target (< 15 deg)
+    else if (error > 60) {
+        times_acceptable = 0;
+        return PID_ANG_LOW;
+    }
+    // Settle zone (< 6 deg)
+    else if (error > 20) {
+        times_acceptable = 0;
+        return PID_ANG_FINE;
+    }
+    // Final inch (< 2 deg)
+    else if (error >= 2) {
+        times_acceptable++;
+        // --- CRITICAL CHANGE: Return the correct min PWM based on direction ---
+        // A positive error_angle means a LEFT turn is needed.
+        // A negative error_angle means a RIGHT turn is needed.
+        if (errord > 0) {
+            return PID_ANG_MIN_L; // Use Left minimum
+        } else {
+            return PID_ANG_MIN_R; // Use Right minimum
+        }
+    }
+    else {
+        times_acceptable++;
+        return 0;
+    }
 }
 
 int PID_Control(int error) {
@@ -1005,10 +1038,6 @@ int PID_Control(int error) {
 
 int finishCheck() {
 	uint32_t elapsed_time = HAL_GetTick() - move_start_time;
-	/* Turns receive a shorter safety cap because a missed gyro target can leave
-	 * the robot rotating; straight moves retain their existing longer cap. */
-	uint32_t timeout_ms = (pwmVal_servo < TURNLEFT_TH || pwmVal_servo > TURNRIGHT_TH)
-			? TURN_TIMEOUT_MS : 12000U;
 
     // The motor task has already reached a turn target and requested braking.
     if (!is_moving) {
@@ -1019,27 +1048,25 @@ int finishCheck() {
     if (times_acceptable > 20) {
     	is_moving = 0;
         move_finish_reason = 1;
-        e_brake = 1; // Signal motor task to cut PWM
+        e_brake = 1; 					// Signal motor task to cut PWM
         times_acceptable = 0;
         pwmVal_servo = SERVOCENTER;
-        osDelay(300); // Wait for servo to physically recenter
-        return 0; // 0 means "Finished"
+        osDelay(300); 					// Wait for servo to physically recenter
+        return 0; 						// 0 means "Finished"
     }
 
-    // --- FAIL-SAFE 2: MAXIMUM TIMEOUT REACHED (CRITICAL) ---
-	// If the robot has been struggling/stalled for more than 4 seconds,
-	// force it to stop, brake, and proceed!
-    if (elapsed_time > timeout_ms) {
+    // Dynamic timeout fail-safe
+    if (elapsed_time > current_cmd_timeout) {
         is_moving = 0;
-        move_finish_reason = 2;
-        e_brake = 1;   // Signal motor task to cut PWM
+        move_finish_reason = 2;			// Timeout triggered
+        e_brake = 1;   					// Signal motor task to cut PWM
         times_acceptable = 0;
         pwmVal_servo = SERVOCENTER;
         osDelay(300);
-        return 0; // Force-stop moving
+        return 0; 						// Force-stop moving
     }
 
-    return 1; // 1 means "Still moving"
+    return 1; 							// 1 means "Still moving"
 }
 
 void moveCarStraight(double distance) {
@@ -1056,6 +1083,9 @@ void moveCarStraight(double distance) {
     distance_integral = 0.0;
     move_start_time = HAL_GetTick();
 
+    // Assign dynamic timeout for straight movement (60ms per cm + 4000ms baseline)
+    current_cmd_timeout = (uint32_t)(fabs(distance) * 60.0) + 4000U;
+
     // Set a high baseline to prevent negative underflow
     left_encoder_val = 75000;
     right_encoder_val = 75000;
@@ -1069,6 +1099,8 @@ void moveCarStraight(double distance) {
 }
 
 void moveCarRight(double angle) {
+	double calibrated_angle;
+
     pwmVal_servo = SERVORIGHT;
     osDelay(300);
 
@@ -1079,9 +1111,21 @@ void moveCarRight(double angle) {
     distance_integral = 0.0;
     move_start_time = HAL_GetTick();
 
-    // Subtract from target angle (assuming right turn decreases Z-axis angle)
-    double calibrated_angle = (angle * TURN_SCALE_R) - TURN_BIAS_DEG_R;
+    // If the requested angle is small (e.g., <= 50 degrees),
+    // use the special calibration values for small turns.
+    if (angle <= 50.0)
+    {
+        calibrated_angle = (angle * TURN_SCALE_R_SMALL) - TURN_BIAS_DEG_R_SMALL;
+    }
+    else // Otherwise, for all larger turns (90, 180, 360), use the standard model.
+    {
+        calibrated_angle = (angle * TURN_SCALE_R) - TURN_BIAS_DEG_R;
+    }
+
     target_angle -= calibrated_angle;
+
+    // Set the timeout
+    current_cmd_timeout = (uint32_t) (angle * 45.0) + 3500U;
 
     while (finishCheck()) {
         osDelay(10);
@@ -1089,6 +1133,8 @@ void moveCarRight(double angle) {
 }
 
 void moveCarLeft(double angle) {
+	double calibrated_angle;
+
     pwmVal_servo = SERVOLEFT;
     osDelay(300);
 
@@ -1099,9 +1145,21 @@ void moveCarLeft(double angle) {
     distance_integral = 0.0;
     move_start_time = HAL_GetTick();
 
-    // Add to target angle (assuming left turn increases Z-axis angle)
-    double calibrated_angle = (angle * TURN_SCALE_L) - TURN_BIAS_DEG_L;
+    // If the requested angle is small (e.g., <= 50 degrees),
+    // use the special calibration values for small turns.
+    if (angle <= 50.0)
+    {
+        calibrated_angle = (angle * TURN_SCALE_L_SMALL) + TURN_BIAS_DEG_L_SMALL;
+    }
+    else // Otherwise, for all larger turns (90, 180, 360), use the standard model.
+    {
+        calibrated_angle = (angle * TURN_SCALE_L) + TURN_BIAS_DEG_L;
+    }
+
     target_angle += calibrated_angle;
+
+    // Set dynamic timeout
+    current_cmd_timeout = (uint32_t) (angle * 45.0) + 3500U;
 
     while (finishCheck()) {
         osDelay(10);
@@ -1177,7 +1235,6 @@ void moveCarSlideLeft(int forward) {
     }
     osDelay(50);
 }
-
 
 /* USER CODE END 4 */
 
@@ -1498,9 +1555,6 @@ void StartMotorTask(void *argument)
 			}
 
 			pwmVal_L = PID_Angle(error_angle); // Master Wheel: Left
-			/* Preserve enough torque for the right-turn drivetrain near target. */
-			if (pwmVal_L < TURN_RIGHT_MIN_PWM)
-				pwmVal_L = TURN_RIGHT_MIN_PWM;
 			pwmVal_R = pwmVal_L * TURN_SLAVE_RATIO;	   // Slave Wheel: Right
 
 			// 2. Apply speeds to 2-pin H-Bridge based on error direction
