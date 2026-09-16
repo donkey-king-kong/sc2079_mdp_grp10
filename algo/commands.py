@@ -28,6 +28,8 @@ import math
 import re
 from typing import Iterable, List, Optional, Sequence, Tuple
 
+from planner import calculate_max_safe_speed #added for dynamic radius calculation
+
 import config as cfg
 from motion import (
     BACKWARD,

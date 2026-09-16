@@ -66,7 +66,15 @@ START_THETA = math.pi / 2.0
 # "There is a turning radius of about 25cm but it is a larger radius if robot
 # moves faster." This and CAPTURE_STANDOFF are the two values most likely to
 # need re-measuring against the real robot.
-TURNING_RADIUS = 25.0
+# TURNING_RADIUS = 25.0. //old hardcoded
+
+# New dynamic turning radiuses (cm)
+# Physical kinematic limits
+MIN_TURNING_RADIUS = 18.0   # Mechanical steering limit (tightest possible arc)
+MAX_TURNING_RADIUS = 35.0   # Upper bound for wide, high-speed turns
+
+# Traction limits (cm/s^2)
+MAX_LATERAL_ACCEL = 294.0   # ~0.3g max lateral grip before skid
 
 # --------------------------------------------------------------------------
 # Obstacle avoidance (briefing slide 36)

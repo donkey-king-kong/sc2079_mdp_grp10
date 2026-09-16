@@ -59,3 +59,4 @@ Release/
 # =========================
 .venv/
 __pycache__/
+venv

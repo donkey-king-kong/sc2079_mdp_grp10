@@ -41,6 +41,7 @@ import dubins
 import hybrid_astar
 from arena import Arena, CapturePose, start_pose
 from motion import BACKWARD, STRAIGHT, Pose, Segment, Trajectory, merge_segments
+import math #added for turning radius calculation
 
 STRATEGIES = ("nearest", "greedy_swap", "exhaustive")
 
@@ -134,44 +135,97 @@ def leg_cost(trajectory: Trajectory, metric: str = "time") -> float:
         return trajectory.length
     raise ValueError("metric must be 'time' or 'distance', got %r" % (metric,))
 
+# --------------------------------------------------------------------------
+# Dynamic Speed & Dynamic Turning Radius Calculation
+#
+# EXECUTION HIERACHY:
+# 1. Analytical Dubins Search (First Choice): find_optimal_leg() tests Dubins curves starting at MAX_TURNING_RADIUS (35cm) and steps down to 
+# MIN_TURNING_RADIUS (18cm). If any Dubins curve is collision-free, it returns that Dubins trajectory immediately (taking microseconds to compute).
+#
+# 2. Hybrid A Search (Last Resort)*: If Dubins fails across all tested radii because obstacles, block simple 3-segment arcs, 
+# the planner falls back to hybrid_astar.plan() to perform a full grid search around the clutter.
+# --------------------------------------------------------------------------
+def calculate_max_safe_speed(radius: float) -> float:
+    """Calculates maximum safe turning speed (cm/s) for a given radius based on lateral acceleration."""
+    max_speed = math.sqrt(cfg.MAX_LATERAL_ACCEL * radius)
+    return min(cfg.SPEED_STRAIGHT, max_speed)
 
-def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
-              max_expansions: int = cfg.HA_MAX_EXPANSIONS,
-              allow_backoff: bool = True) -> Optional[Tuple[str, Trajectory]]:
-    """One leg: back out of the capture pose, then Dubins; Hybrid A* as a last resort.
-
-    The back-out is not an optimisation, it is a necessity. A capture pose sits
-    30cm from an obstacle face pointing straight at it, and the turning radius
-    is 25cm, so the tightest forward arc the robot can drive still ends up
-    inside the block. Briefing slide 33 says as much: reverse first.
-
-    Pass `allow_backoff=False` when the robot is not parked in front of anything
-    -- the start pose, or a transit pose. There is nothing to reverse away from,
-    and since a failed leg costs one Dubins attempt per option, skipping them is
-    most of the cost of building the roadmap.
-    """
+# --------------------------------------------------------------------------
+# Dynamic Speed & Dynamic Turning Radius Calculation
+# --------------------------------------------------------------------------
+def find_optimal_leg(arena: Arena, source: Pose, target: Pose, allow_backoff: bool = True, step: float = 2.0) -> Optional[Dict]:
+    """Dynamically searches for the largest collision-free turning radius R* in [cfg.MIN_TURNING_RADIUS, cfg.MAX_TURNING_RADIUS]."""
     options = cfg.DEPARTURE_BACKOFF_OPTIONS if allow_backoff else (0.0,)
-    for backoff in options:
-        if backoff <= 0.0:
-            departure, prefix = source, []
-        else:
-            reverse = Segment(BACKWARD, STRAIGHT, backoff, cfg.TURNING_RADIUS, source)
-            if not all(arena.is_pose_free(p)
-                       for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
-                break            # blocked behind: reversing further cannot help
-            departure, prefix = reverse.end, [reverse]
 
-        result = dubins.plan(departure, target, cfg.TURNING_RADIUS, arena.is_pose_free)
-        if result is None:
-            continue
-        word, trajectory = result
-        combined = Trajectory(merge_segments(prefix + trajectory.segments))
-        return (word if not prefix else "SB+" + word, combined)
+    # Search from largest radius (fastest speed) down to minimum radius (tightest turn)
+    r_candidate = cfg.MAX_TURNING_RADIUS
+    while r_candidate >= cfg.MIN_TURNING_RADIUS - 1e-6:
+        for backoff in options:
+            if backoff <= 0.0:
+                departure, prefix = source, []
+            else:
+                reverse = Segment(BACKWARD, STRAIGHT, backoff, r_candidate, source)
+                if not all(arena.is_pose_free(p) for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
+                    break
+                departure, prefix = reverse.end, [reverse]
 
-    if not allow_search:
-        return None
-    trajectory = hybrid_astar.plan(arena, source, target, max_expansions=max_expansions)
-    return ("hybrid_astar", trajectory) if trajectory is not None else None
+            result = dubins.plan(departure, target, r_candidate, arena.is_pose_free)
+            if result is not None:
+                word, trajectory = result
+                combined = Trajectory(merge_segments(prefix + trajectory.segments))
+                target_speed = calculate_max_safe_speed(r_candidate)
+                
+                return {
+                    "method": word if not prefix else "SB+" + word,
+                    "trajectory": combined,
+                    "radius": r_candidate,
+                    "target_speed": target_speed
+                }
+        
+        r_candidate -= step
+
+    return None
+
+
+
+
+# def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
+#               max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+#               allow_backoff: bool = True) -> Optional[Tuple[str, Trajectory]]:
+#     """One leg: back out of the capture pose, then Dubins; Hybrid A* as a last resort.
+
+#     The back-out is not an optimisation, it is a necessity. A capture pose sits
+#     30cm from an obstacle face pointing straight at it, and the turning radius
+#     is 25cm, so the tightest forward arc the robot can drive still ends up
+#     inside the block. Briefing slide 33 says as much: reverse first.
+
+#     Pass `allow_backoff=False` when the robot is not parked in front of anything
+#     -- the start pose, or a transit pose. There is nothing to reverse away from,
+#     and since a failed leg costs one Dubins attempt per option, skipping them is
+#     most of the cost of building the roadmap.
+#     """
+#     options = cfg.DEPARTURE_BACKOFF_OPTIONS if allow_backoff else (0.0,)
+#     for backoff in options:
+#         if backoff <= 0.0:
+#             departure, prefix = source, []
+#         else:
+#             reverse = Segment(BACKWARD, STRAIGHT, backoff, cfg.TURNING_RADIUS, source)
+#             if not all(arena.is_pose_free(p)
+#                        for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
+#                 break            # blocked behind: reversing further cannot help
+#             departure, prefix = reverse.end, [reverse]
+
+#         result = dubins.plan(departure, target, cfg.TURNING_RADIUS, arena.is_pose_free)
+#         if result is None:
+#             continue
+#         word, trajectory = result
+#         combined = Trajectory(merge_segments(prefix + trajectory.segments))
+#         return (word if not prefix else "SB+" + word, combined)
+
+#     if not allow_search:
+#         return None
+#     trajectory = hybrid_astar.plan(arena, source, target, max_expansions=max_expansions)
+#     return ("hybrid_astar", trajectory) if trajectory is not None else None
 
 
 class CostModel:
