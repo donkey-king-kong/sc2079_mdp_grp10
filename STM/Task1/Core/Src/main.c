@@ -73,11 +73,11 @@
 #define TURN_STOP_TOLERANCE_DEG 1.0f    // Degrees of allowable error to consider turn finished
 
 /* --- 3. SERVO CALIBRATION ------------------------------------------------- */
-#define SERVOCENTER             150     // PWM value for centered steering
-#define SERVOLEFT               100     // PWM value for max left steering
-#define SERVORIGHT              200     // PWM value for max right steering
-#define TURNLEFT_TH             115     // Threshold to consider servo in 'left' state
-#define TURNRIGHT_TH            195     // Threshold to consider servo in 'right' state
+#define SERVOCENTER             1500    // PWM value for centered steering
+#define SERVOLEFT               1000    // PWM value for max left steering
+#define SERVORIGHT              2000    // PWM value for max right steering
+#define TURNLEFT_TH             1150    // Threshold to consider servo in 'left' state
+#define TURNRIGHT_TH            1950    // Threshold to consider servo in 'right' state
 
 /* --- 4. PID GAINS (Tune for different floors!) ---------------------------- */
 // Straight Line Controller
@@ -106,7 +106,9 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- I2C_HandleTypeDef hi2c2;
+ ADC_HandleTypeDef hadc1;
+
+I2C_HandleTypeDef hi2c2;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -120,8 +122,6 @@ UART_HandleTypeDef huart3;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
-/* Larger stacks prevent task-local buffers and formatting from exhausting the
- * original 1 KB allocations. */
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .stack_size = 512 * 4,
@@ -215,6 +215,8 @@ uint16_t dash_direction = 0;                    // Encoder direction indicator
 uint32_t diag_timer = 0;                        // Timer for diagnostic blinking
 int16_t dash_speedL = 0;                        // Instantaneous speed (Left)
 int16_t dash_speedR = 0;                        // Instantaneous speed (Right)
+float dash_battV = 0.0f;
+int dash_battPct = 0;
 
 /* --- ULTRASONIC SENSOR --- */
 uint32_t tc1 = 0;                               // Timer capture 1 (Rising Edge)
@@ -238,6 +240,7 @@ static void MX_TIM9_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM12_Init(void);
+static void MX_ADC1_Init(void);
 void StartDefaultTask(void *argument);
 void StartCommunicateTask(void *argument);
 void StartMotorTask(void *argument);
@@ -291,6 +294,7 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM12_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
   // 1. Initialize OLED and Show Boot Message
@@ -420,6 +424,58 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -788,9 +844,9 @@ static void MX_TIM12_Init(void)
 
   /* USER CODE END TIM12_Init 1 */
   htim12.Instance = TIM12;
-  htim12.Init.Prescaler = 160-1;
+  htim12.Init.Prescaler = 16-1;
   htim12.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim12.Init.Period = 2000-1;
+  htim12.Init.Period = 20000-1;
   htim12.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim12.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim12) != HAL_OK)
@@ -807,7 +863,7 @@ static void MX_TIM12_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 1500;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim12, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
@@ -1363,6 +1419,31 @@ void executeFlowerPetal(int clockwise)
     }
 }
 
+/* Reads the 11:1 divider on PB0 (R27/R26) and returns pack volts. */
+static float readBatteryVoltage(void)
+{
+    uint32_t raw;
+    HAL_ADC_Start(&hadc1);
+    if (HAL_ADC_PollForConversion(&hadc1, 10) != HAL_OK) {
+        HAL_ADC_Stop(&hadc1);
+        return dash_battV;              // keep last good reading
+    }
+    raw = HAL_ADC_GetValue(&hadc1);
+    HAL_ADC_Stop(&hadc1);
+    return ((float)raw * 3.3f / 4095.0f) * 11.0f;
+}
+
+/* Rough 3S Li-ion state of charge. Approximate: voltage sags under load. */
+static int batteryPercent(float v)
+{
+    float cell = v / 3.0f;
+    if (cell >= 4.15f) return 100;
+    if (cell <= 3.30f) return 0;
+    if (cell >  3.85f) return (int)(55.0f + (cell - 3.85f) * (45.0f / 0.30f));
+    if (cell >  3.60f) return (int)(20.0f + (cell - 3.60f) * (35.0f / 0.25f));
+    return (int)((cell - 3.30f) * (20.0f / 0.30f));
+}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -1391,11 +1472,8 @@ void StartDefaultTask(void *argument)
           // Determine the parameters for the current test step
           switch(test_step) {
               case 0: strcpy(test_name, "R90");  is_left = 0; test_angle = 90.0;  break;
-              case 1: strcpy(test_name, "R180"); is_left = 0; test_angle = 180.0; break;
-              case 2: strcpy(test_name, "R360"); is_left = 0; test_angle = 360.0; break;
-              case 3: strcpy(test_name, "L90");  is_left = 1; test_angle = 90.0;  break;
-              case 4: strcpy(test_name, "L180"); is_left = 1; test_angle = 180.0; break;
-              case 5: strcpy(test_name, "L360"); is_left = 1; test_angle = 360.0; break;
+              case 1: strcpy(test_name, "L90");  is_left = 1; test_angle = 90.0;  break;
+              case 2: strcpy(test_name, "S100"); is_left = 0; test_angle = 0.0; break;
           }
 
           // 1. Alert user which test is armed
@@ -1428,7 +1506,10 @@ void StartDefaultTask(void *argument)
           if (is_left) {
               moveCarLeft(test_angle);
           } else {
-              moveCarRight(test_angle);
+        	  if (test_angle > 0)
+        		  moveCarRight(test_angle);
+        	  else
+        		  moveCarStraight(100);
           }
 
           // 4. Test is complete. Show a completion message.
@@ -1441,7 +1522,7 @@ void StartDefaultTask(void *argument)
 
           // 5. Advance the state machine for the next button press
           test_step++;
-          if (test_step > 5) {
+          if (test_step > 3) {
               test_step = 0; // Reset back to R90 after finishing L360
           }
 
@@ -1850,6 +1931,8 @@ void StartOledTask(void *argument)
   /* USER CODE BEGIN StartOledTask */
   char textBuffer[32];	// Temp buffer to format numbers into text
 
+  dash_battV = readBatteryVoltage();
+
   /* Infinite loop */
   for(;;)
   {
@@ -1877,8 +1960,11 @@ void StartOledTask(void *argument)
 		sprintf(textBuffer, "Enc R: %d", dash_encoderR);
 		OLED_ShowString(0, 36, (uint8_t *) textBuffer);
 
-		// Line 5: Raw Direction Indicator
-		sprintf(textBuffer, "Dir: %d", dash_direction);
+		// Line 5: Raw Direction Indicator & Battery Percentage
+		dash_battV = dash_battV * 0.9f + readBatteryVoltage() * 0.1f;   // smooth out load sag
+		dash_battPct = batteryPercent(dash_battV);
+		//sprintf(textBuffer, "Dir:%d B:%d%%", dash_direction, dash_battPct);
+		sprintf(textBuffer, "Dir:%d B:%.1fV", dash_direction, dash_battV);
 		OLED_ShowString(0, 48, (uint8_t *) textBuffer);
 	}
 
