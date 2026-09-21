@@ -98,6 +98,36 @@
 #define PID_STR_MAX             5000    // ~55% speed (leaves headroom for PID to adjust)
 #define PID_STR_MIN             2800    // Minimum power to break static floor friction
 
+
+/* ============================================================
+ * PHASE 1: SERVO CHARACTERISATION TEST  (temporary - remove after Phase 1)
+ * ============================================================ */
+#define TRACK_CM            15.7f   // Rear track, wheel centre to wheel centre (cm)
+#define DEG2RAD             0.0174533f
+#define TEST_SPEED_TPC      12.0f   // Test speed in encoder ticks per 10 ms (~19 cm/s)
+#define TEST_PWM_START      3000.0f // PWM both wheels start from before the speed loop adjusts
+#define TEST_SPEED_KP       150.0f  // PWM per tick of (filtered) speed error
+#define TEST_SPEED_KI       4.0f    // PWM added to the integral per tick of error, every 10 ms
+#define TEST_PWM_FLOOR      2400.0f // Never drop below this while driving: stops roll-stop-roll
+#define SERVO_APPROACH_US   40      // Every run approaches its servo value from this far below
+#define TEST_PWM_LIMIT      6500.0f // Never command more than this during a test
+#define TEST_ARC_DEG        90.0f   // Arc test stops after this much heading change
+#define TEST_CENTRE_CM      100.0f  // Centre test stops after this distance
+#define TEST_TIMEOUT_MS     12000   // Safety cut-off for a single test run
+#define TEST_SERVO_MIN      800     // Refuse servo values outside this window
+#define TEST_SERVO_MAX      2200
+#define PWM_BRAKE           7200    // CCR above ARR holds a pin high; both pins high = AT8236 brake
+
+#define PHASE1_FIELD_TOOL   1       // 1 = knob + button test tool replaces the old button harness
+#define KNOB_US_MIN         900     // Knob fully one way  -> this servo value
+#define KNOB_US_MAX         2200    // Knob fully other way -> this servo value
+#define TEST_LOG_SIZE       30      // Results kept for the "TD" dump command
+#define BTN_LONG_MS         800     // Hold the button this long to switch TA/TC
+
+#define ST_SETTLE           0       // Test phases
+#define ST_DRIVE            1
+#define ST_BRAKE            2
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -226,6 +256,32 @@ uint8_t first_captured = 0;                     // State flag for input capture
 uint16_t distance = 0;                          // Calculated distance in cm
 int k = 0;                                      // General purpose counter
 
+
+/* PHASE 1: servo test state. The communicate task starts a run,
+ * the motor task executes it, so encoder data never crosses tasks. */
+typedef struct {
+    volatile uint8_t active;      // 1 while a test run owns the motors
+    char     mode;                // 'A' = arc, 'C' = centre
+    uint16_t servo_us;            // Servo pulse width under test (us)
+    uint8_t  phase;               // ST_SETTLE / ST_DRIVE / ST_BRAKE
+    uint32_t phaseTick;           // HAL tick when the current phase began
+    int32_t  startL, startR;      // Encoder totals at the start of driving
+    double   startHeading;        // Gyro heading at the start of driving
+    float    pwmL, pwmR;          // Speed-loop integral terms
+    float    fL, fR;              // Filtered wheel speeds (ticks per 10 ms)
+    uint8_t  timedOut;            // 1 if the run hit TEST_TIMEOUT_MS
+    char     result[48];          // Full result line, sent in the ACK
+    char     oledShort[15];       // Short result for the OLED CMD line
+} ServoTest_t;
+
+ServoTest_t st = {0};
+volatile float dash_gyroRate = 0.0f;               // Yaw rate in deg/s (CCW positive)
+volatile uint16_t dash_knobUs = 1500;              // Servo us for the field tool (knob or "TV" command)
+volatile int32_t  dash_knobRaw = -1;               // Raw knob ADC reading, -1 = read failed
+char     st_log[TEST_LOG_SIZE][48];                // Ring buffer of test results
+uint8_t  st_logHead  = 0;                          // Next slot to write
+uint8_t  st_logCount = 0;                          // Number of valid entries
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -249,6 +305,7 @@ void StartGyroTask(void *argument);
 void StartUltrasonicTask(void *argument);
 
 /* USER CODE BEGIN PFP */
+static void knobPinInit(void);   // PHASE 1: defined in USER CODE 4
 
 /* USER CODE END PFP */
 
@@ -313,6 +370,7 @@ int main(void)
 
   // 3. Start UART Interrupt Listener
   HAL_UART_Receive_IT(&huart3, &rxByte, 1);
+  knobPinInit();   // PHASE 1: PB1 potentiometer as analog input
 
   // 4. Start Ultrasonic Timers
   HAL_TIM_Base_Start(&htim6);
@@ -1420,16 +1478,14 @@ void executeFlowerPetal(int clockwise)
 }
 
 /* Reads the 11:1 divider on PB0 (R27/R26) and returns pack volts. */
+static uint32_t adcReadChannel(uint32_t channel);   // PHASE 1: defined further down
+
 static float readBatteryVoltage(void)
 {
-    uint32_t raw;
-    HAL_ADC_Start(&hadc1);
-    if (HAL_ADC_PollForConversion(&hadc1, 10) != HAL_OK) {
-        HAL_ADC_Stop(&hadc1);
+    uint32_t raw = adcReadChannel(ADC_CHANNEL_8);      // PHASE 1: shared ADC helper
+    if (raw == 0xFFFFFFFFu) {
         return dash_battV;              // keep last good reading
     }
-    raw = HAL_ADC_GetValue(&hadc1);
-    HAL_ADC_Stop(&hadc1);
     return ((float)raw * 3.3f / 4095.0f) * 11.0f;
 }
 
@@ -1444,6 +1500,264 @@ static int batteryPercent(float v)
     return (int)((cell - 3.30f) * (20.0f / 0.30f));
 }
 
+
+/* Re-arms UART3 reception after a line error (noise, a cable being
+ * plugged or unplugged). Without this the robot stops listening until
+ * reset. If reception is still running, the call just returns busy. */
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART3) {
+        HAL_UART_Receive_IT(&huart3, &rxByte, 1);
+    }
+}
+
+/* ============================================================
+ * PHASE 1: SERVO CHARACTERISATION TEST
+ * ============================================================ */
+
+/* Writes all four motor-driver compare registers in one place. */
+static void setMotorPwm(uint16_t l3, uint16_t l4, uint16_t r1, uint16_t r2)
+{
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, l3);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, l4);
+    __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, r1);
+    __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, r2);
+}
+
+static float clampf(float v, float lo, float hi)
+{
+    return (v < lo) ? lo : (v > hi) ? hi : v;
+}
+
+/* One 10 ms step of a test run. Called ONLY from the motor task.
+ *
+ * Each rear wheel runs its own speed loop. The targets follow the
+ * yaw rate the gyro measures, so the rear wheels roll along with
+ * whatever the steering does instead of fighting it. That keeps
+ * wheel slip out of the measurement. */
+static void servoTestStep(int16_t cntL, int16_t cntR)
+{
+    uint32_t now = HAL_GetTick();
+
+    // Servo gears have a little slack, so where they stop depends on which
+    // side they came from. Always arrive from below so runs are comparable.
+    if (st.phase == ST_SETTLE && (now - st.phaseTick) < 300) {
+        __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, st.servo_us - SERVO_APPROACH_US);
+    } else {
+        __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, st.servo_us);
+    }
+
+    switch (st.phase) {
+
+    case ST_SETTLE:                                    // motors off, let the servo arrive
+        setMotorPwm(0, 0, 0, 0);
+        if (now - st.phaseTick >= 900) {
+            st.startL = left_encoder_val;
+            st.startR = right_encoder_val;
+            st.startHeading = total_angle;
+            st.pwmL = TEST_PWM_START;
+            st.pwmR = TEST_PWM_START;
+            st.fL = 0.0f;
+            st.fR = 0.0f;
+            st.phase = ST_DRIVE;
+            st.phaseTick = now;
+        }
+        break;
+
+    case ST_DRIVE: {
+        float dL = (float)(left_encoder_val  - st.startL) / TICKS_PER_CM;
+        float dR = (float)(right_encoder_val - st.startR) / TICKS_PER_CM;
+        float dist   = 0.5f * (dL + dR);
+        float turned = (float)(total_angle - st.startHeading);
+        int reached  = (st.mode == 'A') ? (fabsf(turned) >= TEST_ARC_DEG)
+                                        : (dist >= TEST_CENTRE_CM);
+
+        if (reached || emergency_stop_requested ||
+            (now - st.phaseTick) > TEST_TIMEOUT_MS) {
+            st.timedOut = !reached;
+            st.phase = ST_BRAKE;
+            st.phaseTick = now;
+            break;
+        }
+
+        // Rear-axle kinematics: outer wheel = v + w*T/2, inner = v - w*T/2
+        float yawTicks = dash_gyroRate * DEG2RAD * (TRACK_CM * 0.5f)
+                         * TICKS_PER_CM / 100.0f;      // per 10 ms
+        float tgtL = clampf(TEST_SPEED_TPC - yawTicks, 0.0f, 3.0f * TEST_SPEED_TPC);
+        float tgtR = clampf(TEST_SPEED_TPC + yawTicks, 0.0f, 3.0f * TEST_SPEED_TPC);
+
+        st.fL = 0.6f * st.fL + 0.4f * (float)cntL;       // smooth the 1-tick jitter
+        st.fR = 0.6f * st.fR + 0.4f * (float)cntR;
+        float eL = tgtL - st.fL;
+        float eR = tgtR - st.fR;
+
+        st.pwmL = clampf(st.pwmL + TEST_SPEED_KI * eL, TEST_PWM_FLOOR, TEST_PWM_LIMIT);
+        st.pwmR = clampf(st.pwmR + TEST_SPEED_KI * eR, TEST_PWM_FLOOR, TEST_PWM_LIMIT);
+        float outL = clampf(st.pwmL + TEST_SPEED_KP * eL, TEST_PWM_FLOOR, TEST_PWM_LIMIT);
+        float outR = clampf(st.pwmR + TEST_SPEED_KP * eR, TEST_PWM_FLOOR, TEST_PWM_LIMIT);
+
+        setMotorPwm(0, (uint16_t)outL, 0, (uint16_t)outR);         // both forward
+        break;
+    }
+
+    case ST_BRAKE:
+    default:
+        if (now - st.phaseTick < 300) {                // active brake
+            setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
+            break;
+        }
+        setMotorPwm(0, 0, 0, 0);
+        if (now - st.phaseTick < 700) break;           // let the car fully stop
+
+        {
+            float dL = (float)(left_encoder_val  - st.startL) / TICKS_PER_CM;
+            float dR = (float)(right_encoder_val - st.startR) / TICKS_PER_CM;
+            float dist   = 0.5f * (dL + dR);
+            float turned = (float)(total_angle - st.startHeading);
+            const char *to = st.timedOut ? " TO" : "";
+
+            if (st.mode == 'A') {
+                float rad = fabsf(turned) * DEG2RAD;
+                float R   = (rad > 0.01f) ? dist / rad : 0.0f;
+                float outer = fmaxf(dL, dR);
+                float inner = fminf(dL, dR);
+                float io    = (outer > 0.1f) ? inner / outer : 0.0f;
+                snprintf(st.result, sizeof(st.result),
+                         "TA%u R=%.1f th=%.1f d=%.1f io=%.2f%s",
+                         st.servo_us, R, turned, dist, io, to);
+                snprintf(st.oledShort, sizeof(st.oledShort), "%u R%.1f", st.servo_us, R);
+            } else {
+                float perM = (dist > 1.0f) ? turned / (dist / 100.0f) : 0.0f;
+                snprintf(st.result, sizeof(st.result),
+                         "TC%u drift=%+.2f/m th=%.1f d=%.1f%s",
+                         st.servo_us, perM, turned, dist, to);
+                snprintf(st.oledShort, sizeof(st.oledShort), "%u %+.1f/m", st.servo_us, perM);
+            }
+        }
+        __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, SERVOCENTER);
+        st.active = 0;
+        break;
+    }
+}
+
+/* Starts a test and blocks until it finishes. Called from the communicate task.
+ *   TS<us>  hold the servo at <us>, no driving (for the mechanical-limit check)
+ *   TC<us>  centre test: drive TEST_CENTRE_CM straight-ish, report heading drift
+ *   TA<us>  arc test: drive until the heading changes TEST_ARC_DEG, report radius */
+static void runServoTest(char mode, int servo_us)
+{
+    if (st.active) {
+        snprintf(st.result, sizeof(st.result), "T ERR busy");
+        return;
+    }
+    if (mode == 'D') {                                 // TD: dump the result log over UART
+        char line[64];
+        uint8_t first = (uint8_t)((st_logHead + TEST_LOG_SIZE - st_logCount) % TEST_LOG_SIZE);
+        for (uint8_t i = 0; i < st_logCount; i++) {
+            snprintf(line, sizeof(line), "%2u %s\r\n", i + 1,
+                     st_log[(first + i) % TEST_LOG_SIZE]);
+            HAL_UART_Transmit(&huart3, (uint8_t *)line, strlen(line), 100);
+        }
+        snprintf(st.result, sizeof(st.result), "TD %u results", st_logCount);
+        snprintf(st.oledShort, sizeof(st.oledShort), "TD %u", st_logCount);
+        return;
+    }
+    if (servo_us < TEST_SERVO_MIN || servo_us > TEST_SERVO_MAX) {
+        snprintf(st.result, sizeof(st.result), "T ERR %d out of range", servo_us);
+        snprintf(st.oledShort, sizeof(st.oledShort), "T ERR range");
+        return;
+    }
+    if (mode == 'V') {                                 // TV: set the field tool value
+        dash_knobUs = (uint16_t)servo_us;
+        snprintf(st.result, sizeof(st.result), "TV%d set", servo_us);
+        snprintf(st.oledShort, sizeof(st.oledShort), "TV%d", servo_us);
+        return;
+    }
+    if (mode == 'S') {
+        __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, servo_us);
+        snprintf(st.result, sizeof(st.result), "TS%d holding", servo_us);
+        snprintf(st.oledShort, sizeof(st.oledShort), "TS%d", servo_us);
+        return;
+    }
+    if (mode != 'A' && mode != 'C') {
+        snprintf(st.result, sizeof(st.result), "T ERR use TS/TC/TA");
+        snprintf(st.oledShort, sizeof(st.oledShort), "T ERR mode");
+        return;
+    }
+
+    st.mode      = mode;
+    st.servo_us  = (uint16_t)servo_us;
+    st.timedOut  = 0;
+    st.phase     = ST_SETTLE;
+    st.phaseTick = HAL_GetTick();
+    st.active    = 1;                                  // motor task takes over from here
+
+    while (st.active) {
+        osDelay(20);
+    }
+
+    strcpy(st_log[st_logHead], st.result);             // keep it for "TD"
+    st_logHead = (uint8_t)((st_logHead + 1) % TEST_LOG_SIZE);
+    if (st_logCount < TEST_LOG_SIZE) st_logCount++;
+}
+
+/* Reads one ADC1 channel. Only ever called from the OLED task, so the
+ * battery and the knob never fight over the ADC. Returns 0xFFFFFFFF on failure. */
+static uint32_t adcReadChannel(uint32_t channel)
+{
+    ADC_ChannelConfTypeDef c = {0};
+    uint32_t raw = 0xFFFFFFFFu;
+    c.Channel = channel;
+    c.Rank = 1;
+    c.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+    HAL_ADC_ConfigChannel(&hadc1, &c);
+    HAL_ADC_Start(&hadc1);
+    if (HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK) {
+        raw = HAL_ADC_GetValue(&hadc1);
+    }
+    HAL_ADC_Stop(&hadc1);
+    return raw;
+}
+
+/* Potentiometer on PB1 -> servo us, rounded to 5 us. The pot's usable raw
+ * range depends on the board wiring, so it learns its own end stops:
+ * turn the knob fully both ways once after power-up. */
+static void updateKnob(void)
+{
+    static float filt = -1.0f;
+    static uint32_t rawMin = 4095, rawMax = 0;
+    static int lastRounded = -1;
+    uint32_t raw = adcReadChannel(ADC_CHANNEL_9);
+    dash_knobRaw = (raw == 0xFFFFFFFFu) ? -1 : (int32_t)raw;
+    if (raw == 0xFFFFFFFFu) return;
+
+    if (raw < rawMin) rawMin = raw;
+    if (raw > rawMax) rawMax = raw;
+    if (rawMax - rawMin < 200) return;                 // not enough travel seen yet
+
+    filt = (filt < 0.0f) ? (float)raw : filt * 0.7f + (float)raw * 0.3f;
+    float frac = (filt - (float)rawMin) / (float)(rawMax - rawMin);
+    float us = KNOB_US_MIN + frac * (float)(KNOB_US_MAX - KNOB_US_MIN);
+    uint16_t rounded = (uint16_t)(((int)(us + 2.5f) / 5) * 5);
+
+    if (lastRounded < 0 || abs((int)rounded - lastRounded) >= 5) {   // knob physically moved
+        lastRounded = rounded;
+        dash_knobUs = rounded;
+    }
+}
+
+/* Sets PB1 to analog so the pot can be read. Done in code so the .ioc
+ * doesn't need changing. Call once before the scheduler starts. */
+static void knobPinInit(void)
+{
+    GPIO_InitTypeDef g = {0};
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    g.Pin  = GPIO_PIN_1;
+    g.Mode = GPIO_MODE_ANALOG;
+    g.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOB, &g);
+}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -1456,6 +1770,62 @@ static int batteryPercent(float v)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
+#if PHASE1_FIELD_TOOL
+  /* PHASE 1 FIELD TOOL - no cable needed while driving.
+   *   Knob   : sets the servo; the wheels follow it live while idle
+   *   Tap    : run the current test at the knob value (1.5 s delay to let go)
+   *   Hold   : switch between TA (arc/radius) and TC (centre/drift)
+   *   OLED   : CMD line shows "TA 1540" etc, then the result after a run
+   *   "TD"   : over serial afterwards, prints every result from this power-up
+   *   "TV<us>": over serial, sets the value instead of the knob (then unplug)
+   *   k####  : raw knob reading on the CMD line, for diagnosis */
+  char     fieldMode   = 'A';
+  uint8_t  showResult  = 0;
+  uint16_t resultUs    = 0;
+
+  for(;;)
+  {
+      uint16_t us = dash_knobUs;
+
+      if (!st.active && !is_moving) {
+          __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);   // live steering
+      }
+
+      if (showResult && abs((int)us - (int)resultUs) >= 10) {
+          showResult = 0;                              // knob moved: back to live view
+      }
+      if (!showResult) {
+          if (dash_knobRaw >= 0) {
+              snprintf(dash_lastCmd, sizeof(dash_lastCmd), "T%c%u k%ld", fieldMode, us, (long)dash_knobRaw);
+          } else {
+              snprintf(dash_lastCmd, sizeof(dash_lastCmd), "T%c%u k--", fieldMode, us);
+          }
+      }
+
+      if (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+          uint32_t t0 = HAL_GetTick();
+          while (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+              osDelay(20);
+          }
+          uint32_t held = HAL_GetTick() - t0;
+
+          if (held >= BTN_LONG_MS) {                  // hold: switch mode
+              fieldMode = (fieldMode == 'A') ? 'C' : 'A';
+              showResult = 0;
+          } else if (held >= 40) {                     // tap: run
+              snprintf(dash_lastCmd, sizeof(dash_lastCmd), "T%c %u GO", fieldMode, us);
+              osDelay(1500);
+              runServoTest(fieldMode, us);
+              strcpy(dash_lastCmd, st.oledShort);
+              resultUs = us;
+              showResult = 1;
+          }
+      }
+
+      HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+      osDelay(50);
+  }
+#else
   char oled_buf[32];
   uint8_t test_step = 0; // Tracks which test is next (0 to 5)
 
@@ -1540,6 +1910,7 @@ void StartDefaultTask(void *argument)
       HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
       osDelay(100);
   }
+#endif  /* PHASE1_FIELD_TOOL */
   /* USER CODE END 5 */
 }
 
@@ -1642,6 +2013,10 @@ void StartCommunicateTask(void *argument)
 							e_brake = 1; // For now, just trigger a brake.
 							break;
 
+						case 'T':   // PHASE 1 servo tests: TS / TC / TA + servo us
+							runServoTest(command_char2, value);
+							break;
+
 						/* Can add more cases here */
 					}
 				}
@@ -1653,6 +2028,9 @@ void StartCommunicateTask(void *argument)
 					snprintf(ackMsg, sizeof(ackMsg), "A G:%.1f T:%.1f %s\n",
 							(float)total_angle, (float)target_angle,
 							move_finish_reason == 2 ? "TIMEOUT" : "TARGET");
+				} else if (command_char1 == 'T') {
+					// PHASE 1 test result
+					snprintf(ackMsg, sizeof(ackMsg), "A %s\n", st.result);
 				} else {
 					// Standard ACK
 					snprintf(ackMsg, sizeof(ackMsg), "A\n");
@@ -1660,7 +2038,11 @@ void StartCommunicateTask(void *argument)
 				HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
 
 				// 4. UPDATE DASHBOARD AND RESET
-				strcpy(dash_lastCmd, cmdBuffer);
+				if (command_char1 == 'T') {
+					strcpy(dash_lastCmd, st.oledShort);     // PHASE 1: show the result instead
+				} else {
+					strcpy(dash_lastCmd, cmdBuffer);
+				}
 				cmdIndex = 0; // Reset index to build the next incoming command
 			}
 		} else {
@@ -1738,6 +2120,15 @@ void StartMotorTask(void *argument)
 	dash_encoderL = left_encoder_val;
 	dash_encoderR = right_encoder_val;
 	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
+
+	// ---------------------------------------------------------
+	// PHASE 1 TEST HOOK: a servo test owns the motors while active
+	// ---------------------------------------------------------
+	if (st.active) {
+		servoTestStep(cnt_L, cnt_R);
+		osDelay(10);
+		continue;
+	}
 
 	// ---------------------------------------------------------
 	// STEP B: Handle Braking and Emergency Stops
@@ -1962,9 +2353,9 @@ void StartOledTask(void *argument)
 
 		// Line 5: Raw Direction Indicator & Battery Percentage
 		dash_battV = dash_battV * 0.9f + readBatteryVoltage() * 0.1f;   // smooth out load sag
+		updateKnob();   // PHASE 1: potentiometer -> servo us
 		dash_battPct = batteryPercent(dash_battV);
-		//sprintf(textBuffer, "Dir:%d B:%d%%", dash_direction, dash_battPct);
-		sprintf(textBuffer, "Dir:%d B:%.1fV", dash_direction, dash_battV);
+		sprintf(textBuffer, "Dir:%d B:%d%%", dash_direction, dash_battPct);
 		OLED_ShowString(0, 48, (uint8_t *) textBuffer);
 	}
 
@@ -2038,6 +2429,7 @@ void StartGyroTask(void *argument)
 
 	// 4. Integrate the filtered velocity to get absolute heading
 	total_angle += gz_corrected * dt;
+	dash_gyroRate = (float)gz_corrected;   // PHASE 1: yaw rate for the servo test
 
 	// 5. Publish to global dashboard variable
 	dash_gyroZ = total_angle;
