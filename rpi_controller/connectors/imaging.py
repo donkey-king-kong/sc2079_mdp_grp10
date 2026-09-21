@@ -1,3 +1,6 @@
+from imaging.service import ImagingService
+
+
 class ImagingConnector:
     """
     Interface between the RPi controller and the imaging subsystem.
@@ -6,8 +9,8 @@ class ImagingConnector:
     added by the imaging teammate later without changing manager.py.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, service: ImagingService | None = None):
+        self.service = service or ImagingService()
 
     def capture_and_predict(self, obstacle_id):
         """
@@ -30,8 +33,9 @@ class ImagingConnector:
         )
 
         # Placeholder result for integration testing
-        return {
-            "obstacle_id": str(obstacle_id),
-            "image_id": None,
-            "confidence": None,
-        }
+        # return {
+        #     "obstacle_id": str(obstacle_id),
+        #     "image_id": None,
+        #     "confidence": None,
+        # }
+        return self.service.capture_and_predict(obstacle_id)

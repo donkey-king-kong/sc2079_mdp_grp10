@@ -32,11 +32,12 @@ rpi_controller/
 │   ├── bluetooth.py
 │   ├── imaging.py
 │   └── stm.py
-├── manager.py
-├── protocol.py
-├── router.py
-├── requirements.txt
-└── test_*.py
+├── dummy_test/       # manual hardware and integration checks
+├── imaging/          # Picamera2 capture and local YOLO inference
+├── manager.py        # controller entry point
+├── migrate.py        # PC → RPi source sync
+├── protocol.py / router.py
+└── requirements.txt
 ```
 
 ## Communication
@@ -70,13 +71,33 @@ STM → A\n
 capture_and_predict(obstacle_id)
 ```
 
-The imaging team can plug the camera and recognition model into this interface.
+The result contains `obstacle_id`, `image_id`, and `confidence`.
 
 ## Setup
 
+On the RPi:
+
 ```bash
-pip install -r rpi_controller/requirements.txt
+cd rpi_controller
+source .venv/bin/activate
+pip install -r requirements.txt
+python manager.py
 ```
+
+YOLO weights belong at `imaging/models/best.pt`.
+
+To sync source, run this on the PC (keeps the RPi `.venv` and model):
+
+```bash
+python migrate.py
+```
+
+Manual checks are under `dummy_test/`.
+```
+source .venv/bin/activate
+python dummy_test/<any-file>.py
+```
+
 
 ## Status
 
