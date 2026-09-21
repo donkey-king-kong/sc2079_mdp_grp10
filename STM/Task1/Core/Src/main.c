@@ -121,9 +121,32 @@
 #define PHASE1_FIELD_TOOL   1       // 1 = knob + button test tool replaces the old button harness
 #define KNOB_US_MIN         900     // Knob fully one way  -> this servo value
 #define KNOB_US_MAX         2200    // Knob fully other way -> this servo value
-#define TEST_LOG_SIZE       30      // Results kept for the "TD" dump command
+#define TEST_LOG_SIZE       40      // Results kept for the "TD" dump command
 #define BTN_LONG_MS         800     // Hold the button this long to switch TA/TC
 
+
+/* ---- Phase 1 results ---- */
+#define SERVO_TRUE_CENTRE   1494    // Measured straight-ahead (approach from below)
+
+/* ---- PHASE 2: MOTOR CHARACTERISATION TEST ---- */
+#define MT_RAMP_STEP        5.0f    // PWM change per 10 ms loop (500 PWM per second)
+#define MT_START_TICKS      10      // A wheel counts as moving after this many ticks
+#define MT_STILL_LOOPS      8       // ...and as stopped after this many loops with no ticks
+#define MT_RAMP_MAX         6500.0f // Give up looking for breakaway above this
+#define MT_FLOOR_RAMP_FROM  1000.0f // Floor ramp starts here (nothing moves below it)
+#define MT_SWEEP_FIRST      1000    // Stand sweep: first PWM level
+#define MT_SWEEP_LAST       7000    //              last PWM level (ARR is 7199)
+#define MT_SWEEP_STEP       500     //              step between levels
+#define MT_SWEEP_SETTLE_MS  400     // Let the speed settle at each level...
+#define MT_SWEEP_MEASURE_MS 300     // ...then average it over this long
+#define MT_STAND_ARM_US     950     // Stand test only starts with the knob fully clockwise
+
+#define MT_SETTLE           0       // Motor test phases
+#define MT_RAMP_UP          1
+#define MT_HOLD             2
+#define MT_RAMP_DOWN        3
+#define MT_SWEEP            4
+#define MT_REST             5
 #define ST_SETTLE           0       // Test phases
 #define ST_DRIVE            1
 #define ST_BRAKE            2
@@ -273,6 +296,29 @@ typedef struct {
     char     result[48];          // Full result line, sent in the ACK
     char     oledShort[15];       // Short result for the OLED CMD line
 } ServoTest_t;
+
+/* PHASE 2: motor test state. Same split as the servo test: started by
+ * runMotorTest(), executed 10 ms at a time inside the motor task. */
+typedef struct {
+    volatile uint8_t active;      // 1 while a motor test owns the motors
+    char     kind;                // 'F' = floor, 'S' = stand (wheels in the air)
+    int8_t   dir;                 // +1 forward, -1 reverse
+    uint8_t  phase;               // MT_SETTLE ... MT_REST
+    uint32_t phaseTick;           // HAL tick when the current phase began
+    float    pwm;                 // PWM being applied to both wheels
+    int32_t  cumL, cumR;          // Ticks since the ramp started (magnitude)
+    uint16_t goL, goR;            // PWM at which each wheel started moving (0 = never)
+    uint16_t stopL, stopR;        // PWM at which each wheel stopped on the way down
+    uint8_t  stillL, stillR;      // Consecutive loops with no ticks
+    uint16_t level;               // Current sweep PWM level
+    int32_t  sumL, sumR;          // Ticks accumulated while measuring a sweep level
+    uint32_t measStart;           // HAL tick when measuring began
+    uint16_t goCar[2];            // Floor: car breakaway PWM, [0] forward, [1] reverse
+    uint8_t  aborted;             // 1 if the button or '!' stopped the test
+} MotorTest_t;
+
+MotorTest_t mt = {0};
+volatile uint8_t testAbort = 0;                    // Set by a button press during any test
 
 ServoTest_t st = {0};
 volatile float dash_gyroRate = 0.0f;               // Yaw rate in deg/s (CCW positive)
@@ -1529,6 +1575,15 @@ static float clampf(float v, float lo, float hi)
     return (v < lo) ? lo : (v > hi) ? hi : v;
 }
 
+/* Appends one line to the result log that "TD" prints. */
+static void logResult(const char *line)
+{
+    strncpy(st_log[st_logHead], line, sizeof(st_log[0]) - 1);
+    st_log[st_logHead][sizeof(st_log[0]) - 1] = '\0';
+    st_logHead = (uint8_t)((st_logHead + 1) % TEST_LOG_SIZE);
+    if (st_logCount < TEST_LOG_SIZE) st_logCount++;
+}
+
 /* One 10 ms step of a test run. Called ONLY from the motor task.
  *
  * Each rear wheel runs its own speed loop. The targets follow the
@@ -1572,7 +1627,7 @@ static void servoTestStep(int16_t cntL, int16_t cntR)
         int reached  = (st.mode == 'A') ? (fabsf(turned) >= TEST_ARC_DEG)
                                         : (dist >= TEST_CENTRE_CM);
 
-        if (reached || emergency_stop_requested ||
+        if (reached || emergency_stop_requested || testAbort ||
             (now - st.phaseTick) > TEST_TIMEOUT_MS) {
             st.timedOut = !reached;
             st.phase = ST_BRAKE;
@@ -1690,15 +1745,215 @@ static void runServoTest(char mode, int servo_us)
     st.timedOut  = 0;
     st.phase     = ST_SETTLE;
     st.phaseTick = HAL_GetTick();
+    testAbort    = 0;
     st.active    = 1;                                  // motor task takes over from here
 
     while (st.active) {
+        if (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+            testAbort = 1;                             // button pressed mid-run: stop
+        }
         osDelay(20);
     }
 
-    strcpy(st_log[st_logHead], st.result);             // keep it for "TD"
-    st_logHead = (uint8_t)((st_logHead + 1) % TEST_LOG_SIZE);
-    if (st_logCount < TEST_LOG_SIZE) st_logCount++;
+    logResult(st.result);                              // keep it for "TD"
+}
+
+/* ============================================================
+ * PHASE 2: MOTOR CHARACTERISATION TEST
+ * ============================================================ */
+
+/* Both wheels at the given PWMs, forward (dir > 0) or reverse. */
+static void motorDrive(int dir, uint16_t l, uint16_t r)
+{
+    if (dir > 0) setMotorPwm(0, l, 0, r);
+    else         setMotorPwm(l, 0, r, 0);
+}
+
+/* One 10 ms step of a motor test. Called ONLY from the motor task.
+ *
+ * For each direction:
+ *   1. ramp both wheels up slowly and note the PWM where each starts turning,
+ *   2. ramp back down slowly and note where each stops,
+ *   3. stand test only: step through fixed PWM levels and measure each
+ *      wheel's steady speed.
+ * Every result goes into the "TD" log. */
+static void motorTestStep(int16_t cntL, int16_t cntR)
+{
+    uint32_t now = HAL_GetTick();
+    uint32_t el  = now - mt.phaseTick;
+    int32_t  aL  = abs((int)cntL);
+    int32_t  aR  = abs((int)cntR);
+    char     line[48];
+
+    if (testAbort || emergency_stop_requested) {
+        setMotorPwm(0, 0, 0, 0);
+        mt.aborted = 1;
+        mt.active  = 0;
+        return;
+    }
+
+    switch (mt.phase) {
+
+    case MT_SETTLE:                                    // wheels straight, motors off
+        setMotorPwm(0, 0, 0, 0);
+        __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, (el < 300)
+                              ? (SERVO_TRUE_CENTRE - SERVO_APPROACH_US) : SERVO_TRUE_CENTRE);
+        if (el >= 900) {
+            mt.cumL = mt.cumR = 0;
+            mt.goL = mt.goR = mt.stopL = mt.stopR = 0;
+            mt.stillL = mt.stillR = 0;
+            mt.pwm = (mt.kind == 'F') ? MT_FLOOR_RAMP_FROM : 0.0f;
+            mt.phase = MT_RAMP_UP;
+            mt.phaseTick = now;
+        }
+        break;
+
+    case MT_RAMP_UP:
+        mt.cumL += aL;
+        mt.cumR += aR;
+        if (!mt.goL && mt.cumL >= MT_START_TICKS) mt.goL = (uint16_t)mt.pwm;
+        if (!mt.goR && mt.cumR >= MT_START_TICKS) mt.goR = (uint16_t)mt.pwm;
+
+        if ((mt.goL && mt.goR) || mt.pwm >= MT_RAMP_MAX) {
+            mt.phase = MT_HOLD;
+            mt.phaseTick = now;
+        } else {
+            mt.pwm += MT_RAMP_STEP;
+        }
+        motorDrive(mt.dir, (uint16_t)mt.pwm, (uint16_t)mt.pwm);
+        break;
+
+    case MT_HOLD:                                      // make sure it is really rolling
+        motorDrive(mt.dir, (uint16_t)mt.pwm, (uint16_t)mt.pwm);
+        if (el >= 300) {
+            mt.phase = MT_RAMP_DOWN;
+            mt.phaseTick = now;
+        }
+        break;
+
+    case MT_RAMP_DOWN:
+        mt.stillL = (aL == 0) ? (uint8_t)(mt.stillL + 1) : 0;
+        mt.stillR = (aR == 0) ? (uint8_t)(mt.stillR + 1) : 0;
+        // The wheel really stopped MT_STILL_LOOPS loops ago, when PWM was higher
+        if (!mt.stopL && mt.stillL >= MT_STILL_LOOPS)
+            mt.stopL = (uint16_t)(mt.pwm + MT_STILL_LOOPS * MT_RAMP_STEP);
+        if (!mt.stopR && mt.stillR >= MT_STILL_LOOPS)
+            mt.stopR = (uint16_t)(mt.pwm + MT_STILL_LOOPS * MT_RAMP_STEP);
+
+        if ((mt.stopL && mt.stopR) || mt.pwm <= MT_RAMP_STEP) {
+            snprintf(line, sizeof(line), "%c%c go L=%u R=%u stop L=%u R=%u",
+                     mt.kind, (mt.dir > 0) ? '+' : '-',
+                     mt.goL, mt.goR, mt.stopL, mt.stopR);
+            logResult(line);
+            mt.goCar[(mt.dir > 0) ? 0 : 1] = (mt.goL > mt.goR) ? mt.goL : mt.goR;
+
+            if (mt.kind == 'S') {
+                mt.level = MT_SWEEP_FIRST;
+                mt.sumL = mt.sumR = 0;
+                mt.phase = MT_SWEEP;
+            } else {
+                mt.phase = MT_REST;
+            }
+            mt.phaseTick = now;
+            setMotorPwm(0, 0, 0, 0);
+            break;
+        }
+        mt.pwm -= MT_RAMP_STEP;
+        motorDrive(mt.dir, (uint16_t)mt.pwm, (uint16_t)mt.pwm);
+        break;
+
+    case MT_SWEEP:                                     // stand only: steady speed per level
+        motorDrive(mt.dir, mt.level, mt.level);
+        if (el < MT_SWEEP_SETTLE_MS) {
+            break;
+        }
+        if (mt.sumL == 0 && mt.sumR == 0 && mt.measStart == 0) {
+            mt.measStart = now;
+        }
+        mt.sumL += aL;
+        mt.sumR += aR;
+        if (el >= MT_SWEEP_SETTLE_MS + MT_SWEEP_MEASURE_MS) {
+            float ms  = (float)(now - mt.measStart + 10);   // include this loop's 10 ms
+            float vL  = (float)mt.sumL * 1000.0f / ms / TICKS_PER_CM;
+            float vR  = (float)mt.sumR * 1000.0f / ms / TICKS_PER_CM;
+            snprintf(line, sizeof(line), "S%c%u L=%.1f R=%.1f cm/s",
+                     (mt.dir > 0) ? '+' : '-', mt.level, vL, vR);
+            logResult(line);
+
+            mt.sumL = mt.sumR = 0;
+            mt.measStart = 0;
+            mt.phaseTick = now;
+            if (mt.level + MT_SWEEP_STEP > MT_SWEEP_LAST) {
+                mt.phase = MT_REST;
+                setMotorPwm(0, 0, 0, 0);
+            } else {
+                mt.level += MT_SWEEP_STEP;
+            }
+        }
+        break;
+
+    case MT_REST:
+    default:                                           // coast, then reverse or finish
+        setMotorPwm(0, 0, 0, 0);
+        if (el >= 800) {
+            if (mt.dir > 0) {
+                mt.dir = -1;
+                mt.phase = MT_SETTLE;
+                mt.phaseTick = now;
+            } else {
+                mt.active = 0;
+            }
+        }
+        break;
+    }
+}
+
+/* Starts a motor test and blocks until it finishes. A button press stops it.
+ *   MF  floor test (robot on the floor): breakaway and stopping PWM, fwd + rev
+ *   MS  stand test (rear wheels in the air): breakaway, stopping, and a
+ *       PWM -> speed sweep for each wheel, fwd + rev */
+static void runMotorTest(char kind)
+{
+    if (st.active || mt.active) {
+        snprintf(st.result, sizeof(st.result), "M ERR busy");
+        snprintf(st.oledShort, sizeof(st.oledShort), "M ERR busy");
+        return;
+    }
+    if (kind != 'F' && kind != 'S') {
+        snprintf(st.result, sizeof(st.result), "M ERR use MF/MS");
+        snprintf(st.oledShort, sizeof(st.oledShort), "M ERR mode");
+        return;
+    }
+
+    mt.kind      = kind;
+    mt.dir       = 1;
+    mt.phase     = MT_SETTLE;
+    mt.phaseTick = HAL_GetTick();
+    mt.measStart = 0;
+    mt.goCar[0]  = mt.goCar[1] = 0;
+    mt.aborted   = 0;
+    testAbort    = 0;
+    mt.active    = 1;                                  // motor task takes over
+
+    while (mt.active) {
+        if (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+            testAbort = 1;
+        }
+        osDelay(20);
+    }
+    setMotorPwm(0, 0, 0, 0);
+
+    if (mt.aborted) {
+        snprintf(st.result, sizeof(st.result), "M%c aborted", kind);
+        snprintf(st.oledShort, sizeof(st.oledShort), "M%c ABORTED", kind);
+    } else if (kind == 'F') {
+        snprintf(st.result, sizeof(st.result), "MF go fwd=%u rev=%u", mt.goCar[0], mt.goCar[1]);
+        snprintf(st.oledShort, sizeof(st.oledShort), "F+%u -%u", mt.goCar[0], mt.goCar[1]);
+    } else {
+        snprintf(st.result, sizeof(st.result), "MS done, send TD");
+        snprintf(st.oledShort, sizeof(st.oledShort), "MS done");
+    }
+    logResult(st.result);
 }
 
 /* Reads one ADC1 channel. Only ever called from the OLED task, so the
@@ -1774,7 +2029,9 @@ void StartDefaultTask(void *argument)
   /* PHASE 1 FIELD TOOL - no cable needed while driving.
    *   Knob   : sets the servo; the wheels follow it live while idle
    *   Tap    : run the current test at the knob value (1.5 s delay to let go)
-   *   Hold   : switch between TA (arc/radius) and TC (centre/drift)
+   *   Hold   : cycle modes TA (arc) -> TC (centre) -> MF (motor floor)
+   *            -> MS (motor stand, knob fully clockwise to arm) -> TA
+   *   Tap during any test: stop it
    *   OLED   : CMD line shows "TA 1540" etc, then the result after a run
    *   "TD"   : over serial afterwards, prints every result from this power-up
    *   "TV<us>": over serial, sets the value instead of the knob (then unplug)
@@ -1786,15 +2043,21 @@ void StartDefaultTask(void *argument)
   for(;;)
   {
       uint16_t us = dash_knobUs;
+      int motorMode = (fieldMode == 'F' || fieldMode == 'S');
 
-      if (!st.active && !is_moving) {
-          __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);   // live steering
+      if (!st.active && !mt.active && !is_moving) {
+          // Live steering in the servo modes; wheels straight in the motor modes
+          __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, motorMode ? SERVO_TRUE_CENTRE : us);
       }
 
       if (showResult && abs((int)us - (int)resultUs) >= 10) {
           showResult = 0;                              // knob moved: back to live view
       }
-      if (!showResult) {
+      if (!showResult && fieldMode == 'F') {
+          strcpy(dash_lastCmd, "MF floor");
+      } else if (!showResult && fieldMode == 'S') {
+          strcpy(dash_lastCmd, (us <= MT_STAND_ARM_US) ? "MS ready" : "MS knob CW");
+      } else if (!showResult) {
           if (dash_knobRaw >= 0) {
               snprintf(dash_lastCmd, sizeof(dash_lastCmd), "T%c%u k%ld", fieldMode, us, (long)dash_knobRaw);
           } else {
@@ -1809,16 +2072,36 @@ void StartDefaultTask(void *argument)
           }
           uint32_t held = HAL_GetTick() - t0;
 
-          if (held >= BTN_LONG_MS) {                  // hold: switch mode
-              fieldMode = (fieldMode == 'A') ? 'C' : 'A';
+          if (held >= BTN_LONG_MS) {                  // hold: next mode
+              fieldMode = (fieldMode == 'A') ? 'C'
+                        : (fieldMode == 'C') ? 'F'
+                        : (fieldMode == 'F') ? 'S' : 'A';
               showResult = 0;
           } else if (held >= 40) {                     // tap: run
-              snprintf(dash_lastCmd, sizeof(dash_lastCmd), "T%c %u GO", fieldMode, us);
-              osDelay(1500);
-              runServoTest(fieldMode, us);
-              strcpy(dash_lastCmd, st.oledShort);
-              resultUs = us;
-              showResult = 1;
+              if (fieldMode == 'S' && us > MT_STAND_ARM_US) {
+                  strcpy(dash_lastCmd, "MS knob CW!");  // safety interlock
+                  osDelay(1000);
+              } else {
+                  if (motorMode) {
+                      snprintf(dash_lastCmd, sizeof(dash_lastCmd), "M%c GO", fieldMode);
+                  } else {
+                      snprintf(dash_lastCmd, sizeof(dash_lastCmd), "T%c %u GO", fieldMode, us);
+                  }
+                  osDelay(1500);
+                  if (motorMode) {
+                      runMotorTest(fieldMode);
+                  } else {
+                      runServoTest(fieldMode, us);
+                  }
+                  strcpy(dash_lastCmd, st.oledShort);
+                  resultUs = us;
+                  showResult = 1;
+                  // If the button stopped the test, don't read that press as a new tap
+                  while (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+                      osDelay(20);
+                  }
+                  osDelay(200);
+              }
           }
       }
 
@@ -2017,6 +2300,10 @@ void StartCommunicateTask(void *argument)
 							runServoTest(command_char2, value);
 							break;
 
+						case 'M':   // PHASE 2 motor tests: MF (floor) / MS (stand)
+							runMotorTest(command_char2);
+							break;
+
 						/* Can add more cases here */
 					}
 				}
@@ -2028,7 +2315,7 @@ void StartCommunicateTask(void *argument)
 					snprintf(ackMsg, sizeof(ackMsg), "A G:%.1f T:%.1f %s\n",
 							(float)total_angle, (float)target_angle,
 							move_finish_reason == 2 ? "TIMEOUT" : "TARGET");
-				} else if (command_char1 == 'T') {
+				} else if (command_char1 == 'T' || command_char1 == 'M') {
 					// PHASE 1 test result
 					snprintf(ackMsg, sizeof(ackMsg), "A %s\n", st.result);
 				} else {
@@ -2038,7 +2325,7 @@ void StartCommunicateTask(void *argument)
 				HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
 
 				// 4. UPDATE DASHBOARD AND RESET
-				if (command_char1 == 'T') {
+				if (command_char1 == 'T' || command_char1 == 'M') {
 					strcpy(dash_lastCmd, st.oledShort);     // PHASE 1: show the result instead
 				} else {
 					strcpy(dash_lastCmd, cmdBuffer);
@@ -2124,6 +2411,11 @@ void StartMotorTask(void *argument)
 	// ---------------------------------------------------------
 	// PHASE 1 TEST HOOK: a servo test owns the motors while active
 	// ---------------------------------------------------------
+	if (mt.active) {                   // PHASE 2 motor test
+		motorTestStep(cnt_L, cnt_R);
+		osDelay(10);
+		continue;
+	}
 	if (st.active) {
 		servoTestStep(cnt_L, cnt_R);
 		osDelay(10);
