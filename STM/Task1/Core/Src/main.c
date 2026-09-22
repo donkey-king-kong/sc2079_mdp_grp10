@@ -43,8 +43,9 @@
  * ========================================================================== */
 
 /* --- 1. DISTANCE & GYRO CALIBRATION --------------------------------------- */
-#define TICKS_PER_CM            62.568f  // Tweak if robot travels more or less than 10cm
+#define TICKS_PER_CM            75.5f    // PHASE 3a: measured (was 62.568, 17% short on every floor). [CAL]
 #define SLIDE_TICKS_PER_CM      75.19f  // Specific tuning multiplier used in slide maneuvers
+#define LEGACY_TICKS_PER_CM     62.568f // Old value, kept ONLY for the old moveCarStraight (slides, petal) so their tuning is unchanged
 #define BACKWARD_MULTIPLIER     1.12f   // Scaling factor for backward movement
 
 /* --- 2. MOTOR BIAS (HARDWARE OFFSETS) ------------------------------------- */
@@ -147,6 +148,46 @@
 #define MT_RAMP_DOWN        3
 #define MT_SWEEP            4
 #define MT_REST             5
+
+/* ============================================================
+ * PHASE 3a: NEW STRAIGHT-LINE MOTION  (SF / SB / S / F / B commands)
+ * Tuning knobs for Phase 5 calibration are marked [CAL].
+ * ============================================================ */
+/* Motor model from Phase 2 (cm/s per PWM, measured with wheels in the air).
+ * Rescaled x0.829 to real cm after TICKS_PER_CM was corrected 62.568 -> 75.5. */
+#define GAIN_L_FWD          0.0226f
+#define GAIN_R_FWD          0.0196f
+#define GAIN_L_REV          0.0179f
+#define GAIN_R_REV          0.0193f
+#define MOTOR_FF_BASE       2100.0f // Floor "keep moving" PWM from Phase 2
+#define MOTOR_KICK_PWM      3300.0f // Start burst: covers the worst floor start seen (3205)
+#define KICK_AFTER_LOOPS    3       // Apply the burst after this many loops with no ticks
+#define MOTOR_PWM_MAX       6500.0f // Stay below the non-linear top end
+#define WHEEL_KP            120.0f  // PWM per tick/10ms of speed error
+#define WHEEL_KI            3.0f    // PWM added per tick of error, every 10 ms
+#define WHEEL_I_LIMIT       1500.0f // Integral term limit (PWM)
+#define BRAKE_ASSIST_TICKS  5.0f    // While slowing down: car this much too fast (ticks/10ms, ~7 cm/s) -> brake both
+
+/* Speed profile */
+#define STRAIGHT_V_MAX      35.0f   // [CAL] Cruise speed, cm/s
+#define STRAIGHT_V_MIN      12.0f   // Slowest speed used: above the stick-slip region
+#define STRAIGHT_ACCEL      60.0f   // cm/s per second when speeding up
+#define STRAIGHT_DECEL      50.0f   // cm/s per second when slowing down
+#define STRAIGHT_APPROACH   2.0f    // Last few cm are driven at STRAIGHT_V_MIN
+#define STOP_T              0.050f  // [CAL] Stopping distance = STOP_T x speed (cm, speed in cm/s):
+                                    //       the robot rolls ~50 ms after deciding to stop.
+                                    //       Fitted from office-floor runs at 13-21 cm/s (0.039-0.055).
+
+/* Heading hold: the servo steers gently to keep the start heading */
+#define HEADING_KP_US       11.0f   // Servo us per degree of heading error
+#define HEADING_MAX_US      60.0f   // Largest correction allowed
+#define SERVO_RATE_US       4.0f    // Max servo change per 10 ms (keeps it smooth)
+#define HEADING_KI_US       0.03f   // Centre learning: us per degree of error, per 10 ms
+#define SERVO_TRIM_MAX      30.0f   // Learned centre may move at most this far from SERVO_TRUE_CENTRE
+
+#define MV_SETTLE           0       // Straight-move phases
+#define MV_DRIVE            1
+#define MV_BRAKE            2
 #define ST_SETTLE           0       // Test phases
 #define ST_DRIVE            1
 #define ST_BRAKE            2
@@ -319,6 +360,39 @@ typedef struct {
 
 MotorTest_t mt = {0};
 volatile uint8_t testAbort = 0;                    // Set by a button press during any test
+
+/* PHASE 3a: per-wheel speed controller state */
+typedef struct {
+    float   integ;                // Integral term (PWM)
+    float   filt;                 // Filtered speed, ticks per 10 ms
+    uint8_t still;                // Loops in a row with no ticks
+} WheelCtl_t;
+
+/* PHASE 3a: straight move. Started by runStraight(), executed in the motor task. */
+typedef struct {
+    volatile uint8_t active;      // 1 while a straight move owns the motors
+    uint8_t  phase;               // MV_SETTLE / MV_DRIVE / MV_BRAKE
+    uint32_t phaseTick;
+    int8_t   dir;                 // +1 forward, -1 backward
+    float    target;              // Distance to travel, cm (always positive)
+    float    v;                   // Current profile speed, cm/s
+    int32_t  startL, startR;      // Encoder totals when driving began
+    double   heading0;            // Heading to hold (deg)
+    float    servoCmd;            // Current servo command (us)
+    uint16_t settleA, settleB;    // Servo settle times (ms): below-centre, then centre
+    uint32_t deadline;            // Timeout tick
+    uint8_t  timedOut;
+    uint8_t  aborted;
+    uint8_t  stillLoops;          // Used while waiting to stop after braking
+    WheelCtl_t wl, wr;
+    float    resDist, resHead;    // Results: distance travelled, heading change
+    float    vBrake;              // Measured speed when braking started (cm/s)
+    char     result[40];
+} Move_t;
+
+Move_t mv = {0};
+float servoTrim = 0.0f;                            // Learned centre correction (us), kept between moves
+volatile uint8_t robotStill = 0;                   // 1 when the wheels haven't moved for 0.5 s
 
 ServoTest_t st = {0};
 volatile float dash_gyroRate = 0.0f;               // Yaw rate in deg/s (CCW positive)
@@ -1270,7 +1344,7 @@ int finishCheck()
 void moveCarStraight(double distance)
 {
 	// Convert target cm into hardware encoder ticks
-	int tick_distance = (int)(distance * TICKS_PER_CM);
+	int tick_distance = (int)(distance * LEGACY_TICKS_PER_CM);   // PHASE 3a: legacy scale
 
 	// Center steering servo before moving
 	pwmVal_servo = SERVOCENTER;
@@ -1956,6 +2030,234 @@ static void runMotorTest(char kind)
     logResult(st.result);
 }
 
+/* ============================================================
+ * PHASE 3a: STRAIGHT-LINE MOTION
+ * ============================================================ */
+
+/* Drives ONE wheel: forward/reverse at pwm, or short-brakes it. */
+static void driveWheel(int left, int dir, uint16_t pwm, int brake)
+{
+    uint16_t fwdPin = 0, revPin = 0;
+    if (brake) {
+        fwdPin = revPin = PWM_BRAKE;                   // both high = AT8236 brake
+    } else if (dir > 0) {
+        fwdPin = pwm;
+    } else {
+        revPin = pwm;
+    }
+    if (left) {
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, fwdPin);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, revPin);
+    } else {
+        __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, fwdPin);
+        __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, revPin);
+    }
+}
+
+/* One wheel's speed controller. tgtCmS = wanted speed (cm/s, >= 0),
+ * cnt = ticks this loop, gain = that wheel's cm/s per PWM in this direction.
+ * Returns the PWM magnitude to apply. When braking = 1 the caller is braking
+ * both wheels this loop: only the speed filter is updated, and the integral
+ * is left alone so it doesn't wind down. */
+static uint16_t wheelControl(WheelCtl_t *w, float tgtCmS, int32_t cnt, float gain, int braking)
+{
+    float meas = (float)abs((int)cnt);
+    w->filt = 0.6f * w->filt + 0.4f * meas;
+
+    if (tgtCmS <= 0.0f) {
+        w->integ = 0.0f;
+        w->still = KICK_AFTER_LOOPS;
+        return 0;
+    }
+
+    float tgtTicks = tgtCmS * TICKS_PER_CM / 100.0f;
+    float e = tgtTicks - w->filt;
+
+    if (braking) {
+        w->still = 0;
+        return 0;
+    }
+    w->integ = clampf(w->integ + WHEEL_KI * e, -WHEEL_I_LIMIT, WHEEL_I_LIMIT);
+
+    // Feedforward from the Phase 2 model, then feedback for everything else
+    float pwm = MOTOR_FF_BASE + tgtCmS / gain + WHEEL_KP * e + w->integ;
+
+    // Starting takes about twice the power of keeping going: give a burst
+    // whenever the wheel should be turning but isn't.
+    w->still = (meas == 0.0f) ? (uint8_t)((w->still < 200) ? w->still + 1 : 200) : 0;
+    if (w->still >= KICK_AFTER_LOOPS && pwm < MOTOR_KICK_PWM) {
+        pwm = MOTOR_KICK_PWM;
+    }
+    return (uint16_t)clampf(pwm, 0.0f, MOTOR_PWM_MAX);
+}
+
+static void writeServo(float us)
+{
+    __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, (uint16_t)(us + 0.5f));
+}
+
+/* One 10 ms step of a straight move. Called ONLY from the motor task. */
+static void straightStep(int16_t cntL, int16_t cntR)
+{
+    uint32_t now = HAL_GetTick();
+    uint32_t el  = now - mv.phaseTick;
+    float    dist = (float)mv.dir * 0.5f *
+                    (float)((left_encoder_val - mv.startL) + (right_encoder_val - mv.startR))
+                    / TICKS_PER_CM;
+
+    if (mv.phase != MV_BRAKE && (testAbort || emergency_stop_requested)) {
+        mv.aborted = 1;
+        mv.phase = MV_BRAKE;
+        mv.phaseTick = now;
+        el = 0;
+    }
+
+    switch (mv.phase) {
+
+    case MV_SETTLE:
+        // Wheels straight, always arriving at centre from below (servo slack)
+        setMotorPwm(0, 0, 0, 0);
+        if (el < mv.settleA) {
+            writeServo(SERVO_TRUE_CENTRE + servoTrim - SERVO_APPROACH_US);
+        } else {
+            writeServo(SERVO_TRUE_CENTRE + servoTrim);
+        }
+        if (el >= (uint32_t)(mv.settleA + mv.settleB)) {
+            mv.startL = left_encoder_val;
+            mv.startR = right_encoder_val;
+            mv.heading0 = total_angle;
+            mv.servoCmd = SERVO_TRUE_CENTRE + servoTrim;
+            mv.v = STRAIGHT_V_MIN;
+            mv.wl.integ = mv.wr.integ = 0.0f;
+            mv.wl.filt  = mv.wr.filt  = 0.0f;
+            mv.wl.still = mv.wr.still = KICK_AFTER_LOOPS;   // burst from the first loop
+            mv.phase = MV_DRIVE;
+            mv.phaseTick = now;
+        }
+        break;
+
+    case MV_DRIVE: {
+        float remaining = mv.target - dist;
+        // Brake early enough for the speed we are actually doing: the robot
+        // keeps rolling for ~STOP_T seconds after the decision, so the stop
+        // point moves back in proportion to speed. Capped at the approach zone
+        // so it never brakes early while still slowing down from cruise.
+        float vNow     = 0.5f * (mv.wl.filt + mv.wr.filt) * 100.0f / TICKS_PER_CM;
+        float stopDist = fminf(STOP_T * vNow, STRAIGHT_APPROACH);
+        if (remaining <= stopDist || now > mv.deadline) {
+            mv.timedOut = (remaining > stopDist);
+            mv.vBrake = vNow;
+            mv.phase = MV_BRAKE;
+            mv.phaseTick = now;
+            setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
+            break;
+        }
+
+        // Speed profile: speed up, cruise, slow down so we arrive at V_MIN
+        float slowTo = sqrtf(2.0f * STRAIGHT_DECEL *
+                       fmaxf(remaining - STRAIGHT_APPROACH, 0.0f)) + STRAIGHT_V_MIN;
+        float upTo   = fminf(mv.v + STRAIGHT_ACCEL * 0.01f, STRAIGHT_V_MAX);
+        int slowing  = (slowTo < upTo);                // profile is bringing us down to stop
+        mv.v = fminf(upTo, slowTo);
+        if (mv.v < STRAIGHT_V_MIN) mv.v = STRAIGHT_V_MIN;
+
+        // Heading hold through the servo (+ error = drifted left).
+        // P term reacts; servoTrim slowly learns where "straight" really is
+        // and is remembered between moves, so it stops re-appearing as error.
+        float err = (float)(total_angle - mv.heading0);
+        float sgn = (mv.dir > 0) ? 1.0f : -1.0f;       // steering works backwards in reverse
+        servoTrim = clampf(servoTrim + HEADING_KI_US * err * sgn, -SERVO_TRIM_MAX, SERVO_TRIM_MAX);
+        float off = clampf(HEADING_KP_US * err, -HEADING_MAX_US, HEADING_MAX_US) * sgn;
+        float want = SERVO_TRUE_CENTRE + servoTrim + off;
+        mv.servoCmd += clampf(want - mv.servoCmd, -SERVO_RATE_US, SERVO_RATE_US);
+        writeServo(mv.servoCmd);
+
+        // Both wheels at the same speed; each has its own controller.
+        // Cutting power only lets the car coast, which sheds speed too slowly
+        // on a smooth floor. If the car as a whole is clearly too fast, brake
+        // BOTH wheels for this loop: braking one side alone swings the robot.
+        // Only while slowing down for the stop: during cruise, normal speed
+        // jiggle on an uneven floor must not trigger braking (that was jerky).
+        float tgtTicks  = mv.v * TICKS_PER_CM / 100.0f;
+        int   brakeBoth = slowing &&
+                          (0.5f * (mv.wl.filt + mv.wr.filt) > tgtTicks + BRAKE_ASSIST_TICKS);
+        uint16_t pL = wheelControl(&mv.wl, mv.v, cntL, (mv.dir > 0) ? GAIN_L_FWD : GAIN_L_REV, brakeBoth);
+        uint16_t pR = wheelControl(&mv.wr, mv.v, cntR, (mv.dir > 0) ? GAIN_R_FWD : GAIN_R_REV, brakeBoth);
+        driveWheel(1, mv.dir, pL, brakeBoth);
+        driveWheel(0, mv.dir, pR, brakeBoth);
+        break;
+    }
+
+    case MV_BRAKE:
+    default:
+        if (el < 200) {                                // active brake
+            setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
+            mv.stillLoops = 0;
+            break;
+        }
+        setMotorPwm(0, 0, 0, 0);
+        mv.stillLoops = (cntL == 0 && cntR == 0) ? (uint8_t)(mv.stillLoops + 1) : 0;
+        if (mv.stillLoops >= 5 || el > 700) {
+            mv.resDist = dist;
+            mv.resHead = (float)(total_angle - mv.heading0);
+            mv.active = 0;
+        }
+        break;
+    }
+}
+
+/* Drives straight by distance_cm (negative = backwards) and blocks until the
+ * robot has stopped. Result text is left in mv.result. */
+static void runStraight(float distance_cm)
+{
+    if (mv.active || st.active || mt.active) {
+        snprintf(mv.result, sizeof(mv.result), "BUSY");
+        return;
+    }
+    if (fabsf(distance_cm) < 0.5f) {
+        snprintf(mv.result, sizeof(mv.result), "d=0.0 h=0.0");
+        return;
+    }
+
+    // Short servo settle if it is already near centre, longer after a turn
+    int curServo = (int)__HAL_TIM_GET_COMPARE(&htim12, TIM_CHANNEL_2);
+    int far = abs(curServo - SERVO_TRUE_CENTRE) > 20;
+
+    mv.dir       = (distance_cm > 0.0f) ? 1 : -1;
+    mv.target    = fabsf(distance_cm);
+    mv.settleA   = far ? 250 : 120;
+    mv.settleB   = far ? 200 : 120;
+    mv.deadline  = HAL_GetTick() + mv.settleA + mv.settleB + 2000
+                   + (uint32_t)(mv.target * 1000.0f / STRAIGHT_V_MIN);
+    mv.timedOut  = 0;
+    mv.aborted   = 0;
+    mv.vBrake    = 0.0f;
+    mv.phase     = MV_SETTLE;
+    mv.phaseTick = HAL_GetTick();
+    testAbort    = 0;
+    mv.active    = 1;                                  // motor task takes over
+
+    while (mv.active) {
+        if (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+            testAbort = 1;                             // user button: stop now
+        }
+        osDelay(10);
+    }
+
+    snprintf(mv.result, sizeof(mv.result), "d=%.1f h=%.1f vb=%.0f%s",
+             mv.resDist, mv.resHead, mv.vBrake,
+             mv.aborted ? " ABORT" : (mv.timedOut ? " TO" : ""));
+}
+
+/* Field tool: knob position -> distance, -100..+100 cm in 10 cm steps. */
+static int knobDistanceCm(uint16_t us)
+{
+    int d = (int)lroundf(((float)us - 1550.0f) / 650.0f * 10.0f) * 10;
+    if (d > 100)  d = 100;
+    if (d < -100) d = -100;
+    return d;
+}
+
 /* Reads one ADC1 channel. Only ever called from the OLED task, so the
  * battery and the knob never fight over the ADC. Returns 0xFFFFFFFF on failure. */
 static uint32_t adcReadChannel(uint32_t channel)
@@ -2029,14 +2331,15 @@ void StartDefaultTask(void *argument)
   /* PHASE 1 FIELD TOOL - no cable needed while driving.
    *   Knob   : sets the servo; the wheels follow it live while idle
    *   Tap    : run the current test at the knob value (1.5 s delay to let go)
-   *   Hold   : cycle modes TA (arc) -> TC (centre) -> MF (motor floor)
-   *            -> MS (motor stand, knob fully clockwise to arm) -> TA
+   *   Hold   : cycle modes SD (straight drive) -> TA (arc) -> TC (centre)
+   *            -> MF (motor floor) -> MS (motor stand, knob fully CW) -> SD
+   *   SD     : knob picks a distance, -100..+100 cm in 10 cm steps
    *   Tap during any test: stop it
    *   OLED   : CMD line shows "TA 1540" etc, then the result after a run
    *   "TD"   : over serial afterwards, prints every result from this power-up
    *   "TV<us>": over serial, sets the value instead of the knob (then unplug)
    *   k####  : raw knob reading on the CMD line, for diagnosis */
-  char     fieldMode   = 'A';
+  char     fieldMode   = 'D';   // PHASE 3a: start in drive-test mode
   uint8_t  showResult  = 0;
   uint16_t resultUs    = 0;
 
@@ -2045,15 +2348,22 @@ void StartDefaultTask(void *argument)
       uint16_t us = dash_knobUs;
       int motorMode = (fieldMode == 'F' || fieldMode == 'S');
 
-      if (!st.active && !mt.active && !is_moving) {
-          // Live steering in the servo modes; wheels straight in the motor modes
-          __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, motorMode ? SERVO_TRUE_CENTRE : us);
+      if (!st.active && !mt.active && !mv.active && !is_moving) {
+          // Live steering in the servo modes; wheels straight in the motor modes.
+          // In SD mode the servo is left alone: the drive code owns it.
+          if (fieldMode == 'A' || fieldMode == 'C') {
+              __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);
+          } else if (motorMode) {
+              __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, SERVO_TRUE_CENTRE);
+          }
       }
 
       if (showResult && abs((int)us - (int)resultUs) >= 10) {
           showResult = 0;                              // knob moved: back to live view
       }
-      if (!showResult && fieldMode == 'F') {
+      if (!showResult && fieldMode == 'D') {
+          snprintf(dash_lastCmd, sizeof(dash_lastCmd), "SD %+d", knobDistanceCm(us));
+      } else if (!showResult && fieldMode == 'F') {
           strcpy(dash_lastCmd, "MF floor");
       } else if (!showResult && fieldMode == 'S') {
           strcpy(dash_lastCmd, (us <= MT_STAND_ARM_US) ? "MS ready" : "MS knob CW");
@@ -2073,14 +2383,32 @@ void StartDefaultTask(void *argument)
           uint32_t held = HAL_GetTick() - t0;
 
           if (held >= BTN_LONG_MS) {                  // hold: next mode
-              fieldMode = (fieldMode == 'A') ? 'C'
+              fieldMode = (fieldMode == 'D') ? 'A'
+                        : (fieldMode == 'A') ? 'C'
                         : (fieldMode == 'C') ? 'F'
-                        : (fieldMode == 'F') ? 'S' : 'A';
+                        : (fieldMode == 'F') ? 'S' : 'D';
               showResult = 0;
           } else if (held >= 40) {                     // tap: run
               if (fieldMode == 'S' && us > MT_STAND_ARM_US) {
                   strcpy(dash_lastCmd, "MS knob CW!");  // safety interlock
                   osDelay(1000);
+              } else if (fieldMode == 'D') {
+                  int d = knobDistanceCm(us);
+                  snprintf(dash_lastCmd, sizeof(dash_lastCmd), "SD %+d GO", d);
+                  osDelay(1500);
+                  if (d != 0) {
+                      char line[48];
+                      runStraight((float)d);
+                      snprintf(line, sizeof(line), "SD%+d %s", d, mv.result);
+                      logResult(line);
+                      snprintf(dash_lastCmd, sizeof(dash_lastCmd), "%.14s", mv.result);
+                  }
+                  resultUs = us;
+                  showResult = 1;
+                  while (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+                      osDelay(20);
+                  }
+                  osDelay(200);
               } else {
                   if (motorMode) {
                       snprintf(dash_lastCmd, sizeof(dash_lastCmd), "M%c GO", fieldMode);
@@ -2230,6 +2558,7 @@ void StartCommunicateTask(void *argument)
 				char command_char2 = ' ';
 				int value = 0;
 				int items_parsed = 0;
+				int usedNewStraight = 0;   // PHASE 3a: ACK carries the move result
 
 				// Check if the command is a 2-letter code (e.g., "SL50") or 1-letter ("F50")
 				if ((cmdBuffer[1] >= 'A' && cmdBuffer[1] <= 'Z') ||
@@ -2254,20 +2583,24 @@ void StartCommunicateTask(void *argument)
 							} else if (command_char2 == 'R') {	// "SR": Slide Right
 								moveCarSlideRight(value);
 							} else if (command_char2 == 'B') {
-								// RPi sends "SB<val>" for backwards straight
-								moveCarStraight(-value * BACKWARD_MULTIPLIER);
+								// "SB<cm>": backwards straight (PHASE 3a engine)
+								runStraight(-(float)value);
+								usedNewStraight = 1;
 							} else {
-								// "S<val>": Standard Straight
-								moveCarStraight(value);
+								// "SF<cm>" or "S<cm>": forwards straight (PHASE 3a engine)
+								runStraight((float)value);
+								usedNewStraight = 1;
 							}
 							break;
 
 						case 'F':								// Forward (Alias for Straight)
-							moveCarStraight(value);
+							runStraight((float)value);
+							usedNewStraight = 1;
 							break;
 
 						case 'B':								// Backward (Alias for negative Straight)
-							moveCarStraight(-value * BACKWARD_MULTIPLIER);
+							runStraight(-(float)value);
+							usedNewStraight = 1;
 							break;
 
 						case 'R':								// Right Turn
@@ -2315,6 +2648,9 @@ void StartCommunicateTask(void *argument)
 					snprintf(ackMsg, sizeof(ackMsg), "A G:%.1f T:%.1f %s\n",
 							(float)total_angle, (float)target_angle,
 							move_finish_reason == 2 ? "TIMEOUT" : "TARGET");
+				} else if (usedNewStraight) {
+					// PHASE 3a: distance travelled and heading change
+					snprintf(ackMsg, sizeof(ackMsg), "A %s\n", mv.result);
 				} else if (command_char1 == 'T' || command_char1 == 'M') {
 					// PHASE 1 test result
 					snprintf(ackMsg, sizeof(ackMsg), "A %s\n", st.result);
@@ -2408,9 +2744,26 @@ void StartMotorTask(void *argument)
 	dash_encoderR = right_encoder_val;
 	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
 
+	// PHASE 3a: the robot can't rotate if neither wheel has turned for 0.5 s.
+	// The gyro task uses this to keep its zero-rate offset up to date.
+	{
+		static uint16_t stillCount = 0;
+		if (cnt_L == 0 && cnt_R == 0 && !mv.active && !st.active && !mt.active && !is_moving) {
+			if (stillCount < 1000) stillCount++;
+		} else {
+			stillCount = 0;
+		}
+		robotStill = (stillCount >= 50);
+	}
+
 	// ---------------------------------------------------------
 	// PHASE 1 TEST HOOK: a servo test owns the motors while active
 	// ---------------------------------------------------------
+	if (mv.active) {                   // PHASE 3a straight move
+		straightStep(cnt_L, cnt_R);
+		osDelay(10);
+		continue;
+	}
 	if (mt.active) {                   // PHASE 2 motor test
 		motorTestStep(cnt_L, cnt_R);
 		osDelay(10);
@@ -2712,11 +3065,19 @@ void StartGyroTask(void *argument)
 	tick = current_tick;
 
 	// 3. Subtract baseline drift offset from angular velocity
-	double gz_corrected = (double)IMU_Data.z_gyro - offset;
+	double gz_raw = (double)IMU_Data.z_gyro;
+	double gz_corrected;
 
-	// Filter mechanical deadband noise (< 0.35 deg/sec) using floating math
-	if (fabs(gz_corrected) < 0.35) {
+	if (robotStill) {
+		// PHASE 3a: the wheels haven't turned for 0.5 s, so the robot isn't
+		// rotating. Hold the heading and use the reading to track the
+		// gyro's zero-rate offset, which drifts as the sensor warms up.
+		offset += 0.002 * (gz_raw - offset);
 		gz_corrected = 0.0;
+	} else {
+		// PHASE 3a: no deadband any more. The old 0.35 deg/s deadband hid
+		// drifts of up to ~1.8 deg/m, which the heading hold must see.
+		gz_corrected = gz_raw - offset;
 	}
 
 	// 4. Integrate the filtered velocity to get absolute heading
