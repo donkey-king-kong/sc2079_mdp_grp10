@@ -127,7 +127,9 @@
 
 
 /* ---- Phase 1 results ---- */
-#define SERVO_TRUE_CENTRE   1494    // Measured straight-ahead (approach from below)
+#define SERVO_TRUE_CENTRE   1500    // Straight-ahead. [CAL] From 1494 the learned trim climbed to +11;
+                                    // from 1504 it fell to -9. True centre ~1500, +/- a few us of
+                                    // servo slack run to run.
 
 /* ---- PHASE 2: MOTOR CHARACTERISATION TEST ---- */
 #define MT_RAMP_STEP        5.0f    // PWM change per 10 ms loop (500 PWM per second)
@@ -168,11 +170,33 @@
 #define WHEEL_I_LIMIT       1500.0f // Integral term limit (PWM)
 #define BRAKE_ASSIST_TICKS  5.0f    // While slowing down: car this much too fast (ticks/10ms, ~7 cm/s) -> brake both
 
-/* Speed profile */
-#define STRAIGHT_V_MAX      35.0f   // [CAL] Cruise speed, cm/s
+/* Speed profile: change ONE number to switch every speed together.
+ *   0 = original (35 / 25 cm/s)  - fully tested
+ *   1 = faster   (50 / 35 cm/s)  - ~13% quicker route in simulation
+ *   2 = fastest  (65 / 45 cm/s)  - ~17% quicker; with the turn-approach fix,
+ *                                  no accuracy loss across 5 simulated robot
+ *                                  conditions. Faster than this, errors rise.
+ * Stops always finish from the slow approach speed, so accuracy should
+ * mostly hold - but confirm on the robot after any change. */
+#define SPEED_PROFILE       2       // [CAL] 2 = fastest with no accuracy loss in simulation
+
+#if SPEED_PROFILE == 0
+  #define STRAIGHT_V_MAX    35.0f   // Straight cruise speed (cm/s)
+  #define TURN_V_MAX_P      25.0f   // Turn cruise speed at the rear-axle centre (cm/s)
+  #define STRAIGHT_ACCEL    60.0f   // cm/s per second when speeding up
+  #define STRAIGHT_DECEL    50.0f   // cm/s per second when slowing down
+#elif SPEED_PROFILE == 1
+  #define STRAIGHT_V_MAX    50.0f
+  #define TURN_V_MAX_P      35.0f
+  #define STRAIGHT_ACCEL    80.0f
+  #define STRAIGHT_DECEL    70.0f
+#else
+  #define STRAIGHT_V_MAX    65.0f
+  #define TURN_V_MAX_P      45.0f
+  #define STRAIGHT_ACCEL    100.0f
+  #define STRAIGHT_DECEL    90.0f
+#endif
 #define STRAIGHT_V_MIN      12.0f   // Slowest speed used: above the stick-slip region
-#define STRAIGHT_ACCEL      60.0f   // cm/s per second when speeding up
-#define STRAIGHT_DECEL      50.0f   // cm/s per second when slowing down
 #define STRAIGHT_APPROACH   2.0f    // Last few cm are driven at STRAIGHT_V_MIN
 #define STOP_T              0.050f  // [CAL] Stopping distance = STOP_T x speed (cm, speed in cm/s):
                                     //       the robot rolls ~50 ms after deciding to stop.
@@ -182,12 +206,52 @@
 #define HEADING_KP_US       11.0f   // Servo us per degree of heading error
 #define HEADING_MAX_US      60.0f   // Largest correction allowed
 #define SERVO_RATE_US       4.0f    // Max servo change per 10 ms (keeps it smooth)
-#define HEADING_KI_US       0.03f   // Centre learning: us per degree of error, per 10 ms
+#define HEADING_KI_US       0.01f   // Centre learning: us per degree of error, per 10 ms.
+                                    // Was 0.03 (~5 us per metre) - it chased run-to-run scatter.
+#define STEER_PLAY_US       15.0f   // [CAL] Backlash compensation: servo jumps this far across the
+                                    // steering play when a correction reverses (0 = off). Play is
+                                    // ~1 mm at the tyre (~20-40 us); 15 is safe across that range.
+                                    // Must stay BELOW the real play or the steering starts hopping.
+#define HEADING_KD_S        0.0f    // Damping: steer against the robot's current rotation, as if
+                                    // looking this many seconds ahead. Counters weaving.
+#define STEER_RIGHT_GAIN    1.3f    // [CAL] Right steering is weaker per us than left (Phase 1), so
+                                    // corrections to the right are scaled up. x1.0 left drifts avg
+                                    // +1.7 deg; x1.6 flipped it to -1.55 deg -> balance point ~x1.3.
+#define HEADING_KI_MOVE     0.0f    // Within-move correction: us per degree of error, per 10 ms.
+                                    // Builds up against a steady push (e.g. sloped floor), resets
+                                    // every move. OFF (0) until eb= shows where the drift comes
+                                    // from; 0.3 was tried in simulation.
+#define HEADING_I_MAX       40.0f   // Largest within-move correction (us)
+#define STRAIGHT_KY         0.9f    // Line holding: degrees of heading correction per cm of estimated
+                                    // sideways drift. Sized for no overshoot (~40-60 cm to recover).
+#define STRAIGHT_KY_FADE    25.0f   // Line holding fades out over the last this-many cm
 #define SERVO_TRIM_MAX      30.0f   // Learned centre may move at most this far from SERVO_TRUE_CENTRE
 
 #define MV_SETTLE           0       // Straight-move phases
 #define MV_DRIVE            1
 #define MV_BRAKE            2
+
+/* ============================================================
+ * PHASE 3b: TURNS  (LF / RF / LB / RB, and old-style L90 / R90)
+ * ============================================================ */
+#define SERVO_LEFT_LOCK     940     // Phase 1 left lock (us)
+#define SERVO_RIGHT_LOCK    2080    // Phase 1 right lock (us)
+#define TURN_RADIUS_L       19.7f   // [CAL] Rear-axle-centre turning radius at the left lock (cm), measured LF180
+#define TURN_RADIUS_R       36.0f   // [CAL] ... at the right lock (cm), measured RF180
+#define TURN_IO_L           0.50f   // Inner / outer rear wheel speed at the left lock (Phase 1 measured)
+#define TURN_IO_R           0.67f   // ... at the right lock
+#define TURN_V_MAX          TURN_V_MAX_P   // Set by SPEED_PROFILE above
+#define TURN_V_MIN          14.0f   // Slowest centre speed: keeps the inner wheel above stick-slip
+#define TURN_STOP_T         0.075f  // [CAL] Brake when remaining angle <= TURN_STOP_T x yaw rate.
+                                    //       Fitted from 13 turns: robot keeps rotating ~75 ms after the decision
+#define TURN_SETTLE_MS      300     // Time for the servo to travel from centre to a lock
+#define TURN_APPROACH_CM    4.0f    // Final slow approach for turns (cm of arc). Was 2: turns arrived too fast
+#define TURN_ASSIST_TICKS   3.0f    // Turns: brake both wheels when this much too fast while slowing (was 5)
+#define TURN_W_ALPHA        0.4f    // Yaw-rate averaging weight for the newest reading (1 = no averaging)
+
+#define TN_SETTLE           0       // Turn phases
+#define TN_DRIVE            1
+#define TN_BRAKE            2
 #define ST_SETTLE           0       // Test phases
 #define ST_DRIVE            1
 #define ST_BRAKE            2
@@ -378,6 +442,11 @@ typedef struct {
     float    v;                   // Current profile speed, cm/s
     int32_t  startL, startR;      // Encoder totals when driving began
     double   heading0;            // Heading to hold (deg)
+    float    lateral;             // Estimated sideways drift from the start line (cm, + = left)
+    float    hInteg;              // Within-move steering correction (us), reset every move
+    float    rateF;               // Filtered yaw rate (deg/s) for damping
+    float    wheelEst;            // Where the wheels actually point, in servo us (backlash model)
+    float    distPrev;            // Distance travelled at the previous loop (cm)
     float    servoCmd;            // Current servo command (us)
     uint16_t settleA, settleB;    // Servo settle times (ms): below-centre, then centre
     uint32_t deadline;            // Timeout tick
@@ -387,18 +456,63 @@ typedef struct {
     WheelCtl_t wl, wr;
     float    resDist, resHead;    // Results: distance travelled, heading change
     float    vBrake;              // Measured speed when braking started (cm/s)
-    char     result[40];
+    float    eBrake;              // Heading error when braking started (deg) - diagnostic
+    float    eEarly;              // Largest heading error in the first 20 cm (deg, signed) - diagnostic
+    uint16_t loops;               // Loops since driving began - diagnostic
+    uint16_t startLoopL;          // Loop when each wheel first turned (0 = not yet) - diagnostic
+    uint16_t startLoopR;
+    char     result[72];
 } Move_t;
 
 Move_t mv = {0};
 float servoTrim = 0.0f;                            // Learned centre correction (us), kept between moves
 volatile uint8_t robotStill = 0;                   // 1 when the wheels haven't moved for 0.5 s
 
+/* PHASE 3b: turn. Started by runTurn(), executed in the motor task. */
+typedef struct {
+    volatile uint8_t active;      // 1 while a turn owns the motors
+    uint8_t  phase;               // TN_SETTLE / TN_DRIVE / TN_BRAKE
+    uint32_t phaseTick;
+    int8_t   dir;                 // +1 forward, -1 reverse
+    int8_t   left;                // 1 = left lock, 0 = right lock
+    int8_t   hsign;               // +1 if the heading should increase (CCW), -1 if decrease
+    float    target;              // Heading change wanted (degrees, positive)
+    float    radius;              // Turning radius for this lock (cm)
+    float    io;                  // Inner/outer wheel speed ratio for this lock
+    uint16_t lockUs;              // Servo lock value
+    uint16_t settleMs;            // Servo settle time before driving
+    float    v;                   // Current centre speed (cm/s)
+    double   heading0;            // Heading when driving began
+    uint32_t deadline;
+    uint8_t  timedOut;
+    uint8_t  aborted;
+    uint8_t  stillLoops;
+    WheelCtl_t wl, wr;
+    float    resAngle;            // Heading change actually achieved (degrees, signed by direction)
+    float    targetAbs;           // PHASE 4: absolute heading to stop at (gyro frame)
+    float    resErr;              // PHASE 4: final heading minus targetAbs (deg, + = left of target)
+    float    wBrake;              // Yaw rate when braking started (deg/s)
+    float    wFilt;               // Yaw rate averaged over a few readings (deg/s)
+    float    vBrake;              // Centre wheel speed when braking started (cm/s)
+    char     result[40];
+} Turn_t;
+
+Turn_t tn = {0};
+
+/* PHASE 4: absolute heading. "North" is set once per run by the ZH command
+ * (or by the first move if ZH never arrives). Every turn moves the target by
+ * exactly the commanded angle and every straight holds it, so a small error
+ * in one move is corrected by the next instead of being carried forward. */
+volatile float headingDeg    = 0.0f;               // Gyro heading as a float: one 32-bit write, never torn
+float          headingZero   = 0.0f;               // Gyro heading at the last ZH ("north")
+float          headingTarget = 0.0f;               // Heading the robot should be facing (gyro frame)
+uint8_t        headingSet    = 0;                  // 0 until ZH or the first move sets "north"
+
 ServoTest_t st = {0};
 volatile float dash_gyroRate = 0.0f;               // Yaw rate in deg/s (CCW positive)
 volatile uint16_t dash_knobUs = 1500;              // Servo us for the field tool (knob or "TV" command)
 volatile int32_t  dash_knobRaw = -1;               // Raw knob ADC reading, -1 = read failed
-char     st_log[TEST_LOG_SIZE][48];                // Ring buffer of test results
+char     st_log[TEST_LOG_SIZE][80];                // Ring buffer of test results
 uint8_t  st_logHead  = 0;                          // Next slot to write
 uint8_t  st_logCount = 0;                          // Number of valid entries
 
@@ -1164,10 +1278,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		if (rxByte == '!') {
 			emergency_stop_requested = 1;
 			is_moving = 0;
+		} else {
+			// Pass normal characters to the FreeRTOS Queue for processing.
+			// PHASE 4: '!' is NOT queued - it used to end up at the front of
+			// the next command ("!SF050"), which then matched nothing.
+			osMessageQueuePut(uartQueueHandle, &rxByte, 0U, 0U);
 		}
-
-		// Pass normal characters to the FreeRTOS Queue for processing
-		osMessageQueuePut(uartQueueHandle, &rxByte, 0U, 0U);
 
 		// Re-arm the interrupt to listen for the next byte
 		HAL_UART_Receive_IT(&huart3, &rxByte, 1);
@@ -1683,7 +1799,7 @@ static void servoTestStep(int16_t cntL, int16_t cntR)
         if (now - st.phaseTick >= 900) {
             st.startL = left_encoder_val;
             st.startR = right_encoder_val;
-            st.startHeading = total_angle;
+            st.startHeading = headingDeg;
             st.pwmL = TEST_PWM_START;
             st.pwmR = TEST_PWM_START;
             st.fL = 0.0f;
@@ -1697,7 +1813,7 @@ static void servoTestStep(int16_t cntL, int16_t cntR)
         float dL = (float)(left_encoder_val  - st.startL) / TICKS_PER_CM;
         float dR = (float)(right_encoder_val - st.startR) / TICKS_PER_CM;
         float dist   = 0.5f * (dL + dR);
-        float turned = (float)(total_angle - st.startHeading);
+        float turned = headingDeg - (float)st.startHeading;
         int reached  = (st.mode == 'A') ? (fabsf(turned) >= TEST_ARC_DEG)
                                         : (dist >= TEST_CENTRE_CM);
 
@@ -1742,7 +1858,7 @@ static void servoTestStep(int16_t cntL, int16_t cntR)
             float dL = (float)(left_encoder_val  - st.startL) / TICKS_PER_CM;
             float dR = (float)(right_encoder_val - st.startR) / TICKS_PER_CM;
             float dist   = 0.5f * (dL + dR);
-            float turned = (float)(total_angle - st.startHeading);
+            float turned = headingDeg - (float)st.startHeading;
             const char *to = st.timedOut ? " TO" : "";
 
             if (st.mode == 'A') {
@@ -1780,7 +1896,7 @@ static void runServoTest(char mode, int servo_us)
         return;
     }
     if (mode == 'D') {                                 // TD: dump the result log over UART
-        char line[64];
+        char line[100];
         uint8_t first = (uint8_t)((st_logHead + TEST_LOG_SIZE - st_logCount) % TEST_LOG_SIZE);
         for (uint8_t i = 0; i < st_logCount; i++) {
             snprintf(line, sizeof(line), "%2u %s\r\n", i + 1,
@@ -2030,6 +2146,14 @@ static void runMotorTest(char kind)
     logResult(st.result);
 }
 
+/* PHASE 4: make the robot's current direction "north" for this run. */
+static void zeroHeading(void)
+{
+    headingZero   = headingDeg;
+    headingTarget = headingDeg;
+    headingSet    = 1;
+}
+
 /* ============================================================
  * PHASE 3a: STRAIGHT-LINE MOTION
  * ============================================================ */
@@ -2125,8 +2249,17 @@ static void straightStep(int16_t cntL, int16_t cntR)
         if (el >= (uint32_t)(mv.settleA + mv.settleB)) {
             mv.startL = left_encoder_val;
             mv.startR = right_encoder_val;
-            mv.heading0 = total_angle;
+            mv.heading0 = headingTarget;               // PHASE 4: hold the run's absolute heading
+            mv.lateral  = 0.0f;
+            mv.distPrev = 0.0f;
+            mv.hInteg   = 0.0f;
+            mv.rateF    = 0.0f;
+            mv.eEarly   = 0.0f;
+            mv.loops    = 0;
+            mv.startLoopL = mv.startLoopR = 0;
             mv.servoCmd = SERVO_TRUE_CENTRE + servoTrim;
+            // Settled from below, so the wheels sit at the low side of the play
+            mv.wheelEst = mv.servoCmd - 0.5f * STEER_PLAY_US;
             mv.v = STRAIGHT_V_MIN;
             mv.wl.integ = mv.wr.integ = 0.0f;
             mv.wl.filt  = mv.wr.filt  = 0.0f;
@@ -2147,6 +2280,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
         if (remaining <= stopDist || now > mv.deadline) {
             mv.timedOut = (remaining > stopDist);
             mv.vBrake = vNow;
+            mv.eBrake = headingDeg - (float)mv.heading0;
             mv.phase = MV_BRAKE;
             mv.phaseTick = now;
             setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
@@ -2164,13 +2298,61 @@ static void straightStep(int16_t cntL, int16_t cntR)
         // Heading hold through the servo (+ error = drifted left).
         // P term reacts; servoTrim slowly learns where "straight" really is
         // and is remembered between moves, so it stops re-appearing as error.
-        float err = (float)(total_angle - mv.heading0);
+        float err = headingDeg - (float)mv.heading0;
         float sgn = (mv.dir > 0) ? 1.0f : -1.0f;       // steering works backwards in reverse
+
+        // Diagnostics: how big the early twist is, and which wheel got going first
+        mv.loops++;
+        if (!mv.startLoopL && cntL != 0) mv.startLoopL = mv.loops;
+        if (!mv.startLoopR && cntR != 0) mv.startLoopR = mv.loops;
+        if (dist < 20.0f && fabsf(err) > fabsf(mv.eEarly)) mv.eEarly = err;
+
+        // Line holding: the gyro can't see sideways drift, but it can be
+        // added up - every bit of travel while the heading is off moves the
+        // robot sideways by (distance x sin(heading error)). Steer so the
+        // robot aims back onto the start line, not just parallel to it.
+        float ds = (dist - mv.distPrev) * sgn;         // signed: negative when reversing
+        mv.distPrev = dist;
+        mv.lateral += ds * sinf(err * DEG2RAD);
+        // Fade the line holding out over the last STRAIGHT_KY_FADE cm, so the
+        // robot finishes pointing straight rather than angled mid-correction.
+        float fade = clampf(remaining / STRAIGHT_KY_FADE, 0.0f, 1.0f);
+        // Damping: if the robot is already rotating, start countering the
+        // swing now instead of waiting for the heading error to build up.
+        mv.rateF = 0.5f * mv.rateF + 0.5f * dash_gyroRate;
+        float steerErr = err + sgn * STRAIGHT_KY * fade * mv.lateral + HEADING_KD_S * mv.rateF;
+
         servoTrim = clampf(servoTrim + HEADING_KI_US * err * sgn, -SERVO_TRIM_MAX, SERVO_TRIM_MAX);
-        float off = clampf(HEADING_KP_US * err, -HEADING_MAX_US, HEADING_MAX_US) * sgn;
+        // Within-move correction: keeps adding steering while the robot is
+        // being pushed one way (e.g. a sloped floor), so no error is left over.
+        mv.hInteg = clampf(mv.hInteg + HEADING_KI_MOVE * steerErr, -HEADING_I_MAX, HEADING_I_MAX);
+        float off = clampf(HEADING_KP_US * steerErr + mv.hInteg, -HEADING_MAX_US, HEADING_MAX_US) * sgn;
+        if (off > 0.0f) {
+            off *= STEER_RIGHT_GAIN;                   // higher us = steer right = the weaker side
+        }
         float want = SERVO_TRUE_CENTRE + servoTrim + off;
         mv.servoCmd += clampf(want - mv.servoCmd, -SERVO_RATE_US, SERVO_RATE_US);
-        writeServo(mv.servoCmd);
+
+        if (STEER_PLAY_US > 0.0f) {
+            // Backlash compensation. servoCmd is where we want the WHEELS.
+            // 1500 + trim was found approaching from below, so in wheel terms
+            // "straight" is half the play lower; shift the wheel target to match.
+            float wheelWant = mv.servoCmd - 0.5f * STEER_PLAY_US;
+            float half = 0.5f * STEER_PLAY_US;
+            float servoOut;
+            if (wheelWant > mv.wheelEst) {             // pushing right: servo leads by half the play
+                mv.wheelEst = wheelWant;
+                servoOut = wheelWant + half;
+            } else if (wheelWant < mv.wheelEst) {      // pushing left: servo leads the other way
+                mv.wheelEst = wheelWant;
+                servoOut = wheelWant - half;
+            } else {
+                servoOut = __HAL_TIM_GET_COMPARE(&htim12, TIM_CHANNEL_2);
+            }
+            writeServo(servoOut);
+        } else {
+            writeServo(mv.servoCmd);
+        }
 
         // Both wheels at the same speed; each has its own controller.
         // Cutting power only lets the car coast, which sheds speed too slowly
@@ -2199,7 +2381,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
         mv.stillLoops = (cntL == 0 && cntR == 0) ? (uint8_t)(mv.stillLoops + 1) : 0;
         if (mv.stillLoops >= 5 || el > 700) {
             mv.resDist = dist;
-            mv.resHead = (float)(total_angle - mv.heading0);
+            mv.resHead = headingDeg - (float)mv.heading0;   // PHASE 4: final error vs target
             mv.active = 0;
         }
         break;
@@ -2210,7 +2392,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
  * robot has stopped. Result text is left in mv.result. */
 static void runStraight(float distance_cm)
 {
-    if (mv.active || st.active || mt.active) {
+    if (mv.active || tn.active || st.active || mt.active) {
         snprintf(mv.result, sizeof(mv.result), "BUSY");
         return;
     }
@@ -2219,9 +2401,16 @@ static void runStraight(float distance_cm)
         return;
     }
 
-    // Short servo settle if it is already near centre, longer after a turn
+    if (!headingSet) {
+        zeroHeading();                                 // PHASE 4: no ZH received - this is "north"
+    }
+    emergency_stop_requested = 0;                      // a '!' from before this move doesn't count
+
+    // Short servo settle if it is already near centre (including the
+    // just-below-centre position a turn leaves it at), longer otherwise
     int curServo = (int)__HAL_TIM_GET_COMPARE(&htim12, TIM_CHANNEL_2);
-    int far = abs(curServo - SERVO_TRUE_CENTRE) > 20;
+    int ctr = (int)(SERVO_TRUE_CENTRE + servoTrim);
+    int far = (curServo < ctr - SERVO_APPROACH_US - 5) || (curServo > ctr + 20);
 
     mv.dir       = (distance_cm > 0.0f) ? 1 : -1;
     mv.target    = fabsf(distance_cm);
@@ -2232,6 +2421,7 @@ static void runStraight(float distance_cm)
     mv.timedOut  = 0;
     mv.aborted   = 0;
     mv.vBrake    = 0.0f;
+    mv.eBrake    = 0.0f;
     mv.phase     = MV_SETTLE;
     mv.phaseTick = HAL_GetTick();
     testAbort    = 0;
@@ -2244,9 +2434,203 @@ static void runStraight(float distance_cm)
         osDelay(10);
     }
 
-    snprintf(mv.result, sizeof(mv.result), "d=%.1f h=%.1f vb=%.0f%s",
-             mv.resDist, mv.resHead, mv.vBrake,
+    snprintf(mv.result, sizeof(mv.result), "d=%.1f e=%+.1f eb=%+.1f y=%+.1f m=%+.1f s=%+d vb=%.0f t=%+.0f%s",
+             mv.resDist, mv.resHead, mv.eBrake, mv.lateral, mv.eEarly,
+             (int)mv.startLoopR - (int)mv.startLoopL,   // + = left wheel started first
+             mv.vBrake, servoTrim,
              mv.aborted ? " ABORT" : (mv.timedOut ? " TO" : ""));
+}
+
+/* ============================================================
+ * PHASE 3b: TURNS
+ * ============================================================ */
+
+/* One 10 ms step of a turn. Called ONLY from the motor task. */
+static void turnStep(int16_t cntL, int16_t cntR)
+{
+    uint32_t now    = HAL_GetTick();
+    uint32_t el     = now - tn.phaseTick;
+    float    turned = (headingDeg - (float)tn.heading0) * (float)tn.hsign;   // rotation this turn (deg)
+
+    if (tn.phase != TN_BRAKE && (testAbort || emergency_stop_requested)) {
+        tn.aborted = 1;
+        tn.phase = TN_BRAKE;
+        tn.phaseTick = now;
+        el = 0;
+    }
+
+    switch (tn.phase) {
+
+    case TN_SETTLE:                                    // wheels to full lock, motors off
+        setMotorPwm(0, 0, 0, 0);
+        writeServo(tn.lockUs);
+        if (el >= tn.settleMs) {
+            tn.heading0 = headingDeg;
+            tn.v = TURN_V_MIN;
+            tn.wl.integ = tn.wr.integ = 0.0f;
+            tn.wl.filt  = tn.wr.filt  = 0.0f;
+            tn.wl.still = tn.wr.still = KICK_AFTER_LOOPS;   // start burst from the first loop
+            tn.wFilt = 0.0f;
+            tn.phase = TN_DRIVE;
+            tn.phaseTick = now;
+        }
+        break;
+
+    case TN_DRIVE: {
+        // PHASE 4: measured to the absolute target, so any error left over
+        // from earlier moves is absorbed here instead of carried forward.
+        float remaining = (tn.targetAbs - headingDeg) * (float)tn.hsign;
+        // Yaw rate averaged over a few readings, so a one-instant jolt (e.g.
+        // the front-left wheel skidding and catching) can't fake a high rate.
+        tn.wFilt = (1.0f - TURN_W_ALPHA) * tn.wFilt + TURN_W_ALPHA * fabsf(dash_gyroRate);
+        float wNow      = tn.wFilt;
+
+        // Same idea as straights: the robot keeps turning for ~TURN_STOP_T s
+        // after the decision, so brake earlier the faster it is turning.
+        // Capped at the final approach zone (2 cm of arc).
+        float approachDeg = TURN_APPROACH_CM / tn.radius / DEG2RAD;
+        float stopDeg     = fminf(TURN_STOP_T * wNow, approachDeg);
+        if (remaining <= stopDeg || now > tn.deadline) {
+            tn.timedOut = (remaining > stopDeg);
+            tn.wBrake = wNow;
+            tn.vBrake = 0.5f * (tn.wl.filt + tn.wr.filt) * 100.0f / TICKS_PER_CM;
+            tn.phase = TN_BRAKE;
+            tn.phaseTick = now;
+            setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
+            break;
+        }
+
+        // Speed profile along the arc, exactly like a straight
+        float remCm  = remaining * DEG2RAD * tn.radius;
+        float slowTo = sqrtf(2.0f * STRAIGHT_DECEL *
+                       fmaxf(remCm - TURN_APPROACH_CM, 0.0f)) + TURN_V_MIN;
+        float upTo   = fminf(tn.v + STRAIGHT_ACCEL * 0.01f, TURN_V_MAX);
+        int slowing  = (slowTo < upTo);
+        tn.v = fminf(upTo, slowTo);
+
+        // Outer wheel faster, inner slower, in the measured ratio, so they
+        // roll with the steering instead of fighting it. tn.v is the average.
+        float vOut = 2.0f * tn.v / (1.0f + tn.io);
+        float vIn  = tn.io * vOut;
+        float vL   = tn.left ? vIn  : vOut;
+        float vR   = tn.left ? vOut : vIn;
+
+        float tgtTicks  = tn.v * TICKS_PER_CM / 100.0f;
+        int   brakeBoth = slowing &&
+                          (0.5f * (tn.wl.filt + tn.wr.filt) > tgtTicks + TURN_ASSIST_TICKS);
+
+        uint16_t pL = wheelControl(&tn.wl, vL, cntL, (tn.dir > 0) ? GAIN_L_FWD : GAIN_L_REV, brakeBoth);
+        uint16_t pR = wheelControl(&tn.wr, vR, cntR, (tn.dir > 0) ? GAIN_R_FWD : GAIN_R_REV, brakeBoth);
+        driveWheel(1, tn.dir, pL, brakeBoth);
+        driveWheel(0, tn.dir, pR, brakeBoth);
+        writeServo(tn.lockUs);
+        break;
+    }
+
+    case TN_BRAKE:
+    default:
+        if (el < 200) {                                // active brake
+            setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
+            tn.stillLoops = 0;
+            break;
+        }
+        setMotorPwm(0, 0, 0, 0);
+        tn.stillLoops = (cntL == 0 && cntR == 0) ? (uint8_t)(tn.stillLoops + 1) : 0;
+        if (tn.stillLoops >= 5 || el > 700) {
+            tn.resAngle = turned;
+            tn.resErr   = headingDeg - tn.targetAbs;
+            // Start bringing the wheels back towards straight (from below, like
+            // a straight's settle does) so the next straight can start sooner.
+            writeServo(SERVO_TRUE_CENTRE + servoTrim - SERVO_APPROACH_US);
+            tn.active = 0;
+        }
+        break;
+    }
+}
+
+/* Turns at full lock until the heading has changed by angleDeg, then stops.
+ *   left = 1 for the left lock, 0 for the right lock
+ *   dir  = +1 forward, -1 reverse
+ * LF: heading +,  LB: heading - (nose swings clockwise),
+ * RF: heading -,  RB: heading + (nose swings anticlockwise).
+ * Blocks until the robot has stopped. Result text is left in tn.result. */
+static void runTurn(int left, int dir, float angleDeg)
+{
+    if (tn.active || mv.active || st.active || mt.active) {
+        snprintf(tn.result, sizeof(tn.result), "BUSY");
+        return;
+    }
+    if (angleDeg < 0.0f) {                             // old convention: negative = reverse
+        angleDeg = -angleDeg;
+        dir = -dir;
+    }
+    if (angleDeg < 0.5f) {
+        snprintf(tn.result, sizeof(tn.result), "a=0.0 w=0");
+        return;
+    }
+
+    if (!headingSet) {
+        zeroHeading();                                 // PHASE 4: no ZH received - this is "north"
+    }
+    emergency_stop_requested = 0;                      // a '!' from before this move doesn't count
+
+    int cur = (int)__HAL_TIM_GET_COMPARE(&htim12, TIM_CHANNEL_2);
+
+    tn.left      = (int8_t)(left ? 1 : 0);
+    tn.dir       = (int8_t)((dir > 0) ? 1 : -1);
+    tn.hsign     = (int8_t)((left ? 1 : -1) * tn.dir);
+    tn.target    = angleDeg;
+    tn.targetAbs = headingTarget + (float)tn.hsign * angleDeg;   // PHASE 4
+    headingTarget = tn.targetAbs;                      // the plan's heading after this turn
+    tn.radius    = left ? TURN_RADIUS_L : TURN_RADIUS_R;
+    tn.io        = left ? TURN_IO_L : TURN_IO_R;
+    tn.lockUs    = left ? SERVO_LEFT_LOCK : SERVO_RIGHT_LOCK;
+    tn.settleMs  = (abs(cur - (int)tn.lockUs) > 20) ? TURN_SETTLE_MS : 60;
+    tn.deadline  = HAL_GetTick() + tn.settleMs + 2000
+                   + (uint32_t)(angleDeg * DEG2RAD * tn.radius * 1000.0f / TURN_V_MIN);
+    tn.timedOut  = 0;
+    tn.aborted   = 0;
+    tn.wBrake    = 0.0f;
+    tn.vBrake    = 0.0f;
+    tn.phase     = TN_SETTLE;
+    tn.phaseTick = HAL_GetTick();
+    testAbort    = 0;
+    tn.active    = 1;                                  // motor task takes over
+
+    while (tn.active) {
+        if (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+            testAbort = 1;                             // user button: stop now
+        }
+        osDelay(10);
+    }
+
+    snprintf(tn.result, sizeof(tn.result), "a=%.1f e=%+.1f w=%.0f v=%.0f%s",
+             tn.resAngle, tn.resErr, tn.wBrake, tn.vBrake,
+             tn.aborted ? " ABORT" : (tn.timedOut ? " TO" : ""));
+}
+
+/* Field tool turn list: the knob picks one of these. */
+static const char *const TURN_TESTS[] = {
+    "LF090", "RF090", "LB090", "RB090",
+    "LF045", "RF045", "LB045", "RB045",
+    "LF180", "RF180", "LF010", "RF010",
+    "LF003", "RF003"
+};
+#define TURN_TEST_COUNT  ((int)(sizeof(TURN_TESTS) / sizeof(TURN_TESTS[0])))
+
+static int knobTurnIndex(uint16_t us)
+{
+    int i = (int)(((float)us - (float)KNOB_US_MIN) * TURN_TEST_COUNT
+                  / (float)(KNOB_US_MAX - KNOB_US_MIN + 1));
+    if (i < 0) i = 0;
+    if (i >= TURN_TEST_COUNT) i = TURN_TEST_COUNT - 1;
+    return i;
+}
+
+/* Runs a turn given as text, e.g. "LB045". */
+static void runTurnText(const char *cmd)
+{
+    runTurn(cmd[0] == 'L', (cmd[1] == 'B') ? -1 : 1, (float)atoi(cmd + 2));
 }
 
 /* Field tool: knob position -> distance, -100..+100 cm in 10 cm steps. */
@@ -2331,9 +2715,10 @@ void StartDefaultTask(void *argument)
   /* PHASE 1 FIELD TOOL - no cable needed while driving.
    *   Knob   : sets the servo; the wheels follow it live while idle
    *   Tap    : run the current test at the knob value (1.5 s delay to let go)
-   *   Hold   : cycle modes SD (straight drive) -> TA (arc) -> TC (centre)
+   *   Hold   : cycle modes SD (straight drive) -> TN (turn) -> TA (arc) -> TC (centre)
    *            -> MF (motor floor) -> MS (motor stand, knob fully CW) -> SD
    *   SD     : knob picks a distance, -100..+100 cm in 10 cm steps
+   *   TN     : knob picks a turn from TURN_TESTS (LF090, RB045, ...)
    *   Tap during any test: stop it
    *   OLED   : CMD line shows "TA 1540" etc, then the result after a run
    *   "TD"   : over serial afterwards, prints every result from this power-up
@@ -2348,9 +2733,9 @@ void StartDefaultTask(void *argument)
       uint16_t us = dash_knobUs;
       int motorMode = (fieldMode == 'F' || fieldMode == 'S');
 
-      if (!st.active && !mt.active && !mv.active && !is_moving) {
+      if (!st.active && !mt.active && !mv.active && !tn.active && !is_moving) {
           // Live steering in the servo modes; wheels straight in the motor modes.
-          // In SD mode the servo is left alone: the drive code owns it.
+          // In SD and TN modes the servo is left alone: the drive code owns it.
           if (fieldMode == 'A' || fieldMode == 'C') {
               __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);
           } else if (motorMode) {
@@ -2363,6 +2748,8 @@ void StartDefaultTask(void *argument)
       }
       if (!showResult && fieldMode == 'D') {
           snprintf(dash_lastCmd, sizeof(dash_lastCmd), "SD %+d", knobDistanceCm(us));
+      } else if (!showResult && fieldMode == 'U') {
+          snprintf(dash_lastCmd, sizeof(dash_lastCmd), "TN %s", TURN_TESTS[knobTurnIndex(us)]);
       } else if (!showResult && fieldMode == 'F') {
           strcpy(dash_lastCmd, "MF floor");
       } else if (!showResult && fieldMode == 'S') {
@@ -2383,7 +2770,8 @@ void StartDefaultTask(void *argument)
           uint32_t held = HAL_GetTick() - t0;
 
           if (held >= BTN_LONG_MS) {                  // hold: next mode
-              fieldMode = (fieldMode == 'D') ? 'A'
+              fieldMode = (fieldMode == 'D') ? 'U'
+                        : (fieldMode == 'U') ? 'A'
                         : (fieldMode == 'A') ? 'C'
                         : (fieldMode == 'C') ? 'F'
                         : (fieldMode == 'F') ? 'S' : 'D';
@@ -2392,12 +2780,29 @@ void StartDefaultTask(void *argument)
               if (fieldMode == 'S' && us > MT_STAND_ARM_US) {
                   strcpy(dash_lastCmd, "MS knob CW!");  // safety interlock
                   osDelay(1000);
+              } else if (fieldMode == 'U') {
+                  const char *t = TURN_TESTS[knobTurnIndex(us)];
+                  char line[64];
+                  snprintf(dash_lastCmd, sizeof(dash_lastCmd), "TN %s GO", t);
+                  osDelay(1500);
+                  zeroHeading();                       // PHASE 4: robot was repositioned by hand
+                  runTurnText(t);
+                  snprintf(line, sizeof(line), "%s %s", t, tn.result);
+                  logResult(line);
+                  snprintf(dash_lastCmd, sizeof(dash_lastCmd), "%.14s", tn.result);
+                  resultUs = us;
+                  showResult = 1;
+                  while (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+                      osDelay(20);
+                  }
+                  osDelay(200);
               } else if (fieldMode == 'D') {
                   int d = knobDistanceCm(us);
                   snprintf(dash_lastCmd, sizeof(dash_lastCmd), "SD %+d GO", d);
                   osDelay(1500);
                   if (d != 0) {
-                      char line[48];
+                      char line[80];
+                      zeroHeading();                   // PHASE 4: robot was repositioned by hand
                       runStraight((float)d);
                       snprintf(line, sizeof(line), "SD%+d %s", d, mv.result);
                       logResult(line);
@@ -2559,6 +2964,7 @@ void StartCommunicateTask(void *argument)
 				int value = 0;
 				int items_parsed = 0;
 				int usedNewStraight = 0;   // PHASE 3a: ACK carries the move result
+				int unknownCmd = 0;        // PHASE 4: reply "A ERR" instead of a plain "A"
 
 				// Check if the command is a 2-letter code (e.g., "SL50") or 1-letter ("F50")
 				if ((cmdBuffer[1] >= 'A' && cmdBuffer[1] <= 'Z') ||
@@ -2571,17 +2977,15 @@ void StartCommunicateTask(void *argument)
 				// 2. EXECUTE THE MOVEMENT FUNCTION
 				if (items_parsed > 0) {
 
-				    // Reset Gyro baseline before launching any new maneuver
-				    total_angle = 0.0;
-				    target_angle = 0.0;
+				    // PHASE 4: the gyro is NOT reset per command any more - the run
+				    // keeps one absolute heading, set by ZH (see zeroHeading()).
 
 					switch (command_char1) {
 
-						case 'S': 								// Straight or Slide
-							if (command_char2 == 'L') {			// "SL": Slide Left
-								moveCarSlideLeft(value);
-							} else if (command_char2 == 'R') {	// "SR": Slide Right
-								moveCarSlideRight(value);
+						case 'S': 								// Straight
+							if (command_char2 == 'L' || command_char2 == 'R') {
+								// PHASE 4: old slides disconnected (unused; they reset the gyro)
+								unknownCmd = 1;
 							} else if (command_char2 == 'B') {
 								// "SB<cm>": backwards straight (PHASE 3a engine)
 								runStraight(-(float)value);
@@ -2603,24 +3007,25 @@ void StartCommunicateTask(void *argument)
 							usedNewStraight = 1;
 							break;
 
-						case 'R':								// Right Turn
-							moveCarRight(value);
+						case 'R':								// Right Turn: RF<deg> / RB<deg> / R<deg>
+							runTurn(0, (command_char2 == 'B') ? -1 : 1, (float)value);   // PHASE 3b
 							break;
 
-						case 'L':								// Left Turn
-							moveCarLeft(value);
+						case 'L':								// Left Turn: LF<deg> / LB<deg> / L<deg>
+							runTurn(1, (command_char2 == 'B') ? -1 : 1, (float)value);   // PHASE 3b
 							break;
 
-						case 'O': // Using 'O' for Obstacle
-							if (command_char2 == 'A') { // "OA": Obstacle Approach
-								// The guide suggests 18.0cm, so we'll use that.
-								approachObstacle(13.0f);
-							}
-							else if (command_char2 == 'P') { // "OP": Obstacle Petal
-								// The guide shows a clockwise petal (1)
-								executeFlowerPetal(0);
+						case 'Z':   // PHASE 4: "ZH" = zero heading: this direction is "north"
+							if (command_char2 == 'H') {
+								zeroHeading();
+							} else {
+								unknownCmd = 1;
 							}
 							break;
+
+						/* PHASE 4: 'O' (old obstacle approach / petal) disconnected - it
+						 * reset the gyro, which breaks absolute heading. Task 2 will get
+						 * its own version built on the new motion code. */
 
 						case 'D': // "DONE" confirmation from RPi
 							strcpy(oled_status_msg, "TASK A.5 DONE!");
@@ -2637,17 +3042,24 @@ void StartCommunicateTask(void *argument)
 							runMotorTest(command_char2);
 							break;
 
-						/* Can add more cases here */
+						default:
+							unknownCmd = 1;                   // PHASE 4
+							break;
 					}
+				} else {
+					unknownCmd = 1;                           // PHASE 4: couldn't parse it
 				}
 
 				// 3. SEND ACKNOWLEDGEMENT TO RPI
-				char ackMsg[64];
-				if (command_char1 == 'L' || command_char1 == 'R') {
-					// Turn ACKs include specific angle metrics for remote calibration scripts
-					snprintf(ackMsg, sizeof(ackMsg), "A G:%.1f T:%.1f %s\n",
-							(float)total_angle, (float)target_angle,
-							move_finish_reason == 2 ? "TIMEOUT" : "TARGET");
+				char ackMsg[96];
+				if (unknownCmd) {
+					// PHASE 4: still starts with "A" so the RPi carries on, but says why
+					snprintf(ackMsg, sizeof(ackMsg), "A ERR %s\n", cmdBuffer);
+				} else if (command_char1 == 'Z') {
+					snprintf(ackMsg, sizeof(ackMsg), "A ZH\n");
+				} else if (command_char1 == 'L' || command_char1 == 'R') {
+					// PHASE 3b: heading change achieved and yaw rate at braking
+					snprintf(ackMsg, sizeof(ackMsg), "A %s\n", tn.result);
 				} else if (usedNewStraight) {
 					// PHASE 3a: distance travelled and heading change
 					snprintf(ackMsg, sizeof(ackMsg), "A %s\n", mv.result);
@@ -2748,7 +3160,7 @@ void StartMotorTask(void *argument)
 	// The gyro task uses this to keep its zero-rate offset up to date.
 	{
 		static uint16_t stillCount = 0;
-		if (cnt_L == 0 && cnt_R == 0 && !mv.active && !st.active && !mt.active && !is_moving) {
+		if (cnt_L == 0 && cnt_R == 0 && !mv.active && !tn.active && !st.active && !mt.active && !is_moving) {
 			if (stillCount < 1000) stillCount++;
 		} else {
 			stillCount = 0;
@@ -2759,6 +3171,11 @@ void StartMotorTask(void *argument)
 	// ---------------------------------------------------------
 	// PHASE 1 TEST HOOK: a servo test owns the motors while active
 	// ---------------------------------------------------------
+	if (tn.active) {                   // PHASE 3b turn
+		turnStep(cnt_L, cnt_R);
+		osDelay(10);
+		continue;
+	}
 	if (mv.active) {                   // PHASE 3a straight move
 		straightStep(cnt_L, cnt_R);
 		osDelay(10);
@@ -2985,7 +3402,7 @@ void StartOledTask(void *argument)
 		OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
 
 		// Line 2: Gyroscope Angle & Ultrasonic Distance
-		sprintf(textBuffer, "G: %.1f D: %.1fcm", (float)dash_gyroZ, dash_ultraDist);
+		sprintf(textBuffer, "G: %.1f D: %.1fcm", headingDeg - headingZero, dash_ultraDist);   // PHASE 4
 		OLED_ShowString(0, 12, (uint8_t*) textBuffer);
 
 		// Line 3: Accumulated Left Encoder
@@ -3086,6 +3503,7 @@ void StartGyroTask(void *argument)
 
 	// 5. Publish to global dashboard variable
 	dash_gyroZ = total_angle;
+	headingDeg = (float)total_angle;   // PHASE 4: safe copy for the other tasks
   }
   /* USER CODE END StartGyroTask */
 }
