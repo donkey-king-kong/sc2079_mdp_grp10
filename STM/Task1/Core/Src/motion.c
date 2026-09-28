@@ -1,9 +1,6 @@
 /*
  * motion.c
  *
- *  Created on: Sep 27, 2026
- *      Author: Ryan Tan
- *
  * Straights, turns and absolute heading. See motion.h for how the pieces fit.
  * All tunable values live in robot_config.h.
  *
@@ -527,9 +524,9 @@ static void turnStep(int16_t cntL, int16_t cntR)
 
         // Speed profile along the arc, exactly like a straight
         float remCm  = remaining * DEG2RAD * tn.radius;
-        float slowTo = sqrtf(2.0f * STRAIGHT_DECEL *
+        float slowTo = sqrtf(2.0f * TURN_DECEL *
                        fmaxf(remCm - TURN_APPROACH_CM, 0.0f)) + TURN_V_MIN;
-        float upTo   = fminf(tn.v + STRAIGHT_ACCEL * 0.01f, TURN_V_MAX);
+        float upTo   = fminf(tn.v + TURN_ACCEL * 0.01f, TURN_V_MAX);
         int slowing  = (slowTo < upTo);
         tn.v = fminf(upTo, slowTo);
 
