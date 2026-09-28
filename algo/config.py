@@ -68,13 +68,21 @@ START_THETA = math.pi / 2.0
 # need re-measuring against the real robot.
 # TURNING_RADIUS = 25.0. //old hardcoded
 
-# New dynamic turning radiuses (cm)
-# Physical kinematic limits
-MIN_TURNING_RADIUS = 18.0   # Mechanical steering limit (tightest possible arc)
-MAX_TURNING_RADIUS = 35.0   # Upper bound for wide, high-speed turns
+# Physical turning radii (cm) based on STM calibration testing
+TURNING_RADIUS_LEFT = 20.0   # Physical turning radius for left turns
+TURNING_RADIUS_RIGHT = 36.0  # Physical turning radius for right turns
 
-# Traction limits (cm/s^2)
-MAX_LATERAL_ACCEL = 294.0   # ~0.3g max lateral grip before skid
+# Conservative turning radius used for Dubins & Hybrid A* path planning
+TURNING_RADIUS = max(TURNING_RADIUS_LEFT, TURNING_RADIUS_RIGHT)  # 36.0 cm
+
+# --------------------------------------------------------------------------
+# Obstacle Clearance & Safety Padding (STM Drift Calibration)
+# --------------------------------------------------------------------------
+# Base clearance beyond robot footprint (cm)
+ROBOT_CLEARANCE = 5.0
+
+# Extra clearance padding for right turns due to larger arc drift (cm)
+RIGHT_TURN_EXTRA_CLEARANCE = 1.0  # Total 6.0 cm clearance on right turns
 
 # --------------------------------------------------------------------------
 # Obstacle avoidance (briefing slide 36)
@@ -223,14 +231,21 @@ CMD_FINISH = "FIN"
 
 COMMAND_NUM_WIDTH = 3       # zero-padded field width, e.g. 090
 
+
 # If True, turn commands are rounded to the nearest 90 degrees, because some
 # STM firmwares only implement quarter turns. Leave False while the firmware
 # accepts arbitrary angles -- snapping throws away path accuracy.
 SNAP_TO_90_TURNS = False
 
-# Segments shorter than this are dropped rather than emitted as "SF000".
-MIN_COMMAND_DISTANCE = 1.0      # cm
-MIN_COMMAND_ANGLE = math.radians(1.0)
+# Skip straights under 0.5 cm
+MIN_COMMAND_DISTANCE = 0.5
+
+# Skip turns under 0.5 degrees (~0.0087 rad)
+MIN_COMMAND_ANGLE = math.radians(0.5)
+
+# # Segments shorter than this are dropped rather than emitted as "SF000".
+# MIN_COMMAND_DISTANCE = 1.0      # cm
+# MIN_COMMAND_ANGLE = math.radians(1.0)
 
 # Two arcs around the same circle merge into one command, which can legitimately
 # come out as a 300-degree sweep. Plenty of STM firmwares only accept a quarter

@@ -97,6 +97,14 @@ class _DistanceField:
                     if not arena.is_point_free((nx + 0.5) * resolution,
                                                (ny + 0.5) * resolution):
                         continue
+
+                    # Prevent passing diagonally through touching obstacles
+                    if dx != 0 and dy != 0:
+                        ortho1_free = arena.is_point_free((cx + dx + 0.5) * resolution, (cy + 0.5) * resolution)
+                        ortho2_free = arena.is_point_free((cx + 0.5) * resolution, (cy + dy + 0.5) * resolution)
+                        if not (ortho1_free and ortho2_free):
+                            continue
+
                     step = diag if dx and dy else resolution
                     if dist + step < self.cost[neighbour]:
                         self.cost[neighbour] = dist + step
@@ -202,8 +210,16 @@ def plan(arena: Arena, start: Pose, goal: Pose,
         if _at_goal(node.pose, goal):
             return _reconstruct(node)
 
-        for gear, steering in PRIMITIVES:
-            segment = Segment(gear, steering, cfg.HA_STEP, radius, node.pose)
+            for gear, steering in PRIMITIVES:
+            # Apply specific turning radius based on steering direction
+                if steering == LEFT:
+                    r_step = getattr(cfg, "TURNING_RADIUS_LEFT", radius)
+                elif steering == RIGHT:
+                    r_step = getattr(cfg, "TURNING_RADIUS_RIGHT", radius)
+                else:
+                    r_step = radius
+
+            segment = Segment(gear, steering, cfg.HA_STEP, r_step, node.pose)
             # Check the whole swept step, not just where it lands, or the robot
             # will happily clip a corner mid-primitive.
             if not all(arena.is_pose_free(p) for p in segment.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
