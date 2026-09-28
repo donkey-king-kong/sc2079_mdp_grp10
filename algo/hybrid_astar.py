@@ -27,10 +27,12 @@ from motion import (
     RIGHT,
     STRAIGHT,
     Pose,
+    RadiusSpec,
     Segment,
     Trajectory,
     merge_segments,
     normalise_angle,
+    turning_radii,
 )
 
 # The six ways the robot can move for one primitive step.
@@ -158,9 +160,12 @@ def _reconstruct(node: _Node, tail: Optional[Trajectory] = None) -> Trajectory:
 
 
 def plan(arena: Arena, start: Pose, goal: Pose,
-         radius: float = cfg.TURNING_RADIUS,
+         radius: RadiusSpec = None,
          max_expansions: int = cfg.HA_MAX_EXPANSIONS) -> Optional[Trajectory]:
     """Shortest drivable path from `start` to `goal` avoiding obstacles.
+
+    `radius` defaults to the robot's configured left/right radii; see
+    `motion.turning_radii` for the other forms it accepts.
 
     Returns None if no path is found within `max_expansions` -- a bound that
     exists so an unreachable capture pose costs a fraction of a second instead
@@ -168,6 +173,7 @@ def plan(arena: Arena, start: Pose, goal: Pose,
     """
     if not arena.is_pose_free(start) or not arena.is_pose_free(goal):
         return None
+    radii = turning_radii(radius)
 
     heuristic = _distance_field(arena, goal)
     # The Dijkstra sweep only reaches cells connected to the goal. If the start
@@ -194,8 +200,8 @@ def plan(arena: Arena, start: Pose, goal: Pose,
         # it works the robot lands on the goal pose *exactly* rather than
         # within the lattice tolerance, which matters because the next leg
         # starts from wherever this one ended.
-        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * radius:
-            shot = dubins.plan(node.pose, goal, radius, arena.is_pose_free)
+        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * radii.widest:
+            shot = dubins.plan(node.pose, goal, radii, arena.is_pose_free)
             if shot is not None:
                 return _reconstruct(node, shot[1])
 
@@ -203,7 +209,9 @@ def plan(arena: Arena, start: Pose, goal: Pose,
             return _reconstruct(node)
 
         for gear, steering in PRIMITIVES:
-            segment = Segment(gear, steering, cfg.HA_STEP, radius, node.pose)
+            # Each side turns at its own radius, so a left step swings the nose
+            # further than a right step of the same arc length.
+            segment = Segment(gear, steering, cfg.HA_STEP, radii.of(steering), node.pose)
             # Check the whole swept step, not just where it lands, or the robot
             # will happily clip a corner mid-primitive.
             if not all(arena.is_pose_free(p) for p in segment.iter_sample(cfg.COLLISION_SAMPLE_STEP)):

@@ -91,10 +91,13 @@ class RoundTrip(unittest.TestCase):
             commands.trajectory_to_commands(trajectory), start)
 
     def test_a_handmade_path_survives_the_round_trip(self):
+        # Built at the robot's real radii: a command carries only an angle, so
+        # a path drawn at any other radius is not one the STM would reproduce.
+        right, left = cfg.TURNING_RADIUS_RIGHT, cfg.TURNING_RADIUS_LEFT
         start = Pose(30.0, 30.0, math.pi / 2)
-        first = Segment(FORWARD, STRAIGHT, 60.0, 25.0, start)
-        second = Segment(FORWARD, RIGHT, math.pi / 2 * 25.0, 25.0, first.end)
-        third = Segment(BACKWARD, LEFT, math.pi / 4 * 25.0, 25.0, second.end)
+        first = Segment(FORWARD, STRAIGHT, 60.0, 0.0, start)
+        second = Segment(FORWARD, RIGHT, math.pi / 2 * right, right, first.end)
+        third = Segment(BACKWARD, LEFT, math.pi / 4 * left, left, second.end)
         original = Trajectory([first, second, third])
 
         replayed = self.replay(original, start)
@@ -102,6 +105,24 @@ class RoundTrip(unittest.TestCase):
         self.assertAlmostEqual(got.x, want.x, delta=0.5)
         self.assertAlmostEqual(got.y, want.y, delta=0.5)
         self.assertAlmostEqual(got.theta, want.theta, delta=0.02)
+
+    def test_each_turn_is_replayed_on_its_own_sides_radius(self):
+        # The robot turns 20cm left and 36cm right about its centre. A quarter
+        # turn from the origin facing East must therefore land one left radius
+        # up-and-across for LF090, and one right radius down-and-across for
+        # RF090. Mixing the two up would put every turn in the wrong place.
+        origin = Pose(0.0, 0.0, 0.0)
+        left, right = cfg.TURNING_RADIUS_LEFT, cfg.TURNING_RADIUS_RIGHT
+        cases = [("LF090", left, left, math.pi / 2),
+                 ("RF090", right, -right, -math.pi / 2),
+                 ("LB090", -left, left, -math.pi / 2),
+                 ("RB090", -right, -right, math.pi / 2)]
+        for command, x, y, theta in cases:
+            end = commands.commands_to_trajectory([command], origin).end_pose()
+            with self.subTest(command=command):
+                self.assertAlmostEqual(end.x, x, places=6)
+                self.assertAlmostEqual(end.y, y, places=6)
+                self.assertAlmostEqual(end.theta, theta, places=6)
 
     def test_a_planned_route_survives_the_round_trip(self):
         # The real check: rounding to whole centimetres and whole degrees must

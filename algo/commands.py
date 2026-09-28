@@ -36,9 +36,11 @@ from motion import (
     RIGHT,
     STRAIGHT,
     Pose,
+    RadiusSpec,
     Segment,
     Trajectory,
     merge_segments,
+    turning_radii,
 )
 
 _TURN_PREFIXES = {
@@ -173,14 +175,20 @@ def parse(command: str) -> Tuple[str, Optional[float]]:
 
 
 def commands_to_trajectory(commands: Iterable[str], start: Pose,
-                           radius: float = cfg.TURNING_RADIUS) -> Trajectory:
+                           radius: RadiusSpec = None) -> Trajectory:
     """Replay a command list into the trajectory it describes.
 
     The inverse of `trajectory_to_commands`, so a test can drive a planned path
     out to strings and back and check the robot ends up in the same place. That
     round trip is what catches a bad field width or a swapped L/R before it
     becomes a crash on the arena.
+
+    A turn command carries only an angle; the STM drives it at whatever radius
+    that steering side physically has. So `LF090` is replayed round the left
+    circle and `RF090` round the (wider) right one -- the robot's configured
+    radii unless `radius` says otherwise.
     """
+    radii = turning_radii(radius)
     segments: List[Segment] = []
     pose = start
     for command in commands:
@@ -190,12 +198,13 @@ def commands_to_trajectory(commands: Iterable[str], start: Pose,
 
         if kind in _STRAIGHT_PREFIXES.values():
             gear = FORWARD if kind == cfg.CMD_STRAIGHT_FORWARD else BACKWARD
-            segment = Segment(gear, STRAIGHT, value, radius, pose)
+            segment = Segment(gear, STRAIGHT, value, 0.0, pose)
         else:
             gear, steering = next(key for key, prefix in _TURN_PREFIXES.items()
                                   if prefix == kind)
             # Commands carry the swept angle; the segment wants the arc length.
-            segment = Segment(gear, steering, math.radians(value) * radius, radius, pose)
+            side = radii.of(steering)
+            segment = Segment(gear, steering, math.radians(value) * side, side, pose)
 
         segments.append(segment)
         pose = segment.end

@@ -62,7 +62,8 @@ time &mdash; forward, backward, and left/right arcs in both gears. They go
 through the same parser, the same kinematics and the same collision check as the
 planner, so a move that would clip a virtual obstacle or leave the arena is
 refused and says so. Note there is no on-the-spot turn: every turn is an arc at
-the 25cm turning radius, which is the honest behaviour of the real chassis.
+full lock -- 20cm radius to the left, 36cm to the right -- which is the honest
+behaviour of the real chassis.
 
 Tick **Virtual obstacles** to show the inflated no-go regions the planner
 actually reasons about, and **Capture poses** to show every pose it considered
@@ -125,6 +126,17 @@ the shortest collision-free one wins. It is microseconds, and provably optimal
 when nothing is in the way. Slide 43's worked `rsr` example is reproduced to two
 decimal places in `tests/test_dubins.py`.
 
+**Our robot does not turn symmetrically.** Measured about its centre, it turns
+on a 20cm radius to the left and a 36cm radius to the right, however far it
+turns. That is a fault in the chassis, so the planner models it rather than
+planning for a robot we do not have: every left arc (forward or reverse) is on
+the 20cm circle and every right arc on the 36cm one. The six Dubins shapes
+generalise directly &mdash; the inner tangent of `LSR`/`RSL` uses `r1 + r2` where
+slide 29 has `2r`, and the middle circle of `LRL`/`RLR` sits `r_outer + r_middle`
+from each outer centre where slide 30 has `2r` &mdash; and with equal radii they
+reduce exactly to the slides. Dubins' optimality proof assumes one radius, so on
+this robot the result is the best of the six rather than a proven optimum.
+
 **Hybrid A\*** (`hybrid_astar.py`) is the fallback for legs no Dubins path can
 serve. It searches continuous poses with motion primitives that include reverse,
 so it can three-point-turn into a tight spot, and de-duplicates states on a
@@ -136,7 +148,7 @@ Two details matter more than they look:
 
 - **Reversing out of a capture pose is mandatory, not an optimisation.** The
   robot finishes a photo 30cm from an obstacle face pointing straight at it, and
-  the turning radius is 25cm &mdash; so every forward-only path out drives into
+  the turning radius is 20cm left / 36cm right &mdash; so every forward-only path out drives into
   the block it just photographed. Slide 33 says the same thing. Each leg
   therefore tries backing straight out first, shortest reverse that works.
 - **Three segments is not always enough.** A Dubins path cannot express "along
@@ -208,7 +220,9 @@ Every tunable constant lives there with the slide it came from written next to
 it. It is the only file that should need touching when calibrating against the
 real robot. The ones most likely to be wrong:
 
-- `TURNING_RADIUS` (25cm from slide 4, and larger the faster the robot goes)
+- `TURNING_RADIUS_LEFT` / `TURNING_RADIUS_RIGHT` (20cm / 36cm, measured on our
+  chassis about its centre; slide 4 assumes ~25cm both ways, and larger the
+  faster the robot goes)
 - `CAPTURE_STANDOFF` (30cm, derived from slide 8)
 - `SPEED_STRAIGHT`, `SPEED_TURN`, `DIRECTION_CHANGE_TIME`, `STEERING_CHANGE_TIME`
   &mdash; **measure these with a stopwatch**; they are estimates, and they are
@@ -297,7 +311,8 @@ Read `tests/` before changing anything in `dubins.py`, `hybrid_astar.py` or
   rather than failing outright. Checklist B.2 scores the images actually
   recognised, so this is the right behaviour, but it is worth knowing about.
 
-  Measured over 60 random layouts (`random_layout`, seeds 1000&ndash;1059,
+  Measured over 60 random layouts, *with the old symmetric 25cm radius*
+  (`random_layout`, seeds 1000&ndash;1059,
   all three strategies each): planning takes **3.3s on average, 8.8s worst
   case**, and the exhaustive search reaches all five obstacles on **45 of 60**
   against the greedy walk's 37. Where both reach the same number, exhaustive is

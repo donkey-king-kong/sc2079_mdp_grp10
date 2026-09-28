@@ -142,8 +142,8 @@ def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
 
     The back-out is not an optimisation, it is a necessity. A capture pose sits
     30cm from an obstacle face pointing straight at it, and the turning radius
-    is 25cm, so the tightest forward arc the robot can drive still ends up
-    inside the block. Briefing slide 33 says as much: reverse first.
+    is 20cm left / 36cm right, so the tightest forward arc the robot can drive
+    still ends up inside the block. Briefing slide 33 says as much: reverse first.
 
     Pass `allow_backoff=False` when the robot is not parked in front of anything
     -- the start pose, or a transit pose. There is nothing to reverse away from,
@@ -155,13 +155,13 @@ def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
         if backoff <= 0.0:
             departure, prefix = source, []
         else:
-            reverse = Segment(BACKWARD, STRAIGHT, backoff, cfg.TURNING_RADIUS, source)
+            reverse = Segment(BACKWARD, STRAIGHT, backoff, 0.0, source)
             if not all(arena.is_pose_free(p)
                        for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
                 break            # blocked behind: reversing further cannot help
             departure, prefix = reverse.end, [reverse]
 
-        result = dubins.plan(departure, target, cfg.TURNING_RADIUS, arena.is_pose_free)
+        result = dubins.plan(departure, target, is_free=arena.is_pose_free)
         if result is None:
             continue
         word, trajectory = result
