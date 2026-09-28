@@ -2,6 +2,7 @@ package com.example.sc2079
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.content.ContentValues
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -10,10 +11,13 @@ import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.MediaStore
 import android.util.Log
 import android.view.Gravity
 import android.widget.ImageButton
@@ -41,6 +45,7 @@ import androidx.appcompat.app.AlertDialog
 import com.example.sc2079.ui.coordinates.AddCoordinateFragment
 import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment
 import com.example.sc2079.ui.coordinates.SharedViewModel
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
     private val base64Data = StringBuilder();
@@ -138,6 +143,67 @@ class MainActivity : AppCompatActivity() {
 
     fun setMessageListener(listener: MessageListener?) {
         this.messageListener = listener
+    }
+
+    private fun saveStitchedImageToGallery(base64Image: String): Uri {
+        val imageBytes = Base64.decode(base64Image, Base64.DEFAULT)
+        val (mimeType, extension) = detectImageType(imageBytes)
+        val fileName = "sc2079_stitched_${System.currentTimeMillis()}.$extension"
+
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+            put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                "${Environment.DIRECTORY_PICTURES}/SC2079"
+            )
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+
+        val resolver = contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: throw IOException("Unable to create Gallery image entry")
+
+        try {
+            resolver.openOutputStream(uri)?.use { outputStream ->
+                outputStream.write(imageBytes)
+            } ?: throw IOException("Unable to open Gallery image output stream")
+
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            return uri
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            throw e
+        }
+    }
+
+    private fun detectImageType(bytes: ByteArray): Pair<String, String> {
+        val isPng = bytes.size >= 8 &&
+            bytes[0] == 0x89.toByte() &&
+            bytes[1] == 0x50.toByte() &&
+            bytes[2] == 0x4E.toByte() &&
+            bytes[3] == 0x47.toByte()
+        val isWebp = bytes.size >= 12 &&
+            bytes[0] == 0x52.toByte() &&
+            bytes[1] == 0x49.toByte() &&
+            bytes[2] == 0x46.toByte() &&
+            bytes[3] == 0x46.toByte() &&
+            bytes[8] == 0x57.toByte() &&
+            bytes[9] == 0x45.toByte() &&
+            bytes[10] == 0x42.toByte() &&
+            bytes[11] == 0x50.toByte()
+
+        return when {
+            bytes.size >= 3 &&
+                bytes[0] == 0xFF.toByte() &&
+                bytes[1] == 0xD8.toByte() &&
+                bytes[2] == 0xFF.toByte() -> "image/jpeg" to "jpg"
+            isPng -> "image/png" to "png"
+            isWebp -> "image/webp" to "webp"
+            else -> "image/jpeg" to "jpg"
+        }
     }
 
     // This BroadcastReceiver will handle incoming data messages from the BluetoothService
@@ -238,10 +304,28 @@ class MainActivity : AppCompatActivity() {
                     "3" -> {
                         messageLog.add("Ending Stitch, displaying image \n")
                         messageLog.add("Robot: [Image Received - Tap to view]\n")
-                        val base64Data = base64Data.toString()
-                        Log.d("Image Message", "Final length: ${base64Data.length}")
+                        val stitchedImageBase64 = base64Data.toString()
+                        Log.d("Image Message", "Final length: ${stitchedImageBase64.length}")
+                        try {
+                            val savedUri = saveStitchedImageToGallery(stitchedImageBase64)
+                            messageLog.add("Saved stitched image to Gallery \n")
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Stitched image saved to Gallery",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            Log.d("Image Message", "Saved stitched image to $savedUri")
+                        } catch (e: Exception) {
+                            messageLog.add("Failed to save stitched image to Gallery \n")
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Failed to save stitched image",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            Log.e("Image Message", "Failed to save stitched image", e)
+                        }
                         //val imageBytes = Base64.decode(base64Data.toString(), Base64.DEFAULT)
-                        ImageDisplayFragment.newInstance(base64Data).show(supportFragmentManager, "ImageDisplayFragment")
+                        ImageDisplayFragment.newInstance(stitchedImageBase64).show(supportFragmentManager, "ImageDisplayFragment")
                         iterationHowMany = -1;
                     }
                     else -> {
