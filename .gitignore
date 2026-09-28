@@ -47,6 +47,7 @@ Release/
 # =========================
 *.log
 *.mp4
+rpi_controller/imaging/data/
 
 # =========================
 # IDE
