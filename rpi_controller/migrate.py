@@ -5,9 +5,9 @@ below, then run from this directory:
 
     python migrate.py
 
-The script copies everything in `COPIED_DIR` (including `.venv` and `best.pt`)
-into `TARGET_DIR`, then updates that copy with the PC source. It never changes
-`COPIED_DIR` or deletes remote files.
+The script copies `COPIED_DIR` except `.venv` into `TARGET_DIR`, then updates
+that copy with the PC source. It never changes `COPIED_DIR` or deletes remote
+files.
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ import subprocess
 RPI_HOST = "10.42.0.1"
 RPI_USER = "mdp"
 RPI_SSH_PORT = 22
-COPIED_DIR = "/home/rpi_controller"
-TARGET_DIR = "/home/rpi_controller_updated"
+COPIED_DIR = "/home/mdp/rpi_controller"
+TARGET_DIR = "/home/mdp/rpi_controller_updated"
 
 # Local source and rsync behaviour.
 LOCAL_RPI_CONTROLLER_DIR = Path(__file__).resolve().parent
@@ -61,10 +61,11 @@ def main() -> int:
     remote_copy_command = (
         f"test -d {shlex.quote(COPIED_DIR)} && "
         f"mkdir -p {shlex.quote(TARGET_DIR)} && "
-        f"cp -a {shlex.quote(COPIED_DIR)}/. {shlex.quote(TARGET_DIR)}/"
+        f"rsync -a --exclude=.venv --info=progress2 "
+        f"{shlex.quote(COPIED_DIR)}/ {shlex.quote(TARGET_DIR)}/"
     )
     print(
-        "[MIGRATE] Copying RPi controller (including .venv): "
+        "[MIGRATE] Copying RPi controller (excluding .venv): "
         f"{COPIED_DIR} -> {TARGET_DIR}"
     )
     subprocess.run(
@@ -88,7 +89,7 @@ def main() -> int:
 
     print(f"[MIGRATE] Updating copied controller from {LOCAL_RPI_CONTROLLER_DIR} -> {destination}")
     subprocess.run(command, check=True)
-    print("[MIGRATE] Done. The target controller keeps the copied RPi .venv.")
+    print("[MIGRATE] Done. No .venv was copied.")
     return 0
 
 
