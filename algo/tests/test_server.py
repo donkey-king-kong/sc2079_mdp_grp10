@@ -160,7 +160,9 @@ class Api(unittest.TestCase):
                             {"start": start, "command": "RF090", "obstacles": []})
         self.assertAlmostEqual(data["pose"]["theta_deg"], -90.0, places=6)
         moved = math.hypot(data["pose"]["x"] - 100.0, data["pose"]["y"] - 100.0)
-        self.assertGreater(moved, 25.0, "a 90 degree arc at r=25 must displace the robot")
+        # A quarter turn on the right-hand circle moves the centre one chord,
+        # r * sqrt(2) -- and on our robot that is the wide 36cm side.
+        self.assertAlmostEqual(moved, server.cfg.TURNING_RADIUS_RIGHT * math.sqrt(2), delta=0.05)
 
     def test_drive_refuses_a_move_into_an_obstacle(self):
         # Facing an obstacle from 40cm away: driving forward would clip its

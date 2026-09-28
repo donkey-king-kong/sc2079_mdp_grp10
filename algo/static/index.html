@@ -134,7 +134,9 @@
       <p class="hint">
         Drives the robot with the same STM command strings the planner emits, through
         the same kinematics and the same collision check. The robot has no on-the-spot
-        turn, so every turn is an arc at the 25cm turning radius. A move that would
+        turn, so every turn is an arc at full lock: <span id="radius-left">20</span>cm radius
+        to the left, <span id="radius-right">36</span>cm to the right, as measured on our
+        chassis. A move that would
         clip a virtual obstacle or leave the arena is refused rather than driven.
       </p>
     </div>
@@ -776,6 +778,8 @@ el("metric").addEventListener("change", () => { if (plan) doPlan(); });
 (async function start() {
   try {
     CONFIG = await api("/api/config");
+    el("radius-left").textContent = CONFIG.turning_radius_left;
+    el("radius-right").textContent = CONFIG.turning_radius_right;
     const data = await api("/api/random");
     obstacles = data.obstacles.map((o) => ({ id: o.id, x: o.x, y: o.y, face: o.face }));
     draw();

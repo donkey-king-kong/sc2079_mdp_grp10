@@ -2,14 +2,15 @@
 
 A *trajectory* in this package is a list of `Segment`s. A segment is either a
 straight run or a constant-radius arc, always driven at the robot's minimum
-turning radius. Keeping trajectories as segments (rather than as a soup of
+turning radius for that side -- which on our robot is not the same both ways
+(see `TurningRadii`). Keeping trajectories as segments (rather than as a soup of
 sampled points) is what lets `commands.py` emit a handful of STM instructions
 instead of hundreds of tiny ones.
 """
 
 import math
 from dataclasses import dataclass, field
-from typing import Iterator, List, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple, Union
 
 import config as cfg
 
@@ -18,8 +19,8 @@ TWO_PI = 2.0 * math.pi
 # Below this many radians an arc sweep is treated as no rotation at all. It has
 # to be this loose rather than machine epsilon because the CSC construction
 # feeds acos() a value right at 1, where acos has infinite slope: a rounding
-# error of 1e-16 in the input comes out as 1e-8 in the angle. At a 25cm radius
-# 1e-6 rad is 25 microns of arc, so this can never hide a turn that matters.
+# error of 1e-16 in the input comes out as 1e-8 in the angle. At a 36cm radius
+# 1e-6 rad is 36 microns of arc, so this can never hide a turn that matters.
 _SWEEP_EPSILON = 1e-6
 
 # Steering / gear encoding. These integers are used as multipliers in the
@@ -71,6 +72,52 @@ class Pose:
 
     def normalised(self) -> "Pose":
         return Pose(self.x, self.y, normalise_angle(self.theta))
+
+
+@dataclass(frozen=True)
+class TurningRadii:
+    """The robot's minimum turning radius on each steering side, in cm.
+
+    Our chassis turns tighter to the left (20cm) than to the right (36cm) --
+    see `config.TURNING_RADIUS_LEFT`. Every arc is driven at the radius of its
+    *steering* side, so a reverse-left arc is on the left circle too.
+    """
+
+    left: float
+    right: float
+
+    def of(self, steering: int) -> float:
+        """Radius for LEFT or RIGHT steering; 0.0 for STRAIGHT, which has none."""
+        if steering == LEFT:
+            return self.left
+        if steering == RIGHT:
+            return self.right
+        return 0.0
+
+    @property
+    def widest(self) -> float:
+        return max(self.left, self.right)
+
+
+RadiusSpec = Union[None, float, Tuple[float, float], TurningRadii]
+
+
+def turning_radii(radius: RadiusSpec = None) -> TurningRadii:
+    """Normalise whatever the caller passed as a radius into a `TurningRadii`.
+
+    `None` means the robot as calibrated in config.py, read at call time so a
+    test or a calibration script can change it. A single number is a symmetric
+    robot, which is how the briefing's own worked examples (slide 43) are posed;
+    a `(left, right)` pair is an asymmetric one.
+    """
+    if radius is None:
+        return TurningRadii(cfg.TURNING_RADIUS_LEFT, cfg.TURNING_RADIUS_RIGHT)
+    if isinstance(radius, TurningRadii):
+        return radius
+    if isinstance(radius, (int, float)):
+        return TurningRadii(float(radius), float(radius))
+    left, right = radius
+    return TurningRadii(float(left), float(right))
 
 
 def turn_centre(pose: Pose, radius: float, steering: int) -> Tuple[float, float]:
@@ -302,8 +349,11 @@ def merge_segments(segments: List[Segment]) -> List[Segment]:
         # a cancellation can expose a fuse behind it, and vice versa.
         while merged:
             prev = merged[-1]
+            # A straight has no radius, so whatever its `radius` field holds must
+            # not stop two straights fusing.
             same_shape = (prev.steering == seg.steering
-                          and abs(prev.radius - seg.radius) < 1e-9)
+                          and (seg.steering == STRAIGHT
+                               or abs(prev.radius - seg.radius) < 1e-9))
             if same_shape and prev.gear == seg.gear:
                 seg = Segment(prev.gear, prev.steering, prev.length + seg.length,
                               prev.radius, prev.start)

@@ -40,7 +40,7 @@ ROBOT_HALF = ROBOT_SIZE / 2.0
 
 # Keep-clear square around the start zone, used when generating demo layouts.
 # An obstacle whose virtual box abuts the start zone leaves the robot in a
-# 10cm-tall band, and a 25cm turning radius cannot turn round in one -- the
+# 10cm-tall band, and a 20-36cm turning radius cannot turn round in one -- the
 # robot is walled in before it has moved. Real arenas leave the start clear;
 # generated ones should too. Half a footprint of slack past the zone is enough.
 START_KEEP_CLEAR = START_ZONE_SIZE + ROBOT_HALF
@@ -63,10 +63,19 @@ START_THETA = math.pi / 2.0
 # Kinematics (briefing slide 4)
 # --------------------------------------------------------------------------
 
-# "There is a turning radius of about 25cm but it is a larger radius if robot
-# moves faster." This and CAPTURE_STANDOFF are the two values most likely to
-# need re-measuring against the real robot.
-TURNING_RADIUS = 25.0
+# Slide 4 says "a turning radius of about 25cm but it is a larger radius if robot
+# moves faster", and assumes the same radius both ways. OUR robot does not turn
+# symmetrically: measured about its centre, full left lock gives a 20cm radius
+# and full right lock 36cm, whatever the sweep. That is a fault of this chassis
+# (steering linkage), not a choice -- so the planner models the two sides
+# separately rather than planning with one figure it would then drive wrongly.
+#
+# The radius belongs to the steering side, not to the direction the nose swings:
+# LB (reverse, steering left) is also driven round the 20cm circle, RB round the
+# 36cm one. Re-measure both if the steering is ever trimmed; with equal values
+# the planner reduces exactly to the symmetric construction of slides 27-31.
+TURNING_RADIUS_LEFT = 20.0
+TURNING_RADIUS_RIGHT = 36.0
 
 # --------------------------------------------------------------------------
 # Obstacle avoidance (briefing slide 36)
@@ -96,7 +105,7 @@ COLLISION_SAMPLE_STEP = 3.0
 # from the obstacle face along the face normal, laterally centred on the block.
 CAPTURE_STANDOFF = 30.0
 
-# The single ideal pose is often unreachable (a 25cm turning radius plus a wall
+# The single ideal pose is often unreachable (a 20-36cm turning radius plus a wall
 # or a neighbouring obstacle), so every obstacle offers a *menu* of acceptable
 # poses and the planner takes the first one it can actually drive to. Ordered
 # best-first: the head of the list is slide 8's pose.
@@ -131,7 +140,7 @@ CAPTURE_MAX_DISTANCE = 50.0
 # Briefing slide 33: "After the robot has recognized an image at an obstacle,
 # this obstacle is blocking the robot -- needs to reverse first." The robot
 # finishes a photo parked 30cm from a face, pointing straight at it, and its
-# turning radius is 25cm, so EVERY forward-only path out of a capture pose
+# turning radius is 20cm left / 36cm right, so EVERY forward-only path out of a capture pose
 # drives into the block it just photographed. Before planning the next leg we
 # therefore back straight out by one of these distances and plan the Dubins
 # path from there. 0.0 is tried first so the start pose costs nothing extra.

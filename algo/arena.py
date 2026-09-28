@@ -11,7 +11,7 @@ Two jobs live here.
 
 2. **Capture poses.** Each obstacle shows its image on one of N/S/E/W. The
    robot has to end up standing off that face, pointing back at it. The single
-   ideal pose from slide 8 is frequently unreachable -- a 25cm turning radius
+   ideal pose from slide 8 is frequently unreachable -- a 20-36cm turning radius
    next to a wall leaves no room -- so each obstacle publishes a *menu* of
    acceptable poses and the planner takes the first one it can actually reach.
 """
@@ -321,7 +321,7 @@ def _start_can_escape(arena: "Arena") -> bool:
     """Can the robot actually drive out of the start pose?
 
     The flood fill below treats the robot as a point, so it happily reports a
-    10cm-tall corridor as reachable -- but a car with a 25cm turning radius
+    10cm-tall corridor as reachable -- but a car with a 20-36cm turning radius
     cannot turn round in one, and the real robot would be stuck on the spot.
     This asks the question properly, by trying to plan a real path to a spread
     of poses around the arena.
@@ -333,8 +333,8 @@ def _start_can_escape(arena: "Arena") -> bool:
             if not arena.is_point_free(x, y):
                 continue
             for theta in (0.0, math.pi / 2, math.pi, -math.pi / 2):
-                if dubins.plan(origin, Pose(x, y, theta), cfg.TURNING_RADIUS,
-                               arena.is_pose_free) is not None:
+                if dubins.plan(origin, Pose(x, y, theta),
+                               is_free=arena.is_pose_free) is not None:
                     return True
     return False
 

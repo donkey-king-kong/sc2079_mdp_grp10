@@ -11,8 +11,9 @@ import unittest
 
 import conftest  # noqa: F401  (path setup)
 
+import config as cfg
 import dubins
-from motion import RIGHT, Pose, normalise_angle, turn_centre
+from motion import LEFT, RIGHT, Pose, normalise_angle, turn_centre
 
 
 class SlideFortyThree(unittest.TestCase):
@@ -109,6 +110,87 @@ class Correctness(unittest.TestCase):
         # Accept everything and we get the shortest word back.
         word, trajectory = dubins.plan(start, goal, 25.0, lambda p: True)
         self.assertAlmostEqual(trajectory.length, best.length, places=6)
+
+
+class AsymmetricSteering(unittest.TestCase):
+    """Our robot turns 20cm left and 36cm right; the geometry must honour both.
+
+    The briefing only ever works a symmetric radius, so there is no slide to
+    check against. What pins this down instead is the same integration check as
+    above -- every candidate must drive from start to goal -- plus a check that
+    each arc really is on its own side's circle.
+    """
+
+    RADII = (20.0, 36.0)
+    PAIRS = Correctness.PAIRS + [
+        (Pose(100.0, 100.0, 0.0), Pose(100.0, 100.0, 0.0)),
+        (Pose(40.0, 100.0, 0.0), Pose(160.0, 100.0, math.pi)),
+        (Pose(100.0, 100.0, math.pi / 2), Pose(130.0, 100.0, -math.pi / 2)),
+        (Pose(100.0, 100.0, math.pi / 2), Pose(70.0, 100.0, -math.pi / 2)),
+    ]
+
+    def test_every_candidate_lands_on_the_goal(self):
+        for start, goal in self.PAIRS:
+            candidates = dubins.plan_all(start, goal, self.RADII)
+            with self.subTest(start=start, goal=goal):
+                self.assertTrue(candidates, "some word must always connect two poses")
+            for word, trajectory in candidates:
+                end = trajectory.end_pose()
+                with self.subTest(word=word, start=start, goal=goal):
+                    self.assertAlmostEqual(end.x, goal.x, places=6)
+                    self.assertAlmostEqual(end.y, goal.y, places=6)
+                    self.assertAlmostEqual(normalise_angle(end.theta - goal.theta), 0.0, places=6)
+
+    def test_every_word_is_constructed_somewhere(self):
+        # The mixed-radius cases (LSR, RSL, and both CCC words) are where a
+        # generalisation would go wrong, so they must actually be exercised.
+        seen = {word for start, goal in self.PAIRS
+                for word, _ in dubins.plan_all(start, goal, self.RADII)}
+        self.assertEqual(seen, set(dubins.WORDS))
+
+    def test_each_arc_is_on_its_own_sides_circle(self):
+        left, right = self.RADII
+        for start, goal in self.PAIRS:
+            for word, trajectory in dubins.plan_all(start, goal, self.RADII):
+                for segment in trajectory.segments:
+                    with self.subTest(word=word, steering=segment.steering):
+                        if segment.steering == LEFT:
+                            self.assertEqual(segment.radius, left)
+                        elif segment.steering == RIGHT:
+                            self.assertEqual(segment.radius, right)
+
+    def test_length_matches_the_sampled_curve(self):
+        for start, goal in self.PAIRS[:5]:
+            for word, trajectory in dubins.plan_all(start, goal, self.RADII):
+                poses = trajectory.sample(0.5)
+                walked = sum(math.hypot(b.x - a.x, b.y - a.y) for a, b in zip(poses, poses[1:]))
+                with self.subTest(word=word, start=start, goal=goal):
+                    self.assertAlmostEqual(walked, trajectory.length, delta=0.05)
+
+    def test_equal_radii_reduce_to_the_symmetric_construction(self):
+        # A (25, 25) pair must give exactly what the briefing's single radius
+        # gives -- the generalisation adds nothing when the sides agree.
+        for start, goal in Correctness.PAIRS:
+            symmetric = [(w, round(t.length, 9)) for w, t in dubins.plan_all(start, goal, 25.0)]
+            paired = [(w, round(t.length, 9)) for w, t in dubins.plan_all(start, goal, (25.0, 25.0))]
+            self.assertEqual(symmetric, paired)
+
+    def test_a_u_turn_prefers_the_tight_side(self):
+        # Reversing heading 60cm to the right is a right-hand U-turn on a 36cm
+        # circle -- too wide to fit, so it needs a detour -- while 40cm to the
+        # left is exactly one left-hand half circle. The asymmetry must show.
+        start = Pose(100.0, 100.0, math.pi / 2)
+        to_left = dubins.shortest_length(start, Pose(60.0, 100.0, -math.pi / 2), self.RADII)
+        to_right = dubins.shortest_length(start, Pose(140.0, 100.0, -math.pi / 2), self.RADII)
+        self.assertAlmostEqual(to_left, math.pi * 20.0, places=6)
+        self.assertGreater(to_right, to_left)
+
+    def test_default_radius_is_the_calibrated_robot(self):
+        start, goal = Correctness.PAIRS[0]
+        configured = dubins.plan_all(start, goal, (cfg.TURNING_RADIUS_LEFT, cfg.TURNING_RADIUS_RIGHT))
+        default = dubins.plan_all(start, goal)
+        self.assertEqual([(w, t.length) for w, t in configured],
+                         [(w, t.length) for w, t in default])
 
 
 if __name__ == "__main__":
