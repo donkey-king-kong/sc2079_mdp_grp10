@@ -14,7 +14,44 @@ import conftest  # noqa: F401
 import arena as arena_module
 import config as cfg
 from arena import Arena, Obstacle
-from motion import Pose
+from motion import Pose, footprint_centre
+
+
+class TurningCentre(unittest.TestCase):
+    """Our robot turns about a point 7.4cm behind the middle of its body."""
+
+    def test_slide_8_pose_parks_the_turning_centre_further_back(self):
+        # Slide 8 puts the MIDDLE of the robot 30cm below a south face; the
+        # turning centre is then another offset further from the block.
+        obstacle = Obstacle(1, 100.0, 100.0, "S")
+        pose = Arena([obstacle]).capture_poses(obstacle)[0].pose
+        self.assertAlmostEqual(pose.x, 105.0, places=6)
+        self.assertAlmostEqual(pose.y, 100.0 - 30.0 - cfg.TURNING_CENTRE_OFFSET, places=6)
+
+    def test_start_places_the_body_where_config_says(self):
+        pose = arena_module.start_pose()
+        mx, my = footprint_centre(pose)
+        self.assertAlmostEqual(mx, cfg.START_X, places=6)
+        self.assertAlmostEqual(my, cfg.START_Y, places=6)
+        self.assertAlmostEqual(pose.y, cfg.START_Y - cfg.TURNING_CENTRE_OFFSET, places=6)
+
+    def test_collision_is_judged_at_the_body_not_the_turning_centre(self):
+        # Obstacle box spans y in [85, 125]. The turning centre at y=80 is clear
+        # of it, but facing North the body's middle is at 87.4 -- inside.
+        arena = Arena([Obstacle(1, 100.0, 100.0, "N")])
+        self.assertTrue(arena.is_point_free(105.0, 80.0))
+        self.assertFalse(arena.is_pose_free(Pose(105.0, 80.0, math.pi / 2)))
+        # Facing South from the same spot the body is further away, and clear.
+        self.assertTrue(arena.is_pose_free(Pose(105.0, 80.0, -math.pi / 2)))
+
+    def test_bottom_left_conversions_round_trip(self):
+        for theta in (0.0, math.pi / 2, math.pi, -math.pi / 2, 0.7):
+            pose = arena_module.bottom_left_to_centre(10.0, 20.0, theta)
+            x, y, back = arena_module.centre_to_bottom_left(pose)
+            with self.subTest(theta=theta):
+                self.assertAlmostEqual(x, 10.0, places=6)
+                self.assertAlmostEqual(y, 20.0, places=6)
+                self.assertAlmostEqual(back, pose.theta, places=6)
 
 
 class CapturePoses(unittest.TestCase):
@@ -44,11 +81,13 @@ class CapturePoses(unittest.TestCase):
                 self.assertTrue(arena.is_pose_free(capture.pose))
 
     def test_camera_distance_respects_checklist_a2(self):
-        # Checklist A.2: the image sits 20-50cm from the robot's midpoint.
+        # Checklist A.2: the image sits 20-50cm from the robot's midpoint --
+        # the middle of its body, not the turning centre the pose describes.
         obstacle = Obstacle(1, 100.0, 100.0, "W")
         fx, fy = obstacle.face_centre()
         for capture in Arena([obstacle]).capture_poses(obstacle):
-            distance = math.hypot(capture.pose.x - fx, capture.pose.y - fy)
+            mx, my = footprint_centre(capture.pose)
+            distance = math.hypot(mx - fx, my - fy)
             self.assertGreaterEqual(distance, cfg.CAPTURE_MIN_DISTANCE - 1e-9)
             self.assertLessEqual(distance, cfg.CAPTURE_MAX_DISTANCE + 1e-9)
 
@@ -86,6 +125,15 @@ class Collision(unittest.TestCase):
         # The box spans [85, 125] on each axis: 10cm block plus 15cm each side.
         self.assertTrue(self.arena.is_point_free(84.9, 105.0))
         self.assertTrue(self.arena.is_point_free(125.1, 105.0))
+
+    def test_rounding_noise_on_an_edge_is_not_a_collision(self):
+        # Regression: a leg running exactly along a virtual-obstacle edge or the
+        # wall margin sampled 4e-14cm past it once stitched into a route, and
+        # the finished plan then failed the collision check it was built from.
+        margin = cfg.BOUNDARY_MARGIN
+        self.assertTrue(self.arena.is_point_free(85.0 + 1e-12, 105.0))
+        self.assertTrue(self.arena.is_point_free(125.0 - 1e-12, 105.0))
+        self.assertTrue(self.arena.is_point_free(margin - 1e-12, 50.0))
 
     def test_boundary_margin_keeps_the_footprint_inside_the_arena(self):
         margin = cfg.BOUNDARY_MARGIN

@@ -7,7 +7,9 @@ Two jobs live here.
    robot footprint on each side into a 40cm "virtual obstacle", the walls are
    inset by the same 15cm, and the robot is treated as a single point at its
    centre. If the centre stays out of every virtual obstacle, the real 30x30
-   robot cannot touch the real 10x10 block.
+   robot cannot touch the real 10x10 block. That point is the middle of the
+   *footprint*, which on our robot is 7.4cm ahead of the turning centre a
+   `Pose` describes -- so the nose swings wider than the tail, and is checked.
 
 2. **Capture poses.** Each obstacle shows its image on one of N/S/E/W. The
    robot has to end up standing off that face, pointing back at it. The single
@@ -22,9 +24,18 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import config as cfg
-from motion import Pose, face_to_heading, normalise_angle
+from motion import (Pose, face_to_heading, footprint_centre, normalise_angle,
+                    pose_from_footprint_centre)
 
 FACES = ("N", "S", "E", "W")
+
+# Slack on the wall margin and the virtual-obstacle edges, in cm. A path that
+# runs exactly along an edge is legal (the edge already carries 15cm of margin),
+# but a sample there can come out 4e-14cm past it after a round of
+# floating-point trigonometry -- and whether it does changes when legs are
+# stitched and re-sampled, so a strict comparison makes the collision check of
+# a plan disagree with the checks it was built from.
+_EDGE_TOLERANCE = 1e-6
 
 # Outward unit normal of each obstacle face, and the tangent we slide along
 # when trying laterally-offset capture poses.
@@ -33,12 +44,14 @@ _FACE_TANGENT = {"N": (1.0, 0.0), "S": (1.0, 0.0), "E": (0.0, 1.0), "W": (0.0, 1
 
 
 def bottom_left_to_centre(x: float, y: float, theta: float) -> Pose:
-    """Briefing slide 7 gives robot poses by bottom-left corner; we use centres."""
-    return Pose(x + cfg.ROBOT_HALF, y + cfg.ROBOT_HALF, normalise_angle(theta))
+    """Briefing slide 7 gives robot poses by bottom-left corner; we use the
+    turning centre, which is behind the middle of the footprint."""
+    return pose_from_footprint_centre(x + cfg.ROBOT_HALF, y + cfg.ROBOT_HALF, theta)
 
 
 def centre_to_bottom_left(pose: Pose) -> Tuple[float, float, float]:
-    return (pose.x - cfg.ROBOT_HALF, pose.y - cfg.ROBOT_HALF, pose.theta)
+    cx, cy = footprint_centre(pose)
+    return (cx - cfg.ROBOT_HALF, cy - cfg.ROBOT_HALF, pose.theta)
 
 
 def cell_to_cm(cell: float) -> float:
@@ -106,13 +119,14 @@ class Arena:
         self.obstacles: List[Obstacle] = list(obstacles)
         # Pre-compute the inflated no-go box for each obstacle: cheaper than
         # recomputing it for every one of the tens of thousands of collision
-        # queries a single plan makes.
+        # queries a single plan makes. Shrunk by _EDGE_TOLERANCE so a path
+        # running along an edge is not rejected over rounding noise.
         self._blocked: List[Tuple[float, float, float, float]] = [
             (
-                ob.x - cfg.OBSTACLE_INFLATION,
-                ob.y - cfg.OBSTACLE_INFLATION,
-                ob.x + cfg.OBSTACLE_SIZE + cfg.OBSTACLE_INFLATION,
-                ob.y + cfg.OBSTACLE_SIZE + cfg.OBSTACLE_INFLATION,
+                ob.x - cfg.OBSTACLE_INFLATION + _EDGE_TOLERANCE,
+                ob.y - cfg.OBSTACLE_INFLATION + _EDGE_TOLERANCE,
+                ob.x + cfg.OBSTACLE_SIZE + cfg.OBSTACLE_INFLATION - _EDGE_TOLERANCE,
+                ob.y + cfg.OBSTACLE_SIZE + cfg.OBSTACLE_INFLATION - _EDGE_TOLERANCE,
             )
             for ob in self.obstacles
         ]
@@ -123,7 +137,8 @@ class Arena:
 
     def in_bounds(self, x: float, y: float) -> bool:
         """Is the robot's centre far enough from every wall?"""
-        return self._min_xy <= x <= self._max_xy and self._min_xy <= y <= self._max_xy
+        low, high = self._min_xy - _EDGE_TOLERANCE, self._max_xy + _EDGE_TOLERANCE
+        return low <= x <= high and low <= y <= high
 
     def is_point_free(self, x: float, y: float) -> bool:
         """Slide 36's test: robot as a dot against the 40x40 virtual obstacles."""
@@ -135,7 +150,10 @@ class Arena:
         return True
 
     def is_pose_free(self, pose: Pose) -> bool:
-        return self.is_point_free(pose.x, pose.y)
+        """Is the robot's body clear? Tested at the footprint's middle, which is
+        where slide 36's virtual obstacles assume the dot is -- not at the
+        turning centre the pose describes."""
+        return self.is_point_free(*footprint_centre(pose))
 
     def is_trajectory_free(self, trajectory, step: float = cfg.COLLISION_SAMPLE_STEP) -> bool:
         return all(self.is_pose_free(p) for p in trajectory.iter_sample(step))
@@ -154,6 +172,10 @@ class Arena:
         planner tries the well-aligned ones before the oblique ones. Poses that
         would sit inside a wall or another obstacle's virtual box are dropped
         here, so the planner never wastes a Dubins call on them.
+
+        `standoff` is to the middle of the robot's footprint, as slide 8 and
+        checklist A.2 measure it; the pose itself is the turning centre, which
+        parks `TURNING_CENTRE_OFFSET` further back from the face.
         """
         fx, fy = obstacle.face_centre()
         outward = obstacle.image_heading
@@ -179,7 +201,8 @@ class Arena:
                 continue
             # Turn to face back down the bearing, at the image.
             heading = normalise_angle(bearing + math.pi)
-            results.append(CapturePose(obstacle.id, Pose(x, y, heading),
+            results.append(CapturePose(obstacle.id,
+                                       pose_from_footprint_centre(x, y, heading),
                                        standoff, angle, rank))
         return results
 
@@ -263,7 +286,8 @@ def parse_obstacles(raw: Iterable[Dict], units: str = "cell") -> List[Obstacle]:
 
 
 def start_pose() -> Pose:
-    return Pose(cfg.START_X, cfg.START_Y, cfg.START_THETA)
+    """START_X/START_Y place the middle of the footprint; this is the turning centre."""
+    return pose_from_footprint_centre(cfg.START_X, cfg.START_Y, cfg.START_THETA)
 
 
 def reachable_region(arena: "Arena", origin: Pose,
@@ -280,7 +304,8 @@ def reachable_region(arena: "Arena", origin: Pose,
         return (0 <= cx < n and 0 <= cy < n
                 and arena.is_point_free((cx + 0.5) * resolution, (cy + 0.5) * resolution))
 
-    start = (int(origin.x // resolution), int(origin.y // resolution))
+    ox, oy = footprint_centre(origin)
+    start = (int(ox // resolution), int(oy // resolution))
     if not free(*start):
         return set()
 
@@ -333,7 +358,7 @@ def _start_can_escape(arena: "Arena") -> bool:
             if not arena.is_point_free(x, y):
                 continue
             for theta in (0.0, math.pi / 2, math.pi, -math.pi / 2):
-                if dubins.plan(origin, Pose(x, y, theta),
+                if dubins.plan(origin, pose_from_footprint_centre(x, y, theta),
                                is_free=arena.is_pose_free) is not None:
                     return True
     return False
@@ -351,8 +376,9 @@ def _layout_is_solvable(obstacles: Sequence[Obstacle], resolution: float = 5.0) 
         poses = arena.capture_poses(obstacle)
         if not poses:
             return False
-        if not any((int(p.pose.x // resolution), int(p.pose.y // resolution)) in region
-                   for p in poses):
+        cells = ((int(x // resolution), int(y // resolution))
+                 for x, y in (footprint_centre(p.pose) for p in poses))
+        if not any(cell in region for cell in cells):
             return False
     return True
 

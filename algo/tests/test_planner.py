@@ -14,6 +14,7 @@ import conftest  # noqa: F401
 import config as cfg
 import planner
 from arena import Arena, Obstacle, random_layout, start_pose
+from motion import footprint_centre
 
 # A fixed, open layout. Deliberately not random, so a failure here is always the
 # same failure and can be debugged.
@@ -82,7 +83,9 @@ class Routes(unittest.TestCase):
             obstacle = self.arena.obstacle_by_id(leg.obstacle_id)
             fx, fy = obstacle.face_centre()
             end = leg.trajectory.end_pose()
-            distance = math.hypot(fx - end.x, fy - end.y)
+            # Checklist A.2 measures to the robot's midpoint, not its turning centre.
+            mx, my = footprint_centre(end)
+            distance = math.hypot(fx - mx, fy - my)
             bearing = math.atan2(fy - end.y, fx - end.x)
             off_axis = abs(math.atan2(math.sin(bearing - end.theta),
                                       math.cos(bearing - end.theta)))

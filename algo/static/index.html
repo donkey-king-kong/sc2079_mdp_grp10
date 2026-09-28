@@ -136,7 +136,8 @@
         the same kinematics and the same collision check. The robot has no on-the-spot
         turn, so every turn is an arc at full lock: <span id="radius-left">20</span>cm radius
         to the left, <span id="radius-right">36</span>cm to the right, as measured on our
-        chassis. A move that would
+        chassis about the point it turns on (the ring), <span id="centre-offset">7.4</span>cm
+        behind the middle of its body. A move that would
         clip a virtual obstacle or leave the arena is refused rather than driven.
       </p>
     </div>
@@ -364,22 +365,31 @@ function strokePoses(poses, from, to) {
   ctx.stroke();
 }
 
+// A pose is the robot's turning centre, which sits behind the middle of its
+// body; the path traced on the canvas is that point too. So the body is drawn
+// shifted forward along the heading, and the turning centre marked on it.
 function drawRobot(pose) {
   const half = CONFIG.robot_size / 2 * scale();
+  const ahead = (CONFIG.turning_centre_offset || 0) * scale();
   ctx.save();
   ctx.translate(px(pose.x), py(pose.y));
   ctx.rotate(-pose.theta);                       // canvas y is flipped, so negate
   ctx.fillStyle = "rgba(15,118,110,.22)";
   ctx.strokeStyle = getVar("--robot"); ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.rect(-half, -half, half * 2, half * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.rect(ahead - half, -half, half * 2, half * 2); ctx.fill(); ctx.stroke();
 
   // Camera at the front centre (briefing slide 3), drawn as its view cone so
   // it is obvious which way the robot is pointing.
+  const nose = ahead + half;
   ctx.fillStyle = "rgba(245,158,11,.30)";
-  ctx.beginPath(); ctx.moveTo(half, 0);
-  ctx.arc(half, 0, half * 1.5, -Math.PI / 5, Math.PI / 5); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(nose, 0);
+  ctx.arc(nose, 0, half * 1.5, -Math.PI / 5, Math.PI / 5); ctx.closePath(); ctx.fill();
   ctx.fillStyle = getVar("--robot");
-  ctx.beginPath(); ctx.arc(half, 0, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(nose, 0, 3, 0, Math.PI * 2); ctx.fill();
+
+  // The point it turns about.
+  ctx.strokeStyle = getVar("--robot"); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 }
 
@@ -780,6 +790,7 @@ el("metric").addEventListener("change", () => { if (plan) doPlan(); });
     CONFIG = await api("/api/config");
     el("radius-left").textContent = CONFIG.turning_radius_left;
     el("radius-right").textContent = CONFIG.turning_radius_right;
+    el("centre-offset").textContent = CONFIG.turning_centre_offset;
     const data = await api("/api/random");
     obstacles = data.obstacles.map((o) => ({ id: o.id, x: o.x, y: o.y, face: o.face }));
     draw();

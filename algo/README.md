@@ -221,8 +221,10 @@ it. It is the only file that should need touching when calibrating against the
 real robot. The ones most likely to be wrong:
 
 - `TURNING_RADIUS_LEFT` / `TURNING_RADIUS_RIGHT` (20cm / 36cm, measured on our
-  chassis about its centre; slide 4 assumes ~25cm both ways, and larger the
-  faster the robot goes)
+  chassis about its turning centre; slide 4 assumes ~25cm both ways, and larger
+  the faster the robot goes)
+- `TURNING_CENTRE_OFFSET` (7.4cm, how far the turning centre sits behind the
+  middle of the footprint)
 - `CAPTURE_STANDOFF` (30cm, derived from slide 8)
 - `SPEED_STRAIGHT`, `SPEED_TURN`, `DIRECTION_CHANGE_TIME`, `STEERING_CHANGE_TIME`
   &mdash; **measure these with a stopwatch**; they are estimates, and they are
@@ -231,9 +233,14 @@ real robot. The ones most likely to be wrong:
   match the STM firmware
 
 Coordinates are centimetres with the origin at the arena's bottom-left. A robot
-pose is `(x, y, theta)` about the robot's **centre**, not the bottom-left corner
-the briefing uses on slide 7; `arena.bottom_left_to_centre()` converts at the
-boundary. `theta` is radians, East = 0, counter-clockwise.
+pose is `(x, y, theta)` about the robot's **turning centre** -- the point it
+rotates about, `TURNING_CENTRE_OFFSET` (7.4cm) behind the middle of its
+footprint -- not the bottom-left corner the briefing uses on slide 7;
+`arena.bottom_left_to_centre()` converts at the boundary. Anything about the
+body (collision checks, capture standoff, camera distance, `path_cells`) is
+taken from the footprint's middle via `motion.footprint_centre()`, so the nose
+swinging wide on a turn is accounted for. `theta` is radians, East = 0,
+counter-clockwise.
 
 Note `START_X`/`START_Y` are 20, not 15. Slide 7's corner position puts the
 robot exactly on the boundary margin, where the first left turn dips a
