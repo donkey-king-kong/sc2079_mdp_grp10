@@ -61,7 +61,11 @@ def face_to_heading(face: str) -> float:
 
 @dataclass(frozen=True)
 class Pose:
-    """Robot centre position plus heading."""
+    """Robot turning-centre position plus heading.
+
+    The turning centre is the point the robot rotates about, not the middle of
+    its footprint -- see `footprint_centre()` for that.
+    """
 
     x: float
     y: float
@@ -72,6 +76,24 @@ class Pose:
 
     def normalised(self) -> "Pose":
         return Pose(self.x, self.y, normalise_angle(self.theta))
+
+
+def footprint_centre(pose: Pose) -> Tuple[float, float]:
+    """Middle of the robot's body for a pose, which is about its turning centre.
+
+    The body sits `config.TURNING_CENTRE_OFFSET` ahead of the turning centre
+    along the heading. Read at call time so a calibration script can change it.
+    """
+    offset = cfg.TURNING_CENTRE_OFFSET
+    return (pose.x + offset * math.cos(pose.theta),
+            pose.y + offset * math.sin(pose.theta))
+
+
+def pose_from_footprint_centre(x: float, y: float, theta: float) -> Pose:
+    """The planner pose that puts the middle of the robot's body at (x, y)."""
+    offset = cfg.TURNING_CENTRE_OFFSET
+    return Pose(x - offset * math.cos(theta), y - offset * math.sin(theta),
+                normalise_angle(theta))
 
 
 @dataclass(frozen=True)

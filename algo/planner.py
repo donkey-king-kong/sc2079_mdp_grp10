@@ -40,7 +40,8 @@ import config as cfg
 import dubins
 import hybrid_astar
 from arena import Arena, CapturePose, start_pose
-from motion import BACKWARD, STRAIGHT, Pose, Segment, Trajectory, merge_segments
+from motion import (BACKWARD, STRAIGHT, Pose, Segment, Trajectory, merge_segments,
+                    pose_from_footprint_centre)
 
 STRATEGIES = ("nearest", "greedy_swap", "exhaustive")
 
@@ -209,7 +210,10 @@ class CostModel:
                 if not arena.is_point_free(x, y):
                     continue
                 for theta in TRANSIT_HEADINGS:
-                    self._add(Node(index=len(self.nodes), pose=Pose(x, y, theta),
+                    # The lattice places the robot's body; the pose is its
+                    # turning centre, a little behind that.
+                    self._add(Node(index=len(self.nodes),
+                                   pose=pose_from_footprint_centre(x, y, theta),
                                    kind="transit"))
 
         self.obstacle_ids: List[int] = list(self.nodes_by_obstacle.keys())

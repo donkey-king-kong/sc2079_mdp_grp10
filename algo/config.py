@@ -9,10 +9,13 @@ Coordinate conventions used by the whole package
 * Units are centimetres. Origin is the arena's BOTTOM-LEFT corner, x to the
   East, y to the North (briefing slide 7).
 * An obstacle's position is its BOTTOM-LEFT corner, as in the briefing.
-* A robot pose is ``(x, y, theta)`` about the robot's **centre**, not its
-  bottom-left corner. The briefing uses the corner on slide 7; centre maths is
-  far less error-prone for Dubins curves, so `arena.bottom_left_to_centre()`
-  converts at the boundary.
+* A robot pose is ``(x, y, theta)`` about the robot's **turning centre** -- the
+  point it rotates about, `TURNING_CENTRE_OFFSET` behind the middle of its
+  footprint -- not its bottom-left corner. The briefing uses the corner on
+  slide 7; centre maths is far less error-prone for Dubins curves, so
+  `arena.bottom_left_to_centre()` converts at the boundary. Anything about the
+  robot's *body* (collisions, camera distance, grid cell) is measured from the
+  footprint centre instead, via `motion.footprint_centre()`.
 * ``theta`` is radians, East = 0, counter-clockwise positive, normalised to
   (-pi, pi]. So N = +pi/2, W = pi, S = -pi/2 (briefing slide 7).
 """
@@ -45,7 +48,9 @@ ROBOT_HALF = ROBOT_SIZE / 2.0
 # generated ones should too. Half a footprint of slack past the zone is enough.
 START_KEEP_CLEAR = START_ZONE_SIZE + ROBOT_HALF
 
-# Robot starts in the start zone facing North.
+# Robot starts in the start zone facing North. START_X/START_Y place the MIDDLE
+# of the footprint; `arena.start_pose()` turns that into the turning-centre pose
+# the planner uses, TURNING_CENTRE_OFFSET further back.
 #
 # Slide 7 puts the bottom-left corner at (0, 0), i.e. the centre at (15, 15).
 # That is exactly BOUNDARY_MARGIN from both walls, which makes the very first
@@ -77,6 +82,16 @@ START_THETA = math.pi / 2.0
 TURNING_RADIUS_LEFT = 20.0
 TURNING_RADIUS_RIGHT = 36.0
 
+# Our robot does not turn about the middle of its footprint: the point it
+# rotates about sits 7.4cm behind it, towards the rear. That point is the only
+# one on the chassis whose velocity always lies along the heading, which is what
+# the Dubins/Hybrid A* kinematics assume (slides 27-33), so it is the point
+# every planner pose describes -- and the radii above are measured about it.
+# The body is centred this far AHEAD of the pose, so the nose swings wider than
+# the tail on every turn, and collision checks, the capture standoff and the
+# camera distance are all taken from there. 0 means it turns about its middle.
+TURNING_CENTRE_OFFSET = 7.4
+
 # --------------------------------------------------------------------------
 # Obstacle avoidance (briefing slide 36)
 # --------------------------------------------------------------------------
@@ -103,6 +118,8 @@ COLLISION_SAMPLE_STEP = 3.0
 # Slide 8's worked target: an image at (a, b, S) wants the robot's bottom-left
 # corner at (a - 10, b - 45), i.e. its CENTRE at (a + 5, b - 30). That is 30cm
 # from the obstacle face along the face normal, laterally centred on the block.
+# Every standoff here is to the middle of the footprint, not the turning centre
+# -- the turning centre parks TURNING_CENTRE_OFFSET further back.
 CAPTURE_STANDOFF = 30.0
 
 # The single ideal pose is often unreachable (a 20-36cm turning radius plus a wall

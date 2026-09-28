@@ -30,6 +30,7 @@ from motion import (
     RadiusSpec,
     Segment,
     Trajectory,
+    footprint_centre,
     merge_segments,
     normalise_angle,
     turning_radii,
@@ -74,7 +75,10 @@ class _DistanceField:
         self.n = int(math.ceil(cfg.ARENA_SIZE / resolution))
         self.cost: List[float] = [float("inf")] * (self.n * self.n)
 
-        gx, gy = self._index(goal.x), self._index(goal.y)
+        # The free cells are where the footprint's middle may be, so the field
+        # is seeded, and later read, at the footprint rather than the pose.
+        fx, fy = footprint_centre(goal)
+        gx, gy = self._index(fx), self._index(fy)
         if not (0 <= gx < self.n and 0 <= gy < self.n):
             return
 
@@ -108,7 +112,8 @@ class _DistanceField:
         return int(value // self.resolution)
 
     def __call__(self, pose: Pose) -> float:
-        cx, cy = self._index(pose.x), self._index(pose.y)
+        fx, fy = footprint_centre(pose)
+        cx, cy = self._index(fx), self._index(fy)
         if not (0 <= cx < self.n and 0 <= cy < self.n):
             return float("inf")
         return self.cost[cy * self.n + cx]
@@ -125,7 +130,8 @@ def _distance_field(arena: Arena, goal: Pose) -> "_DistanceField":
     if cache is None:
         cache = {}
         setattr(arena, "_distance_fields", cache)
-    key = (int(goal.x // cfg.HA_XY_RESOLUTION), int(goal.y // cfg.HA_XY_RESOLUTION))
+    fx, fy = footprint_centre(goal)
+    key = (int(fx // cfg.HA_XY_RESOLUTION), int(fy // cfg.HA_XY_RESOLUTION))
     if key not in cache:
         cache[key] = _DistanceField(arena, goal)
     return cache[key]

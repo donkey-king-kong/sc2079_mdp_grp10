@@ -38,7 +38,9 @@ class Api(unittest.TestCase):
     def test_config_exposes_what_the_ui_needs_to_draw(self):
         data = self.client.get("/api/config").get_json()
         for key in ("arena_size", "cell_size", "grid_cells", "robot_size",
-                    "obstacle_inflation", "start", "strategies", "scan_time"):
+                    "obstacle_inflation", "start", "strategies", "scan_time",
+                    "turning_radius_left", "turning_radius_right",
+                    "turning_centre_offset"):
             self.assertIn(key, data)
         self.assertEqual(data["arena_size"], 200.0)
 

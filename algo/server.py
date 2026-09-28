@@ -26,11 +26,15 @@ Request body for ``/api/plan``::
       "units":    "cell",           // "cell" (default, 20x20 grid) or "cm"
       "strategy": "exhaustive",     // "nearest" | "greedy_swap" | "exhaustive"
       "metric":   "time",           // "time" (default) or "distance"
-      "start":    {"x": 20, "y": 20, "theta_deg": 90}    // optional, cm
+      "start":    {"x": 20, "y": 12.6, "theta_deg": 90}  // optional, cm, turning centre
     }
 
 `x`/`y` on an obstacle are the BOTTOM-LEFT corner; `face` (or `dir`) is the
 side the image is on, N/S/E/W. Response is documented in `_plan_response`.
+
+Every robot pose in cm, in and out, is the robot's TURNING CENTRE -- the point
+it rotates about, `TURNING_CENTRE_OFFSET` (7.4cm) behind the middle of its
+footprint. `path_cells` and the RPi's `robot` cell are about the footprint.
 """
 
 import math
@@ -44,7 +48,7 @@ import arena as arena_module
 import commands as commands_module
 import config as cfg
 import planner
-from motion import Pose, heading_to_face, normalise_angle
+from motion import Pose, footprint_centre, heading_to_face, normalise_angle
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
@@ -77,10 +81,15 @@ def _pose_dict(pose: Pose, clock: Optional[float] = None) -> Dict[str, Any]:
 
 
 def _cells(poses) -> List[List[int]]:
-    """Trajectory as 20x20 grid cells, de-duplicated -- what the Android map draws."""
+    """Trajectory as 20x20 grid cells, de-duplicated -- what the Android map draws.
+
+    Tracks the middle of the robot's body rather than its turning centre, since
+    the map draws the robot's footprint.
+    """
     cells: List[List[int]] = []
     for pose in poses:
-        cell = [arena_module.cm_to_cell(pose.x), arena_module.cm_to_cell(pose.y)]
+        x, y = footprint_centre(pose)
+        cell = [arena_module.cm_to_cell(x), arena_module.cm_to_cell(y)]
         if not cells or cells[-1] != cell:
             cells.append(cell)
     return cells
@@ -221,6 +230,7 @@ def api_config():
         "robot_size": cfg.ROBOT_SIZE,
         "turning_radius_left": cfg.TURNING_RADIUS_LEFT,
         "turning_radius_right": cfg.TURNING_RADIUS_RIGHT,
+        "turning_centre_offset": cfg.TURNING_CENTRE_OFFSET,
         "obstacle_inflation": cfg.OBSTACLE_INFLATION,
         "boundary_margin": cfg.BOUNDARY_MARGIN,
         "capture_standoff": cfg.CAPTURE_STANDOFF,
@@ -308,7 +318,7 @@ def api_navigate():
     robot = data.get("robot")
     if robot:
         # The RPi speaks in grid cells like the tablet does; convert to the
-        # centre-of-robot centimetres the planner works in.
+        # turning-centre centimetres the planner works in.
         start = arena_module.bottom_left_to_centre(
             arena_module.cell_to_cm(float(robot.get("x", 0))),
             arena_module.cell_to_cm(float(robot.get("y", 0))),
