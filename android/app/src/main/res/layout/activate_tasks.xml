@@ -135,6 +135,18 @@
                 android:fontFamily="@font/poppins_bold"
                 android:background="@drawable/rounded_status_background"
                 android:backgroundTint="#5A2D8A" />
+
+            <Button
+                android:id="@+id/viewSavedImagesButton"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:layout_marginTop="6dp"
+                android:text="VIEW SAVED IMAGES"
+                android:textSize="11sp"
+                android:textColor="@color/white"
+                android:fontFamily="@font/poppins_bold"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#2563A8" />
         </LinearLayout>
 
     </LinearLayout>
