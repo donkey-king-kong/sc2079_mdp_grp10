@@ -1,0 +1,13 @@
+[
+ {"name": "ryan", "obstacles": [{"id": 1, "x": 5, "y": 7, "face": "S"}, {"id": 2, "x": 12, "y": 9, "face": "E"}, {"id": 3, "x": 5, "y": 13, "face": "W"}, {"id": 4, "x": 15, "y": 15, "face": "S"}, {"id": 5, "x": 15, "y": 4, "face": "N"}]},
+ {"name": "rand01", "obstacles": [{"id": 1, "x": 15, "y": 7, "face": "S"}, {"id": 2, "x": 6, "y": 13, "face": "S"}, {"id": 3, "x": 1, "y": 7, "face": "N"}, {"id": 4, "x": 17, "y": 11, "face": "N"}, {"id": 5, "x": 7, "y": 8, "face": "S"}]},
+ {"name": "rand02", "obstacles": [{"id": 1, "x": 15, "y": 5, "face": "S"}, {"id": 2, "x": 6, "y": 7, "face": "W"}, {"id": 3, "x": 15, "y": 12, "face": "S"}, {"id": 4, "x": 15, "y": 16, "face": "W"}, {"id": 5, "x": 11, "y": 11, "face": "S"}]},
+ {"name": "rand03", "obstacles": [{"id": 1, "x": 3, "y": 17, "face": "E"}, {"id": 2, "x": 2, "y": 13, "face": "N"}, {"id": 3, "x": 10, "y": 5, "face": "E"}, {"id": 4, "x": 16, "y": 13, "face": "W"}, {"id": 5, "x": 15, "y": 2, "face": "N"}]},
+ {"name": "rand04", "obstacles": [{"id": 1, "x": 15, "y": 1, "face": "W"}, {"id": 2, "x": 9, "y": 14, "face": "E"}, {"id": 3, "x": 4, "y": 13, "face": "N"}, {"id": 4, "x": 8, "y": 10, "face": "S"}, {"id": 5, "x": 4, "y": 9, "face": "E"}]},
+ {"name": "rand05", "obstacles": [{"id": 1, "x": 3, "y": 9, "face": "E"}, {"id": 2, "x": 15, "y": 12, "face": "N"}, {"id": 3, "x": 11, "y": 3, "face": "N"}, {"id": 4, "x": 10, "y": 12, "face": "S"}, {"id": 5, "x": 15, "y": 8, "face": "N"}]},
+ {"name": "rand06", "obstacles": [{"id": 1, "x": 6, "y": 16, "face": "E"}, {"id": 2, "x": 8, "y": 4, "face": "N"}, {"id": 3, "x": 11, "y": 11, "face": "E"}, {"id": 4, "x": 5, "y": 9, "face": "E"}, {"id": 5, "x": 14, "y": 3, "face": "W"}]},
+ {"name": "rand07", "obstacles": [{"id": 1, "x": 6, "y": 8, "face": "E"}, {"id": 2, "x": 7, "y": 12, "face": "W"}, {"id": 3, "x": 8, "y": 18, "face": "W"}, {"id": 4, "x": 13, "y": 5, "face": "E"}, {"id": 5, "x": 11, "y": 11, "face": "N"}]},
+ {"name": "rand08", "obstacles": [{"id": 1, "x": 12, "y": 7, "face": "E"}, {"id": 2, "x": 2, "y": 18, "face": "S"}, {"id": 3, "x": 3, "y": 8, "face": "N"}, {"id": 4, "x": 13, "y": 17, "face": "S"}, {"id": 5, "x": 14, "y": 11, "face": "S"}]},
+ {"name": "rand09", "obstacles": [{"id": 1, "x": 9, "y": 5, "face": "W"}, {"id": 2, "x": 10, "y": 17, "face": "S"}, {"id": 3, "x": 12, "y": 10, "face": "E"}, {"id": 4, "x": 15, "y": 17, "face": "S"}, {"id": 5, "x": 9, "y": 1, "face": "W"}]},
+ {"name": "rand10", "obstacles": [{"id": 1, "x": 11, "y": 8, "face": "S"}, {"id": 2, "x": 4, "y": 12, "face": "N"}, {"id": 3, "x": 17, "y": 14, "face": "S"}, {"id": 4, "x": 9, "y": 4, "face": "N"}, {"id": 5, "x": 11, "y": 12, "face": "N"}]}
+]
