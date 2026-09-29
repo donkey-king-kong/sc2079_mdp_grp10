@@ -60,21 +60,24 @@ ROBOT_WIDTH = 21.4
 # generated ones should too. Half a footprint of slack past the zone is enough.
 START_KEEP_CLEAR = START_ZONE_SIZE + ROBOT_HALF
 
-# Robot starts in the start zone facing North. START_X/START_Y place the MIDDLE
-# of the footprint; `arena.start_pose()` turns that into the turning-centre pose
-# the planner uses, TURNING_CENTRE_OFFSET further back.
-#
-# Slide 7 puts the bottom-left corner at (0, 0), i.e. the centre at (15, 15).
-# That is exactly BOUNDARY_MARGIN from both walls, which makes the very first
-# left turn a boundary violation before the robot has moved a centimetre --
-# the turning circle dips a couple of millimetres past x = 15 and every
-# left-handed Dubins word out of the start zone is rejected. Since the start
-# zone is 40cm and the planning footprint is 30cm, centring the robot in it
-# costs nothing, keeps it entirely inside the zone, and buys 5cm of slack on
-# each wall. Set these back to ROBOT_HALF if your robot really is corner-parked.
-START_X = 20.0
-START_Y = 20.0
+# Where the robot starts: THE one setting, used by the simulator (/api/plan) and
+# the RPi (/api/navigate) alike. Nobody measures anything on the day -- the
+# robot is pushed into the bottom-left corner of the arena facing North, its
+# left side on the left edge and the back of its rear tyres on the bottom edge.
+# The front wheels are the widest part when straight (18.9cm across), so the
+# REAR-AXLE CENTRE, which is what a pose describes, is at (18.9/2, ROBOT_REAR).
+START_X = 18.9 / 2.0            # 9.45cm
+START_Y = ROBOT_REAR            # 3.35cm
 START_THETA = math.pi / 2.0
+
+# That pose is inside the safety margin -- the robot touches both walls -- so it
+# gets one exception. While the rear axle is still inside the start zone, each
+# wall only has to stay as clear as it was at the start, less this tolerance;
+# everywhere else the full margin applies. So the robot may leave the corner but
+# never get closer to a wall than it started, and cannot creep along a wall out
+# of the zone. The tolerance covers the rear corner of the 21.4cm-wide outline
+# swinging out ~0.1cm as a right turn begins.
+START_WALL_TOLERANCE = 0.5
 
 # --------------------------------------------------------------------------
 # Kinematics (briefing slide 4)

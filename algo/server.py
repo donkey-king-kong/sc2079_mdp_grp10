@@ -26,15 +26,20 @@ Request body for ``/api/plan``::
       "units":    "cell",           // "cell" (default, 20x20 grid) or "cm"
       "strategy": "exhaustive",     // "nearest" | "greedy_swap" | "exhaustive"
       "metric":   "time",           // "time" (default) or "distance"
-      "start":    {"x": 20, "y": 12.6, "theta_deg": 90}  // optional, cm, turning centre
+      "start":    {"x": 9.45, "y": 3.35, "theta_deg": 90}  // optional, cm, rear axle
     }
 
 `x`/`y` on an obstacle are the BOTTOM-LEFT corner; `face` (or `dir`) is the
 side the image is on, N/S/E/W. Response is documented in `_plan_response`.
 
-Every robot pose in cm, in and out, is the robot's TURNING CENTRE -- the point
-it rotates about, `TURNING_CENTRE_OFFSET` (7.4cm) behind the middle of its
-footprint. `path_cells` and the RPi's `robot` cell are about the footprint.
+Every robot pose in cm, in and out, is the robot's TURNING CENTRE -- the middle
+of the rear axle, `TURNING_CENTRE_OFFSET` (9.325cm) behind the middle of its
+body. `path_cells` are about the body's middle.
+
+The start pose is ONE setting, `config.START_X/START_Y/START_THETA` -- the robot
+pushed into the bottom-left corner. The simulator never sends `start`, and
+`/api/navigate` ignores the RPi's `robot` field, so both plan from the same
+place. `start` on `/api/plan` remains for tests and manual experiments.
 """
 
 import math
@@ -317,16 +322,14 @@ def api_navigate():
     data = payload.get("data", payload)
     layout = _read_layout(data)
 
+    # The robot is always pushed into the corner (config.START_*), so the start
+    # is that one setting -- the same one the simulator plans from. The tablet's
+    # robot cell is a hand-placed marker, not a measurement: log it and move on.
     start = arena_module.start_pose()
     robot = data.get("robot")
     if robot:
-        # The RPi speaks in grid cells like the tablet does; convert to the
-        # turning-centre centimetres the planner works in.
-        start = arena_module.bottom_left_to_centre(
-            arena_module.cell_to_cm(float(robot.get("x", 0))),
-            arena_module.cell_to_cm(float(robot.get("y", 0))),
-            arena_module.face_to_heading(str(robot.get("dir", robot.get("face", "N")))),
-        )
+        app.logger.info("navigate: ignoring robot %r from the RPi; planning from the "
+                        "configured start (%.2f, %.2f)", robot, start.x, start.y)
 
     began = time.time()
     route = planner.plan_route(layout, _read_strategy(data), start=start,

@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Tuple
 
 import config as cfg
 import dubins
-from arena import Arena
+from arena import Arena, nearby_cells
 from motion import (
     BACKWARD,
     FORWARD,
@@ -114,6 +114,18 @@ class _DistanceField:
     def __call__(self, pose: Pose) -> float:
         fx, fy = footprint_centre(pose)
         cx, cy = self._index(fx), self._index(fy)
+        cost = self._at(cx, cy)
+        if math.isinf(cost):
+            # The body's middle can legally be a little inside the inflated
+            # boxes this field is built on (the corner start, or beside a
+            # block's corner). Borrow the nearest cell that has a value.
+            for dist, nx, ny in nearby_cells(cx, cy):
+                near = self._at(nx, ny)
+                if not math.isinf(near):
+                    return near + dist * self.resolution
+        return cost
+
+    def _at(self, cx: int, cy: int) -> float:
         if not (0 <= cx < self.n and 0 <= cy < self.n):
             return float("inf")
         return self.cost[cy * self.n + cx]

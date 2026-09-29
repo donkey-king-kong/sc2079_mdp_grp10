@@ -53,7 +53,7 @@ simulator. Do **not** send the `START_TASK` message there: it expects
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `type` | no | Ignored by the server. Kept for the RPi's own message routing. |
-| `data.robot` | no | Robot start position as a grid cell, same 20x20 grid as the tablet. `x`/`y` are the bottom-left cell of the robot, `dir` is the facing (`N`/`S`/`E`/`W`). Defaults to the start zone, facing north. |
+| `data.robot` | no | **Ignored** (logged only). The robot is always pushed into the bottom-left corner facing north, and the server plans from that one configured start (`START_X`/`START_Y` in `algo/config.py`), exactly as the simulator does. |
 | `data.obstacles` | **yes** | One entry per obstacle. `x`/`y` are the grid cell of the obstacle, `dir` (or `face`) is the side carrying the image. `id` is echoed back in `SNAP<id>` and `order`; it defaults to the 1-based index if missing. Must be a non-empty list. |
 | `data.strategy` | no | `nearest`, `greedy_swap` or `exhaustive` (default). Use `exhaustive`. |
 | `data.metric` | no | `time` (default) or `distance`. Use `time`. |

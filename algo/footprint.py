@@ -19,7 +19,7 @@ at the samples -- see its comment in config.py.
 """
 
 import math
-from typing import Callable, List, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 import config as cfg
 from motion import Pose
@@ -78,13 +78,23 @@ def box_clearance(pose: Pose, box: Box) -> float:
                min(_point_to_body(cx, cy, pose) for cx, cy in box_corners))
 
 
+def wall_clearances(pose: Pose) -> Tuple[float, float, float, float]:
+    """Distance from the body to the left, right, bottom and top walls."""
+    corners = outline(pose)
+    xs = [x for x, _ in corners]
+    ys = [y for _, y in corners]
+    size = cfg.ARENA_SIZE
+    return (min(xs), size - max(xs), min(ys), size - max(ys))
+
+
 def wall_clearance(pose: Pose) -> float:
     """Distance from the body to the nearest arena wall (negative = outside)."""
-    size = cfg.ARENA_SIZE
-    return min(min(x, size - x, y, size - y) for x, y in outline(pose))
+    return min(wall_clearances(pose))
 
 
-def make_checker(boxes: Sequence[Box], clearance: float) -> Callable[[Pose], bool]:
+def make_checker(boxes: Sequence[Box], clearance: float,
+                 start_zone: Optional[Tuple[float, Tuple[float, float, float, float]]] = None
+                 ) -> Callable[[Pose], bool]:
     """A test for "is the body at least `clearance` from every box and wall?".
 
     This is the planner's hot loop -- a single plan asks it over a million
@@ -93,6 +103,11 @@ def make_checker(boxes: Sequence[Box], clearance: float) -> Callable[[Pose], boo
     the half-diagonal (plus clearance) cannot be reached by any corner, and one
     nearer than the half-width (plus clearance) is too close whichever way the
     robot faces. Only the band in between needs `box_clearance`.
+
+    `start_zone` is `(size, (left, right, bottom, top))`: while the rear axle is
+    within `size` of the bottom-left corner, each wall only needs the clearance
+    given for it instead of `clearance`. That is how the corner start pose,
+    which touches two walls, is allowed (see config.START_WALL_TOLERANCE).
     """
     offset = cfg.TURNING_CENTRE_OFFSET
     half_length = (cfg.ROBOT_FRONT + cfg.ROBOT_REAR) / 2.0
@@ -110,7 +125,11 @@ def make_checker(boxes: Sequence[Box], clearance: float) -> Callable[[Pose], boo
         mx = pose.x + offset * cos(pose.theta)
         my = pose.y + offset * sin(pose.theta)
         if not (low <= mx <= high and low <= my <= high):
-            if wall_clearance(pose) < clearance:
+            if start_zone is not None and pose.x < start_zone[0] and pose.y < start_zone[0]:
+                if any(have < need for have, need
+                       in zip(wall_clearances(pose), start_zone[1])):
+                    return False
+            elif wall_clearance(pose) < clearance:
                 return False
         for box, x0, y0, x1, y1 in near:
             if x0 < mx < x1 and y0 < my < y1:

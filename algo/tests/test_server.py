@@ -98,6 +98,18 @@ class Api(unittest.TestCase):
         self.assertIn("path", data["data"])
         self.assertTrue(all(len(cell) == 2 for cell in data["data"]["path"]))
 
+    def test_navigate_and_plan_start_from_the_same_configured_pose(self):
+        # The RPi's robot cell is ignored: whatever it says, /api/navigate plans
+        # the same run the simulator does from the corner start.
+        obstacles = [{"id": 1, "x": 6, "y": 12, "face": "S"},
+                     {"id": 2, "x": 14, "y": 6, "face": "W"}]
+        _, planned = self.post("/api/plan", {"obstacles": obstacles})
+        for robot in ({"x": 1, "y": 1, "dir": "N"}, {"x": 5, "y": 5, "dir": "E"}):
+            _, navigated = self.post("/api/navigate", {
+                "type": "START_TASK", "data": {"robot": robot, "obstacles": obstacles}})
+            with self.subTest(robot=robot):
+                self.assertEqual(navigated["data"]["commands"], planned["commands"])
+
     def test_client_errors_come_back_as_400_with_a_reason(self):
         for body in ({"obstacles": []},
                      {"obstacles": [{"id": 1, "x": 5, "y": 5, "face": "Q"}]},

@@ -137,9 +137,16 @@ class Arena:
             for ob in self.obstacles
         ]
         # Clear means at least SAFETY_MARGIN away, plus SWEEP_PAD so that the
-        # margin also holds between the sampled poses of a path.
+        # margin also holds between the sampled poses of a path. The corner
+        # start touches two walls, so inside the start zone each wall only has
+        # to stay as clear as it is at the start (config.START_WALL_TOLERANCE).
+        clearance = cfg.SAFETY_MARGIN + cfg.SWEEP_PAD - _EDGE_TOLERANCE
+        at_start = footprint.wall_clearances(start_pose())
         self._is_clear = footprint.make_checker(
-            self._boxes, cfg.SAFETY_MARGIN + cfg.SWEEP_PAD - _EDGE_TOLERANCE)
+            self._boxes, clearance,
+            start_zone=(cfg.START_ZONE_SIZE,
+                        tuple(min(clearance, have - cfg.START_WALL_TOLERANCE)
+                              for have in at_start)))
 
     # -- collision ---------------------------------------------------------
 
@@ -295,8 +302,23 @@ def parse_obstacles(raw: Iterable[Dict], units: str = "cell") -> List[Obstacle]:
 
 
 def start_pose() -> Pose:
-    """START_X/START_Y place the middle of the footprint; this is the turning centre."""
-    return pose_from_footprint_centre(cfg.START_X, cfg.START_Y, cfg.START_THETA)
+    """The robot pushed into the bottom-left corner: START_X/START_Y are the rear axle."""
+    return Pose(cfg.START_X, cfg.START_Y, normalise_angle(cfg.START_THETA))
+
+
+# How far (in grid cells) a heuristic looks for a usable cell when the body's
+# middle is in one it has no value for. The body can legally be a little inside
+# the heuristic's inflated boxes -- at the corner start, or beside a block's
+# corner, where the square inflation over-reaches -- and a heuristic that calls
+# that "walled in" would stop the search dead.
+NEAREST_CELL_REACH = 2
+
+
+def nearby_cells(cx: int, cy: int, reach: int = NEAREST_CELL_REACH):
+    """Cells around (cx, cy), nearest first, with their distance in cells."""
+    around = [(math.hypot(dx, dy), cx + dx, cy + dy)
+              for dx in range(-reach, reach + 1) for dy in range(-reach, reach + 1)]
+    return sorted(around)
 
 
 def reachable_region(arena: "Arena", origin: Pose,
@@ -314,9 +336,11 @@ def reachable_region(arena: "Arena", origin: Pose,
                 and arena.is_point_free((cx + 0.5) * resolution, (cy + 0.5) * resolution))
 
     ox, oy = footprint_centre(origin)
-    start = (int(ox // resolution), int(oy // resolution))
-    if not free(*start):
+    cells = [(cx, cy) for _, cx, cy in nearby_cells(int(ox // resolution), int(oy // resolution))
+             if free(cx, cy)]
+    if not cells:
         return set()
+    start = cells[0]
 
     seen = {start}
     stack = [start]

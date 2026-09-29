@@ -252,11 +252,15 @@ taken from the footprint's middle via `motion.footprint_centre()`, so the nose
 swinging wide on a turn is accounted for. `theta` is radians, East = 0,
 counter-clockwise.
 
-Note `START_X`/`START_Y` are 20, not 15. Slide 7's corner position puts the
-robot exactly on the boundary margin, where the first left turn dips a
-fraction of a millimetre outside the arena and every left-handed path out of the
-start zone is rejected. The start zone is 40cm and the planning footprint 30cm,
-so centring the robot in it costs nothing and buys 5cm of slack.
+The start pose is one setting, `START_X`/`START_Y`/`START_THETA`, used by both
+the simulator and `/api/navigate` (which ignores the RPi's `robot` field). It is
+the robot pushed into the bottom-left corner facing North: left side of the
+front wheels (18.9cm across) on x = 0, back of the rear tyres on y = 0, so the
+rear-axle centre is at (9.45, 3.35). Nothing is measured on the day. That pose
+touches two walls, so while the rear axle is inside the 40cm start zone each wall
+only has to stay as clear as it was at the start (less `START_WALL_TOLERANCE`,
+0.5cm); outside the zone the full `SAFETY_MARGIN` applies. The robot can leave
+the corner, but never get closer to a wall than it started.
 
 ## Talking to the rest of the system
 

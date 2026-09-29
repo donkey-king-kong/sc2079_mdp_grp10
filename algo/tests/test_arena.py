@@ -28,12 +28,15 @@ class TurningCentre(unittest.TestCase):
         self.assertAlmostEqual(pose.x, 105.0, places=6)
         self.assertAlmostEqual(pose.y, 100.0 - 30.0 - cfg.TURNING_CENTRE_OFFSET, places=6)
 
-    def test_start_places_the_body_where_config_says(self):
+    def test_start_is_the_rear_axle_pushed_into_the_corner(self):
+        # START_X/START_Y are the rear axle: back of the rear tyres on y = 0,
+        # left side of the (18.9cm, straight) front wheels on x = 0.
         pose = arena_module.start_pose()
-        mx, my = footprint_centre(pose)
-        self.assertAlmostEqual(mx, cfg.START_X, places=6)
-        self.assertAlmostEqual(my, cfg.START_Y, places=6)
-        self.assertAlmostEqual(pose.y, cfg.START_Y - cfg.TURNING_CENTRE_OFFSET, places=6)
+        self.assertAlmostEqual(pose.x, cfg.START_X, places=6)
+        self.assertAlmostEqual(pose.y, cfg.START_Y, places=6)
+        self.assertAlmostEqual(pose.theta, math.pi / 2, places=6)
+        self.assertAlmostEqual(pose.y - cfg.ROBOT_REAR, 0.0, places=6)
+        self.assertAlmostEqual(pose.x - 18.9 / 2, 0.0, places=6)
 
     def test_collision_is_judged_at_the_body_not_the_turning_centre(self):
         # Obstacle box spans y in [85, 125]. The turning centre at y=80 is clear

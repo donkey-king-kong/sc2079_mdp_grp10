@@ -10,10 +10,11 @@ import unittest
 
 import conftest  # noqa: F401
 
+import commands
 import config as cfg
 import footprint
 import planner
-from arena import Arena, Obstacle
+from arena import Arena, Obstacle, start_pose
 from motion import Pose, pose_from_footprint_centre
 
 BLOCK = (100.0, 100.0, 110.0, 110.0)
@@ -68,6 +69,40 @@ class RotatedCheck(unittest.TestCase):
         self.assertFalse(self.arena.is_pose_free(Pose(50.0, just_clear - 0.1, math.pi / 2)))
 
 
+class CornerStart(unittest.TestCase):
+    """The robot starts touching two walls; it may leave, never get closer."""
+
+    def setUp(self):
+        self.arena = Arena([Obstacle(1, 100.0, 100.0, "N")])
+        self.start = start_pose()
+
+    def drive(self, command):
+        return all(self.arena.is_pose_free(p) for p in
+                   commands.commands_to_trajectory([command], self.start).iter_sample(
+                       cfg.COLLISION_SAMPLE_STEP))
+
+    def test_start_pose_is_allowed_inside_the_margin(self):
+        self.assertLess(footprint.wall_clearance(self.start), cfg.SAFETY_MARGIN)
+        self.assertTrue(self.arena.is_pose_free(self.start))
+
+    def test_it_can_drive_out_of_the_corner(self):
+        self.assertTrue(self.drive("SF010"))
+        self.assertTrue(self.drive("RF090"))
+
+    def test_it_cannot_go_through_the_walls_it_starts_on(self):
+        for command in ("SB005", "LF030", "RB030", "LB030"):
+            with self.subTest(command=command):
+                self.assertFalse(self.drive(command))
+
+    def test_it_cannot_creep_along_the_wall_out_of_the_start_zone(self):
+        self.assertFalse(self.drive("SF060"))
+
+    def test_the_exception_is_only_for_the_start_zone(self):
+        # The same wall distance as the start, but further up the left wall.
+        elsewhere = Pose(self.start.x, 100.0, self.start.theta)
+        self.assertFalse(self.arena.is_pose_free(elsewhere))
+
+
 class Sweep(unittest.TestCase):
     def test_planned_paths_keep_the_margin_between_samples(self):
         arena = Arena(LAYOUT)
@@ -75,6 +110,10 @@ class Sweep(unittest.TestCase):
         self.assertTrue(route.legs)
         boxes = [(ob.x, ob.y, ob.x + cfg.OBSTACLE_SIZE, ob.y + cfg.OBSTACLE_SIZE)
                  for ob in LAYOUT]
+        # Leaving the corner, each wall need only stay as clear as at the start.
+        at_start = footprint.wall_clearances(start_pose())
+        zone_need = [min(cfg.SAFETY_MARGIN, have - cfg.START_WALL_TOLERANCE)
+                     for have in at_start]
         worst = math.inf
         for leg in route.legs:
             for segment in leg.trajectory.segments:
@@ -83,8 +122,13 @@ class Sweep(unittest.TestCase):
                 n = max(1, int(math.ceil(segment.length / 0.05)))
                 for i in range(n + 1):
                     pose = segment.pose_at(segment.length * i / n)
-                    worst = min(worst, footprint.wall_clearance(pose),
-                                *(footprint.box_clearance(pose, box) for box in boxes))
+                    worst = min(worst, *(footprint.box_clearance(pose, box) for box in boxes))
+                    walls = footprint.wall_clearances(pose)
+                    if pose.x < cfg.START_ZONE_SIZE and pose.y < cfg.START_ZONE_SIZE:
+                        for have, need in zip(walls, zone_need):
+                            self.assertGreaterEqual(have, need - 1e-6)
+                    else:
+                        worst = min(worst, *walls)
         self.assertGreaterEqual(worst, cfg.SAFETY_MARGIN - 1e-6)
 
 
