@@ -32,6 +32,7 @@ simulator's "compare all strategies" view fast.
 """
 
 import itertools
+import math
 import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -40,8 +41,8 @@ import config as cfg
 import dubins
 import hybrid_astar
 from arena import Arena, CapturePose, start_pose
-from motion import (BACKWARD, STRAIGHT, Pose, Segment, Trajectory, merge_segments,
-                    pose_from_footprint_centre)
+from motion import (BACKWARD, STRAIGHT, Pose, Segment, Trajectory, footprint_centre,
+                    merge_segments, pose_from_footprint_centre)
 
 STRATEGIES = ("nearest", "greedy_swap", "exhaustive")
 
@@ -63,6 +64,10 @@ TRANSIT_HEADINGS = (0.0, 1.5707963267948966, 3.141592653589793, -1.5707963267948
 # not connect. The search is milliseconds when it succeeds but has to exhaust
 # its budget to prove a leg impossible, and mostly it is proving.
 SEARCH_BUDGET = 20
+
+# How many already-reachable poses, nearest first, a stranded obstacle's search
+# may start from before it is given up on. See `CostModel.fill_gaps`.
+SEARCH_SOURCES = 3
 
 
 @dataclass
@@ -162,17 +167,55 @@ def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
                 break            # blocked behind: reversing further cannot help
             departure, prefix = reverse.end, [reverse]
 
-        result = dubins.plan(departure, target, is_free=arena.is_pose_free)
+        result = _dubins(arena, departure, target)
         if result is None:
             continue
         word, trajectory = result
         combined = Trajectory(merge_segments(prefix + trajectory.segments))
         return (word if not prefix else "SB+" + word, combined)
 
+    # Dubins only drives forward, so it cannot enter a pose tucked against a
+    # wall or behind another block. The same path driven backwards can: a
+    # forward path from the target to the source, reversed, reaches the target
+    # in reverse gear -- still analytic -- and covers most of what used to fall
+    # through to the search below.
+    result = _dubins(arena, target, source)
+    if result is not None:
+        word, trajectory = result
+        return ("rev-" + word, _reversed(trajectory))
+
     if not allow_search:
         return None
     trajectory = hybrid_astar.plan(arena, source, target, max_expansions=max_expansions)
     return ("hybrid_astar", trajectory) if trajectory is not None else None
+
+
+def _dubins(arena: Arena, start: Pose, goal: Pose) -> Optional[Tuple[str, Trajectory]]:
+    """`dubins.plan` against this arena, memoised per pose pair.
+
+    Building the roadmap asks for most pairs twice -- once as a forward leg,
+    once as the reversed path of the leg the other way round -- and the
+    collision check on each candidate is the expensive part.
+    """
+    cache = getattr(arena, "_dubins_cache", None)
+    if cache is None:
+        cache = {}
+        setattr(arena, "_dubins_cache", cache)
+    key = (start, goal)
+    if key not in cache:
+        cache[key] = dubins.plan(start, goal, is_free=arena.is_pose_free)
+    return cache[key]
+
+
+def _reversed(trajectory: Trajectory) -> Trajectory:
+    """The same path driven the other way, in reverse gear.
+
+    Each arc keeps its steering side and radius -- reversing round a circle
+    stays on that circle -- so every pose it passes through, and therefore its
+    collision check, is exactly the forward path's.
+    """
+    return Trajectory([Segment(BACKWARD, seg.steering, seg.length, seg.radius, seg.end)
+                       for seg in reversed(trajectory.segments)])
 
 
 class CostModel:
@@ -285,8 +328,14 @@ class CostModel:
         """Last resort: buy connectivity with Hybrid A* where nothing analytic worked.
 
         Runs at most once per model and the result is shared by every strategy.
-        One search per stranded pair -- a failed search has to exhaust its
-        budget to prove the leg impossible, so we do not work down the menu.
+        Only obstacles the robot cannot yet get to from the start are searched
+        for, and each search starts from the few places it CAN already get to
+        that are nearest that obstacle. A short search from next door succeeds
+        in milliseconds; a long one from across the arena (or from another
+        obstacle's photo pose, which the robot has to back out of first) tends
+        to run out of expansions -- and a failed search has to exhaust its
+        budget to prove the leg impossible, so failures are what the time goes
+        on. As soon as one search lands, the next obstacle gets its turn.
 
         Bounded by wall clock as well as call count, because the two failure
         modes cost wildly different amounts and only the clock bounds the thing
@@ -300,35 +349,41 @@ class CostModel:
         deadline = time.monotonic() + cfg.SEARCH_TIME_BUDGET
 
         for target_id in self.obstacle_ids:
+            if self._reachable_from_start(target_id):
+                continue
+            reached = False
             for source_index in self._representative_sources(target_id):
-                if budget <= 0 or time.monotonic() > deadline:
-                    break
-                if self._pair_is_connected(source_index, target_id):
-                    continue
                 for target_index in self.nodes_by_obstacle[target_id][:2]:
                     if budget <= 0 or time.monotonic() > deadline:
                         break
                     budget -= 1
                     if self._solve(source_index, target_index, allow_search=True) < INF:
+                        reached = True
                         break
+                if reached or budget <= 0 or time.monotonic() > deadline:
+                    break
+            if reached:
+                # Route the new edge through the roadmap now, so the next
+                # obstacle can start its search from here.
+                self._close_transitively()
 
         self._close_transitively()      # new edges open up new multi-hop routes
 
-    def _representative_sources(self, target_id: int) -> List[int]:
-        """The start node, plus the best pose of every other obstacle."""
-        sources = [0]
-        for other_id, indices in self.nodes_by_obstacle.items():
-            if other_id != target_id and indices:
-                sources.append(indices[0])
-        return sources
+    def _reachable_from_start(self, target_id: int) -> bool:
+        return any(self._cost[0][j] < INF for j in self.nodes_by_obstacle[target_id])
 
-    def _pair_is_connected(self, source_index: int, target_id: int) -> bool:
-        """Does any known leg run from this source into this obstacle?"""
-        source_obstacle = self.nodes[source_index].obstacle_id
-        sources = ([source_index] if source_obstacle is None
-                   else self.nodes_by_obstacle[source_obstacle])
-        return any(self._cost[i][j] < INF
-                   for i in sources for j in self.nodes_by_obstacle[target_id])
+    def _representative_sources(self, target_id: int) -> List[int]:
+        """The start and every pose already reachable from it, nearest the target first.
+
+        Capped at SEARCH_SOURCES: if the nearest few cannot get in, the far side
+        of the arena will not do better within the expansion budget.
+        """
+        tx, ty = footprint_centre(self.nodes[self.nodes_by_obstacle[target_id][0]].pose)
+        reachable = [i for i, node in enumerate(self.nodes)
+                     if (i == 0 or self._cost[0][i] < INF) and node.obstacle_id != target_id]
+        reachable.sort(key=lambda i: math.hypot(*(a - b for a, b in zip(
+            footprint_centre(self.nodes[i].pose), (tx, ty)))))
+        return reachable[:SEARCH_SOURCES]
 
     # -- queries -----------------------------------------------------------
 

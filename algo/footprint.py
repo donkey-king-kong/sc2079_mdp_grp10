@@ -98,11 +98,11 @@ def make_checker(boxes: Sequence[Box], clearance: float,
     """A test for "is the body at least `clearance` from every box and wall?".
 
     This is the planner's hot loop -- a single plan asks it over a million
-    times -- so the geometry is fixed once here and most poses are settled from
-    the body's middle without the exact rectangle test: an obstacle farther than
-    the half-diagonal (plus clearance) cannot be reached by any corner, and one
-    nearer than the half-width (plus clearance) is too close whichever way the
-    robot faces. Only the band in between needs `box_clearance`.
+    times -- so the geometry is fixed once here and most poses are settled
+    cheaply: an obstacle farther from the body's middle than the half-diagonal
+    (plus clearance) cannot be reached by any corner, and nearer ones are
+    usually settled by the separating-axis test. Only what is left needs the
+    exact `box_clearance`. The answer is always the exact one.
 
     `start_zone` is `(size, (left, right, bottom, top))`: while the rear axle is
     within `size` of the bottom-left corner, each wall only needs the clearance
@@ -113,17 +113,18 @@ def make_checker(boxes: Sequence[Box], clearance: float,
     half_length = (cfg.ROBOT_FRONT + cfg.ROBOT_REAR) / 2.0
     half_width = cfg.ROBOT_WIDTH / 2.0
     outer = math.hypot(half_length, half_width) + clearance
-    inner = min(half_length, half_width) + clearance
     low, high = outer, cfg.ARENA_SIZE - outer
     # Each box grown by `outer`: a middle outside it is out of reach, decided
-    # with four comparisons.
-    near = [(box, box[0] - outer, box[1] - outer, box[2] + outer, box[3] + outer)
+    # with four comparisons. Its centre and half-size feed the axis test below.
+    near = [(box, box[0] - outer, box[1] - outer, box[2] + outer, box[3] + outer,
+             (box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0, (box[2] - box[0]) / 2.0)
             for box in boxes]
     cos, sin = math.cos, math.sin
 
     def is_clear(pose: Pose) -> bool:
-        mx = pose.x + offset * cos(pose.theta)
-        my = pose.y + offset * sin(pose.theta)
+        c, s = cos(pose.theta), sin(pose.theta)
+        mx = pose.x + offset * c
+        my = pose.y + offset * s
         if not (low <= mx <= high and low <= my <= high):
             if start_zone is not None and pose.x < start_zone[0] and pose.y < start_zone[0]:
                 if any(have < need for have, need
@@ -131,13 +132,23 @@ def make_checker(boxes: Sequence[Box], clearance: float,
                     return False
             elif wall_clearance(pose) < clearance:
                 return False
-        for box, x0, y0, x1, y1 in near:
-            if x0 < mx < x1 and y0 < my < y1:
-                gap = _point_to_box(mx, my, box)
-                if gap >= outer:
-                    continue
-                if gap < inner or box_clearance(pose, box) < clearance:
-                    return False
+        for box, x0, y0, x1, y1, bx, by, half in near:
+            if not (x0 < mx < x1 and y0 < my < y1):
+                continue
+            # Separating axes of the two rectangles: how far apart they are
+            # along each. A gap of `clearance` on any one axis proves the whole
+            # body is at least that far away; no gap on any axis means they
+            # overlap. Only what is left needs the exact distance.
+            ac, as_ = abs(c), abs(s)
+            dx, dy = bx - mx, by - my
+            gap = max(abs(dx) - (half_length * ac + half_width * as_ + half),
+                      abs(dy) - (half_length * as_ + half_width * ac + half),
+                      abs(dx * c + dy * s) - (half_length + half * (ac + as_)),
+                      abs(dy * c - dx * s) - (half_width + half * (ac + as_)))
+            if gap >= clearance:
+                continue
+            if gap <= 0.0 or box_clearance(pose, box) < clearance:
+                return False
         return True
 
     return is_clear

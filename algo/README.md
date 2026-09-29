@@ -158,6 +158,12 @@ Two details matter more than they look:
   the turning radius is 20.2cm left / 36.2cm right &mdash; so every forward-only path out drives into
   the block it just photographed. Slide 33 says the same thing. Each leg
   therefore tries backing straight out first, shortest reverse that works.
+- **Reversing in is as necessary as reversing out.** Dubins only drives
+  forward, so it cannot enter a photo pose tucked against a wall or behind
+  another block. When no forward path fits, `_plan_leg` tries the forward path
+  from the target back to the source and drives it in reverse gear: the same
+  poses, the same collision check, still analytic. On the layout from the first
+  robot run this is what took the planner from 2 obstacles to 5.
 - **Three segments is not always enough.** A Dubins path cannot express "along
   the bottom, up the right-hand side, then in", which a cluttered arena needs
   constantly. So the roadmap carries `transit` poses in the open parts of the
@@ -338,8 +344,17 @@ Read `tests/` before changing anything in `dubins.py`, `hybrid_astar.py` or
   against the greedy walk's 37. Where both reach the same number, exhaustive is
   strictly faster on 34 of 48 and saves **9.5% of the run time** on average.
 
+  *Since then* (measured outline, rotated collision check, reversed Dubins
+  legs, nearest-first rescue searches), on `tools/replay/layouts.json` -- the
+  first robot run's layout plus 10 seeded random ones -- the planner reaches
+  54 of 55 obstacles in 6-9.3s each. The one it misses has no legal photo
+  pose: every candidate parks within 1.9cm of the neighbouring block, inside
+  `SAFETY_MARGIN`.
+
   The knob here is `SEARCH_TIME_BUDGET` (4s), the wall-clock ceiling on the
-  Hybrid A* rescue pass. Raising it recovers a few more obstacles at the cost of
+  Hybrid A* rescue pass. It searches from the few poses the robot can already
+  reach that are nearest each stranded obstacle, since a short search from
+  next door succeeds where a long one from across the arena runs out of steps. Raising it recovers a few more obstacles at the cost of
   a longer wait: with the budget lifted entirely, those same 60 layouts give 48
   of 60, but the worst case goes from 8.8s to 18.1s. Planning happens once,
   before the robot moves, so it is worth turning up if a supervisor is watching

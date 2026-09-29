@@ -222,11 +222,27 @@ class Segment:
         if self.length <= 1e-9:
             return
         step = max(step, 1e-6)
-        if self.steering != STRAIGHT and self.radius > 0.0:
-            step = min(step, cfg.COLLISION_SAMPLE_ANGLE * self.radius)
+        start = self.start
+        if self.steering == STRAIGHT or self.radius <= 0.0:
+            n = max(1, int(math.ceil(self.length / step)))
+            dx = self.gear * math.cos(start.theta) * self.length / n
+            dy = self.gear * math.sin(start.theta) * self.length / n
+            for i in range(1, n + 1):
+                yield Pose(start.x + dx * i, start.y + dy * i, start.theta)
+            return
+
+        # The same arithmetic as `pose_at`, with the circle worked out once per
+        # segment rather than once per sample -- this is the planner's hot loop.
+        step = min(step, cfg.COLLISION_SAMPLE_ANGLE * self.radius)
         n = max(1, int(math.ceil(self.length / step)))
+        cx, cy = turn_centre(start, self.radius, self.steering)
+        phi0 = math.atan2(start.y - cy, start.x - cx)
+        sweep = self.steering * self.gear * (self.length / self.radius) / n
+        radius, cos, sin = self.radius, math.cos, math.sin
         for i in range(1, n + 1):
-            yield self.pose_at(self.length * i / n)
+            swept = sweep * i
+            yield Pose(cx + radius * cos(phi0 + swept), cy + radius * sin(phi0 + swept),
+                       normalise_angle(start.theta + swept))
 
     def sample(self, step: float) -> List[Pose]:
         return list(self.iter_sample(step))

@@ -12,9 +12,10 @@ import unittest
 import conftest  # noqa: F401
 
 import config as cfg
+import dubins
 import planner
 from arena import Arena, Obstacle, random_layout, start_pose
-from motion import footprint_centre
+from motion import BACKWARD, Pose, footprint_centre
 
 # A fixed, open layout. Deliberately not random, so a failure here is always the
 # same failure and can be debugged.
@@ -179,6 +180,40 @@ class RandomLayouts(unittest.TestCase):
                 self.assertEqual(len(set(route.order)), len(route.order))
                 for leg in route.legs:
                     self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
+
+class Reachability(unittest.TestCase):
+    """Obstacles the robot can reach must not be given up on."""
+
+    def test_layout_from_the_first_robot_run_reaches_all_five(self):
+        # The simulator layout from the first run on the robot, where the old
+        # planner reached only two: 2, 3 and 4 need the robot to reverse in.
+        layout = [Obstacle(1, 50.0, 70.0, "S"), Obstacle(2, 120.0, 90.0, "E"),
+                  Obstacle(3, 50.0, 130.0, "W"), Obstacle(4, 150.0, 150.0, "S"),
+                  Obstacle(5, 150.0, 40.0, "N")]
+        arena = Arena(layout)
+        route = planner.plan_route(arena, "exhaustive")
+        self.assertEqual(sorted(route.order), [1, 2, 3, 4, 5])
+        self.assertEqual(route.unreachable, [])
+        for leg in route.legs:
+            self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
+    def test_a_reversed_path_drives_the_same_poses_backwards(self):
+        forward = dubins.plan(Pose(50.0, 50.0, 0.0), Pose(120.0, 110.0, math.pi / 2))[1]
+        backward = planner._reversed(forward)
+        self.assertTrue(all(seg.gear == BACKWARD for seg in backward.segments))
+        start, end = backward.start_pose(), backward.end_pose()
+        self.assertAlmostEqual(start.x, 120.0, places=6)
+        self.assertAlmostEqual(start.y, 110.0, places=6)
+        self.assertAlmostEqual(end.x, 50.0, places=6)
+        self.assertAlmostEqual(end.y, 50.0, places=6)
+        self.assertAlmostEqual(end.theta, 0.0, places=6)
+        there = forward.sample(1.0)
+        back = backward.sample(1.0)
+        self.assertEqual(len(there), len(back))
+        for a, b in zip(there, reversed(back)):
+            self.assertAlmostEqual(a.x, b.x, places=6)
+            self.assertAlmostEqual(a.y, b.y, places=6)
 
 
 if __name__ == "__main__":
