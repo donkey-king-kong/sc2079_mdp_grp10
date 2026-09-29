@@ -235,9 +235,10 @@ real robot. The ones most likely to be wrong:
   derived from them (9.325cm, how far the body's middle sits ahead of the
   turning centre)
 - `CAPTURE_STANDOFF` (30cm, derived from slide 8)
-- `SPEED_STRAIGHT`, `SPEED_TURN`, `DIRECTION_CHANGE_TIME`, `STEERING_CHANGE_TIME`
-  &mdash; **measure these with a stopwatch**; they are estimates, and they are
-  what B.3 optimises against
+- `SPEED_*`, `ACCEL_*`, `DECEL_*`, `COMMAND_OVERHEAD` &mdash; the measured
+  motion profile (65cm/s straights, 45cm/s turns, 0.7s per command). Every
+  command is timed as its own stop-to-stop move, and this is what B.3 optimises
+  against; `SCAN_TIME` (2s per photo) is still an estimate
 - `COMMAND_NUM_WIDTH`, `SNAP_TO_90_TURNS`, `MAX_TURN_COMMAND_DEG` &mdash; must
   match the STM firmware
 
@@ -319,10 +320,8 @@ Read `tests/` before changing anything in `dubins.py`, `hybrid_astar.py` or
 
 ## Known gaps
 
-- **Speeds are estimated, not measured.** Everything in the time model is a
-  guess until someone stopwatches the robot. The *relative* ordering it produces
-  is already better than optimising distance, but the absolute seconds are not
-  trustworthy yet. This is the highest-value thing to fix.
+- **Photo time is estimated.** Speeds, accelerations and the 0.7s per-command
+  overhead are measured on the robot; `SCAN_TIME` (2s per photo) is not yet.
 - **No recovery behaviour for a camera miss.** Briefing slides 37&ndash;39
   describe what to do when the robot finds a bull's-eye instead of an image, or
   no obstacle at all: reverse and go round the block, or roam. That needs the

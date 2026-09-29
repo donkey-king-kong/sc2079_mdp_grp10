@@ -237,17 +237,20 @@ SEARCH_TIME_BUDGET = 4.0    # seconds
 # Time model -- this is what makes B.3 "shortest-TIME" and not "shortest-path"
 # --------------------------------------------------------------------------
 #
-# Turning is slower per centimetre than driving straight on the real chassis,
-# and every gear/steering change costs a real pause while the servo swings.
-# Measure these with a stopwatch on the actual robot and put the numbers here;
-# until then they are sane estimates and the *relative* ordering they produce
-# is already better than pure distance.
-
-SPEED_STRAIGHT = 40.0       # cm/s driving straight
-SPEED_TURN = 25.0           # cm/s along the arc while steering
-DIRECTION_CHANGE_TIME = 0.5  # s to shift between forward and reverse
-STEERING_CHANGE_TIME = 0.35  # s for the steering servo to swing over
-SCAN_TIME = 2.0             # s parked at an obstacle taking the photo
+# Measured on the robot (STM firmware motion profiles). Every STM command starts
+# and ends at rest: it accelerates, cruises, decelerates, and costs a fixed
+# overhead on top (settling, the servo swinging, the serial round trip). So a
+# path is timed command by command, and six micro-moves cost far more than one
+# long one even when they cover the same ground. Turn speeds are along the arc
+# at the rear axle.
+SPEED_STRAIGHT = 65.0       # cm/s cruise on a straight
+ACCEL_STRAIGHT = 100.0      # cm/s^2
+DECEL_STRAIGHT = 60.0       # cm/s^2
+SPEED_TURN = 45.0           # cm/s cruise on a turn
+ACCEL_TURN = 60.0           # cm/s^2
+DECEL_TURN = 60.0           # cm/s^2
+COMMAND_OVERHEAD = 0.7      # s fixed cost per command
+SCAN_TIME = 2.0             # s parked at an obstacle taking the photo (estimate)
 
 # The run time the simulator measures itself against.
 #

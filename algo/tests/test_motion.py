@@ -156,13 +156,36 @@ class Timing(unittest.TestCase):
         self.assertAlmostEqual(straight.length, turning.length)
         self.assertLess(straight.duration(), turning.duration())
 
-    def test_switching_direction_costs_time(self):
+    def test_every_command_pays_the_overhead(self):
+        # One 60cm command is quicker than two 30cm ones: the second pays its own
+        # acceleration, deceleration and fixed overhead. Two straights in a row
+        # are fused into the single command the robot is actually sent.
         start = Pose(100.0, 100.0, 0.0)
-        one = Segment(FORWARD, STRAIGHT, 30.0, 25.0, start)
-        two = Segment(BACKWARD, STRAIGHT, 30.0, 25.0, one.end)
-        together = Trajectory([one, two]).duration()
-        apart = Trajectory([one]).duration() + Trajectory([two]).duration()
-        self.assertAlmostEqual(together - apart, cfg.DIRECTION_CHANGE_TIME, places=9)
+        one = Segment(FORWARD, STRAIGHT, 30.0, 0.0, start)
+        two = Segment(FORWARD, STRAIGHT, 30.0, 0.0, one.end)
+        fused = Trajectory([one, two]).duration()
+        self.assertAlmostEqual(fused, Segment(FORWARD, STRAIGHT, 60.0, 0.0, start).duration())
+        self.assertGreater(one.duration() + two.duration(), fused + cfg.COMMAND_OVERHEAD)
+
+    def test_measured_speed_profile(self):
+        # 100cm straight: 0.65s up to 65cm/s over 21.1cm, 1.08s down over 35.2cm,
+        # the remaining 43.7cm at cruise, plus the fixed overhead.
+        straight = Segment(FORWARD, STRAIGHT, 100.0, 0.0, Pose(0.0, 0.0, 0.0))
+        expected = 65 / 100 + 65 / 60 + (100 - 65 ** 2 / 200 - 65 ** 2 / 120) / 65
+        self.assertAlmostEqual(straight.duration(), expected + cfg.COMMAND_OVERHEAD, places=9)
+        # Too short to reach cruise: a triangular profile, still > distance / cruise.
+        self.assertGreater(motion.move_time(10.0, 65.0, 100.0, 60.0), 10.0 / 65.0)
+        # The two profiles meet where the ramps just fit.
+        ramps = 65 ** 2 / 200 + 65 ** 2 / 120
+        self.assertAlmostEqual(motion.move_time(ramps - 1e-9, 65.0, 100.0, 60.0),
+                               motion.move_time(ramps, 65.0, 100.0, 60.0), places=6)
+
+    def test_a_turn_over_the_firmware_limit_costs_two_commands(self):
+        start = Pose(0.0, 0.0, 0.0)
+        radius = 20.0
+        half = Segment(FORWARD, LEFT, math.radians(cfg.MAX_TURN_COMMAND_DEG) * radius, radius, start)
+        whole = Segment(FORWARD, LEFT, 2 * half.length, radius, start)
+        self.assertAlmostEqual(whole.duration(), 2 * half.duration(), places=9)
 
 
 if __name__ == "__main__":
