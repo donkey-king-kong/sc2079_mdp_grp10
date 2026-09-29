@@ -62,7 +62,7 @@ time &mdash; forward, backward, and left/right arcs in both gears. They go
 through the same parser, the same kinematics and the same collision check as the
 planner, so a move that would clip a virtual obstacle or leave the arena is
 refused and says so. Note there is no on-the-spot turn: every turn is an arc at
-full lock -- 20cm radius to the left, 36cm to the right -- which is the honest
+full lock -- 20.2cm radius to the left, 36.2cm to the right -- which is the honest
 behaviour of the real chassis.
 
 Tick **Virtual obstacles** to show the inflated no-go regions the planner
@@ -126,11 +126,11 @@ the shortest collision-free one wins. It is microseconds, and provably optimal
 when nothing is in the way. Slide 43's worked `rsr` example is reproduced to two
 decimal places in `tests/test_dubins.py`.
 
-**Our robot does not turn symmetrically.** Measured about its centre, it turns
-on a 20cm radius to the left and a 36cm radius to the right, however far it
+**Our robot does not turn symmetrically.** Measured at the rear-axle centre, it
+turns on a 20.2cm radius to the left and a 36.2cm radius to the right, however far it
 turns. That is a fault in the chassis, so the planner models it rather than
 planning for a robot we do not have: every left arc (forward or reverse) is on
-the 20cm circle and every right arc on the 36cm one. The six Dubins shapes
+the 20.2cm circle and every right arc on the 36.2cm one. The six Dubins shapes
 generalise directly &mdash; the inner tangent of `LSR`/`RSL` uses `r1 + r2` where
 slide 29 has `2r`, and the middle circle of `LRL`/`RLR` sits `r_outer + r_middle`
 from each outer centre where slide 30 has `2r` &mdash; and with equal radii they
@@ -148,7 +148,7 @@ Two details matter more than they look:
 
 - **Reversing out of a capture pose is mandatory, not an optimisation.** The
   robot finishes a photo 30cm from an obstacle face pointing straight at it, and
-  the turning radius is 20cm left / 36cm right &mdash; so every forward-only path out drives into
+  the turning radius is 20.2cm left / 36.2cm right &mdash; so every forward-only path out drives into
   the block it just photographed. Slide 33 says the same thing. Each leg
   therefore tries backing straight out first, shortest reverse that works.
 - **Three segments is not always enough.** A Dubins path cannot express "along
@@ -220,11 +220,13 @@ Every tunable constant lives there with the slide it came from written next to
 it. It is the only file that should need touching when calibrating against the
 real robot. The ones most likely to be wrong:
 
-- `TURNING_RADIUS_LEFT` / `TURNING_RADIUS_RIGHT` (20cm / 36cm, measured on our
-  chassis about its turning centre; slide 4 assumes ~25cm both ways, and larger
+- `TURNING_RADIUS_LEFT` / `TURNING_RADIUS_RIGHT` (20.2cm / 36.2cm, measured on our
+  chassis at the rear-axle centre; slide 4 assumes ~25cm both ways, and larger
   the faster the robot goes)
-- `TURNING_CENTRE_OFFSET` (7.4cm, how far the turning centre sits behind the
-  middle of the footprint)
+- `ROBOT_FRONT` / `ROBOT_REAR` / `ROBOT_WIDTH` (22.0 / 3.35 / 21.4cm, the
+  measured outline from the rear-axle centre); `TURNING_CENTRE_OFFSET` is
+  derived from them (9.325cm, how far the body's middle sits ahead of the
+  turning centre)
 - `CAPTURE_STANDOFF` (30cm, derived from slide 8)
 - `SPEED_STRAIGHT`, `SPEED_TURN`, `DIRECTION_CHANGE_TIME`, `STEERING_CHANGE_TIME`
   &mdash; **measure these with a stopwatch**; they are estimates, and they are
@@ -234,7 +236,8 @@ real robot. The ones most likely to be wrong:
 
 Coordinates are centimetres with the origin at the arena's bottom-left. A robot
 pose is `(x, y, theta)` about the robot's **turning centre** -- the point it
-rotates about, `TURNING_CENTRE_OFFSET` (7.4cm) behind the middle of its
+rotates about, the middle of the rear axle, `TURNING_CENTRE_OFFSET` (9.325cm)
+behind the middle of its
 footprint -- not the bottom-left corner the briefing uses on slide 7;
 `arena.bottom_left_to_centre()` converts at the boundary. Anything about the
 body (collision checks, capture standoff, camera distance, `path_cells`) is

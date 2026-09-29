@@ -18,7 +18,7 @@ from motion import Pose, footprint_centre
 
 
 class TurningCentre(unittest.TestCase):
-    """Our robot turns about a point 7.4cm behind the middle of its body."""
+    """Our robot turns about its rear axle, TURNING_CENTRE_OFFSET behind the middle of its body."""
 
     def test_slide_8_pose_parks_the_turning_centre_further_back(self):
         # Slide 8 puts the MIDDLE of the robot 30cm below a south face; the
@@ -37,7 +37,7 @@ class TurningCentre(unittest.TestCase):
 
     def test_collision_is_judged_at_the_body_not_the_turning_centre(self):
         # Obstacle box spans y in [85, 125]. The turning centre at y=80 is clear
-        # of it, but facing North the body's middle is at 87.4 -- inside.
+        # of it, but facing North the body's middle is at 89.3 -- inside.
         arena = Arena([Obstacle(1, 100.0, 100.0, "N")])
         self.assertTrue(arena.is_point_free(105.0, 80.0))
         self.assertFalse(arena.is_pose_free(Pose(105.0, 80.0, math.pi / 2)))

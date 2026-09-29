@@ -134,10 +134,10 @@
       <p class="hint">
         Drives the robot with the same STM command strings the planner emits, through
         the same kinematics and the same collision check. The robot has no on-the-spot
-        turn, so every turn is an arc at full lock: <span id="radius-left">20</span>cm radius
-        to the left, <span id="radius-right">36</span>cm to the right, as measured on our
-        chassis about the point it turns on (the ring), <span id="centre-offset">7.4</span>cm
-        behind the middle of its body. A move that would
+        turn, so every turn is an arc at full lock: <span id="radius-left">20.2</span>cm radius
+        to the left, <span id="radius-right">36.2</span>cm to the right, as measured on our
+        chassis about the point it turns on -- the middle of the rear axle (the ring),
+        <span id="centre-offset">9.325</span>cm behind the middle of its body. A move that would
         clip a virtual obstacle or leave the arena is refused rather than driven.
       </p>
     </div>
@@ -365,22 +365,24 @@ function strokePoses(poses, from, to) {
   ctx.stroke();
 }
 
-// A pose is the robot's turning centre, which sits behind the middle of its
-// body; the path traced on the canvas is that point too. So the body is drawn
-// shifted forward along the heading, and the turning centre marked on it.
+// A pose is the robot's turning centre -- the middle of the rear axle -- which
+// sits behind the middle of its body; the path traced on the canvas is that
+// point too. So the real outline is drawn from ROBOT_REAR behind the pose to
+// ROBOT_FRONT ahead of it, and the turning centre marked on it.
 function drawRobot(pose) {
-  const half = CONFIG.robot_size / 2 * scale();
-  const ahead = (CONFIG.turning_centre_offset || 0) * scale();
+  const front = CONFIG.robot_front * scale();
+  const rear = CONFIG.robot_rear * scale();
+  const half = CONFIG.robot_width / 2 * scale();
   ctx.save();
   ctx.translate(px(pose.x), py(pose.y));
   ctx.rotate(-pose.theta);                       // canvas y is flipped, so negate
   ctx.fillStyle = "rgba(15,118,110,.22)";
   ctx.strokeStyle = getVar("--robot"); ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.rect(ahead - half, -half, half * 2, half * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.rect(-rear, -half, front + rear, half * 2); ctx.fill(); ctx.stroke();
 
   // Camera at the front centre (briefing slide 3), drawn as its view cone so
   // it is obvious which way the robot is pointing.
-  const nose = ahead + half;
+  const nose = front;
   ctx.fillStyle = "rgba(245,158,11,.30)";
   ctx.beginPath(); ctx.moveTo(nose, 0);
   ctx.arc(nose, 0, half * 1.5, -Math.PI / 5, Math.PI / 5); ctx.closePath(); ctx.fill();

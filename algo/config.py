@@ -41,6 +41,18 @@ START_ZONE_SIZE = 40.0      # 40cm x 40cm start zone at the bottom-left (slide 3
 ROBOT_SIZE = 30.0
 ROBOT_HALF = ROBOT_SIZE / 2.0
 
+# Our robot's real outline, measured from the centre of the REAR AXLE (the
+# point every planner pose describes -- see TURNING_CENTRE_OFFSET below):
+#   front-most point, the ultrasonic mount ........... 22.0cm ahead
+#   rear-most point, the rear tyres' back edge ....... 3.35cm behind
+#   width, the front wheels at full lock ............. 21.4cm (18.9 straight,
+#                                                      rear tyres 18.65)
+# So the body is 25.35cm x 21.4cm. The widest steering case is used for the
+# whole outline because the wheels are at full lock on every turn.
+ROBOT_FRONT = 22.0
+ROBOT_REAR = 3.35
+ROBOT_WIDTH = 21.4
+
 # Keep-clear square around the start zone, used when generating demo layouts.
 # An obstacle whose virtual box abuts the start zone leaves the robot in a
 # 10cm-tall band, and a 20-36cm turning radius cannot turn round in one -- the
@@ -70,27 +82,29 @@ START_THETA = math.pi / 2.0
 
 # Slide 4 says "a turning radius of about 25cm but it is a larger radius if robot
 # moves faster", and assumes the same radius both ways. OUR robot does not turn
-# symmetrically: measured about its centre, full left lock gives a 20cm radius
-# and full right lock 36cm, whatever the sweep. That is a fault of this chassis
-# (steering linkage), not a choice -- so the planner models the two sides
-# separately rather than planning with one figure it would then drive wrongly.
+# symmetrically: measured at the centre of the rear axle, full left lock gives a
+# 20.2cm radius and full right lock 36.2cm, whatever the sweep. That is a fault
+# of this chassis (steering linkage), not a choice -- so the planner models the
+# two sides separately rather than planning with one figure it would then drive
+# wrongly.
 #
 # The radius belongs to the steering side, not to the direction the nose swings:
-# LB (reverse, steering left) is also driven round the 20cm circle, RB round the
-# 36cm one. Re-measure both if the steering is ever trimmed; with equal values
+# LB (reverse, steering left) is also driven round the 20.2cm circle, RB round
+# the 36.2cm one. Re-measure both if the steering is ever trimmed; with equal values
 # the planner reduces exactly to the symmetric construction of slides 27-31.
-TURNING_RADIUS_LEFT = 20.0
-TURNING_RADIUS_RIGHT = 36.0
+TURNING_RADIUS_LEFT = 20.2
+TURNING_RADIUS_RIGHT = 36.2
 
-# Our robot does not turn about the middle of its footprint: the point it
-# rotates about sits 7.4cm behind it, towards the rear. That point is the only
-# one on the chassis whose velocity always lies along the heading, which is what
-# the Dubins/Hybrid A* kinematics assume (slides 27-33), so it is the point
-# every planner pose describes -- and the radii above are measured about it.
-# The body is centred this far AHEAD of the pose, so the nose swings wider than
-# the tail on every turn, and collision checks, the capture standoff and the
-# camera distance are all taken from there. 0 means it turns about its middle.
-TURNING_CENTRE_OFFSET = 7.4
+# Our robot does not turn about the middle of its footprint: with Ackermann
+# steering and rear-wheel drive the turning circle is always centred on the line
+# through the REAR AXLE, so the point it turns about is the rear-axle centre.
+# That point is the only one on the chassis whose velocity always lies along the
+# heading, which is what the Dubins/Hybrid A* kinematics assume (slides 27-33),
+# so it is the point every planner pose describes -- and the radii above are
+# measured about it. The body is centred this far AHEAD of the pose (derived
+# from the outline, 9.325cm), so the nose swings wider than the tail on every
+# turn, and the capture standoff and camera distance are taken from there.
+TURNING_CENTRE_OFFSET = (ROBOT_FRONT - ROBOT_REAR) / 2.0
 
 # --------------------------------------------------------------------------
 # Obstacle avoidance (briefing slide 36)

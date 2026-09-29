@@ -100,7 +100,7 @@ def pose_from_footprint_centre(x: float, y: float, theta: float) -> Pose:
 class TurningRadii:
     """The robot's minimum turning radius on each steering side, in cm.
 
-    Our chassis turns tighter to the left (20cm) than to the right (36cm) --
+    Our chassis turns tighter to the left (20.2cm) than to the right (36.2cm) --
     see `config.TURNING_RADIUS_LEFT`. Every arc is driven at the radius of its
     *steering* side, so a reverse-left arc is on the left circle too.
     """
