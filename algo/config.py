@@ -213,6 +213,8 @@ DEPARTURE_BACKOFF_OPTIONS = (0.0, 15.0, 30.0)
 HA_STEP = 5.0               # arc length of one motion primitive, cm
 HA_THETA_BINS = 24          # 15 degrees per bin
 HA_XY_RESOLUTION = 5.0      # cm per lattice cell used for de-duplicating states
+# Near enough to the goal to try reversing onto it exactly. Not an acceptance
+# box: the search only ever finishes exactly on the goal pose.
 HA_GOAL_XY_TOLERANCE = 4.0  # cm
 HA_GOAL_THETA_TOLERANCE = math.radians(10.0)
 HA_REVERSE_COST = 2.0       # multiplier: reversing is slow and drifts

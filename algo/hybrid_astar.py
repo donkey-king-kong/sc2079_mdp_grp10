@@ -165,6 +165,12 @@ def _at_goal(pose: Pose, goal: Pose) -> bool:
             and abs(normalise_angle(pose.theta - goal.theta)) <= cfg.HA_GOAL_THETA_TOLERANCE)
 
 
+def _reversed(trajectory: Trajectory) -> Trajectory:
+    """The same path driven the other way in reverse gear (as `planner._reversed`)."""
+    return Trajectory([Segment(BACKWARD, seg.steering, seg.length, seg.radius, seg.end)
+                       for seg in reversed(trajectory.segments)])
+
+
 def _reconstruct(node: _Node, tail: Optional[Trajectory] = None) -> Trajectory:
     segments: List[Segment] = []
     cursor: Optional[_Node] = node
@@ -214,17 +220,22 @@ def plan(arena: Arena, start: Pose, goal: Pose,
         expansions += 1
 
         # Analytic expansion. Every so often -- and always once we are close --
-        # try to close the remaining gap with a single exact Dubins path. When
-        # it works the robot lands on the goal pose *exactly* rather than
-        # within the lattice tolerance, which matters because the next leg
-        # starts from wherever this one ended.
+        # try to close the remaining gap with a single exact Dubins path, so
+        # the robot lands on the goal pose *exactly*. That is the only way this
+        # search may finish: the next leg starts from the exact goal pose, and
+        # the STM is never told about any gap in between, so a leg that stops
+        # "close enough" leaves every later command that far off course.
         if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * radii.widest:
             shot = dubins.plan(node.pose, goal, radii, arena.is_pose_free)
             if shot is not None:
                 return _reconstruct(node, shot[1])
 
+        # Near the goal but no forward shot fits: try reversing onto it. If
+        # that is blocked too, keep searching from here rather than stopping.
         if _at_goal(node.pose, goal):
-            return _reconstruct(node)
+            shot = dubins.plan(goal, node.pose, radii, arena.is_pose_free)
+            if shot is not None:
+                return _reconstruct(node, _reversed(shot[1]))
 
         for gear, steering in PRIMITIVES:
             # Each side turns at its own radius, so a left step swings the nose

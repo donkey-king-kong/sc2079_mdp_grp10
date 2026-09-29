@@ -198,6 +198,27 @@ class Reachability(unittest.TestCase):
         for leg in route.legs:
             self.assertTrue(arena.is_trajectory_free(leg.trajectory))
 
+    def test_legs_chain_exactly_after_a_hybrid_astar_leg(self):
+        # Two stress-test layouts where a Hybrid A* leg used to stop within its
+        # 4cm / 10 degree goal box, so the next leg started 3-4cm away from
+        # where the robot really was and the replay came within 1cm of a block.
+        layouts = {
+            "n7_14": [(1, 9, 13, "W"), (2, 10, 8, "E"), (3, 13, 4, "E"), (4, 15, 8, "N"),
+                      (5, 15, 15, "S"), (6, 2, 14, "N"), (7, 4, 9, "N")],
+            "n7_17": [(1, 12, 9, "E"), (2, 1, 10, "N"), (3, 18, 11, "W"), (4, 13, 5, "W"),
+                      (5, 14, 13, "N"), (6, 4, 16, "S"), (7, 6, 8, "E")],
+        }
+        for name, cells in layouts.items():
+            with self.subTest(layout=name):
+                arena = Arena([Obstacle(i, x * 10.0, y * 10.0, face) for i, x, y, face in cells])
+                route = planner.plan_route(arena, "exhaustive")
+                pose = start_pose()
+                for leg in route.legs:
+                    begin = leg.trajectory.start_pose()
+                    self.assertLess(math.hypot(begin.x - pose.x, begin.y - pose.y), 1e-6)
+                    self.assertLess(abs(math.remainder(begin.theta - pose.theta, 2 * math.pi)), 1e-6)
+                    pose = leg.trajectory.end_pose()
+
     def test_a_reversed_path_drives_the_same_poses_backwards(self):
         forward = dubins.plan(Pose(50.0, 50.0, 0.0), Pose(120.0, 110.0, math.pi / 2))[1]
         backward = planner._reversed(forward)
