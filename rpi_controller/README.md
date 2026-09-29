@@ -18,7 +18,7 @@ Android ──Bluetooth──> Raspberry Pi <──HTTP──> Algo
 - Convert Android arena data into the Algo API format.
 - Request navigation commands from Algo.
 - Route movement commands (`SF`, `SB`, `LF`, `RF`, `LB`, `RB`) to STM32.
-- Wait for STM acknowledgement before sending the next command.
+- Use dedicated STM TX/RX workers: TX serializes commands and RX classifies replies/events.
 - Intercept `SNAP` commands and trigger imaging.
 - Handle `FIN` when navigation is complete.
 
@@ -61,9 +61,25 @@ FIN
 **RPi ↔ STM32:** UART via `/dev/ttyUSB0` at `115200` baud.
 
 ```text
+RPi → ZH\n                 # once at the start of every movement run
+STM → A ZH\n
 RPi → SF010\n
-STM → A\n
+STM → A d=10.0 e=+0.1\n
 ```
+
+The Task1 STM protocol accepted by `connectors/stm.py` is:
+
+```text
+Movement: SF<n>, SB<n>, LF<n>, LB<n>, RF<n>, RB<n>
+Control:  ZH, D, !
+Field tools (only if enabled in firmware): TD, TV<800..2200>
+```
+
+`!` is an immediate one-byte emergency stop, with no newline or independent
+reply; the interrupted move later responds with `A ... ABORT`. All normal
+commands receive one `A` response. `TD` additionally produces numbered log
+records before its final `A TD <count> results` response; RX exposes them as
+events rather than assigning them to another command.
 
 **Imaging:** `SNAPx` commands call:
 
@@ -83,6 +99,22 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python manager.py
 ```
+
+## Android-free Task 1 integration
+
+Tonight's narrow integration runtime does not start Bluetooth or imaging. It
+uses one Algo HTTP worker plus separate STM TX and RX workers; the Task 1
+kernel is the sole owner of route state and sends the next STM movement only
+after the STM RX worker reports that the prior movement has stopped.
+
+```bash
+python3 task1_integration_test.py
+```
+
+The hardcoded robot and obstacle layout is in `task1_integration_test.py`.
+The Algo server must be available at `http://127.0.0.1:5001` and the STM USB
+serial adapter must be `/dev/ttyUSB0`. PC image transfer is optional; configure
+`MDP_PC_HOST`, `MDP_PC_USER`, `MDP_PC_DEST`, and optionally `MDP_PC_SSH_KEY`.
 
 YOLO weights belong at `imaging/models/best.pt`.
 

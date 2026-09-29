@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import re
 
 from PIL import Image, ImageDraw
 
@@ -12,10 +13,10 @@ from .detector import DetectionResult, DetectorSetupError, LocalYoloDetector, sy
 
 
 DEFAULT_MODEL_PATH = Path(__file__).with_name("models") / "best.pt"
-DATA_DIR = Path(__file__).with_name("data")
+DATA_DIR = Path(__file__).parents[1] / "imaging" / "data"
 
 
-def save_detection(frame, result: DetectionResult) -> None:
+def save_detection(frame, result: DetectionResult, obstacle_id: object) -> Path:
     """Save one detected target with its bounding box, ID and symbol."""
     image = Image.fromarray(frame)
     draw = ImageDraw.Draw(image)
@@ -28,10 +29,18 @@ def save_detection(frame, result: DetectionResult) -> None:
     draw.rectangle((x1, label_y, x1 + len(label) * 7, label_y + 20), fill="black")
     draw.text((x1 + 2, label_y + 2), label, fill="lime")
 
-    DATA_DIR.mkdir(exist_ok=True)
-    path = DATA_DIR / f"{datetime.now():%Y%m%d_%H%M%S_%f}_{result.target_id}.jpg"
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    detected_symbol = symbol_for_target(result.target_id) or result.target_id or "unknown"
+    safe_symbol = re.sub(r"[^A-Za-z0-9_-]+", "_", str(detected_symbol)).strip("_") or "unknown"
+    stem = f"{datetime.now():%Y%m%d_%H%M%S}_{safe_symbol}"
+    path = DATA_DIR / f"{stem}.jpg"
+    suffix = 2
+    while path.exists():
+        path = DATA_DIR / f"{stem}_{suffix}.jpg"
+        suffix += 1
     image.save(path, format="JPEG")
     print(f"[IMAGING] Saved {path}")
+    return path
 
 
 class ImagingService:
@@ -57,15 +66,18 @@ class ImagingService:
             frame = camera.capture()
             result = self.detector.detect(frame) if self.detector is not None else DetectionResult.not_found()
 
+        image_path = None
         if self.detector is None:
             print(f"[IMAGING] Model weights not found at {self.model_path}; capture only")
         elif not result.found:
             print("[IMAGING] No target detected")
         elif result.bbox is not None:
-            save_detection(frame, result)
+            image_path = save_detection(frame, result, obstacle_id)
 
         return {
             "obstacle_id": str(obstacle_id),
             "image_id": result.target_id,
             "confidence": result.confidence,
+            "bbox": result.bbox,
+            "image_path": str(image_path) if image_path else None,
         }
