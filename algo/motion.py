@@ -10,7 +10,7 @@ instead of hundreds of tiny ones.
 
 import math
 from dataclasses import dataclass, field
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Callable, Iterator, List, Optional, Tuple, Union
 
 import config as cfg
 
@@ -219,30 +219,40 @@ class Segment:
         loop of the whole planner and most blocked paths collide early -- the
         caller's `all()` short-circuits instead of sampling the full arc.
         """
+        n, pose_of = self.sampler(step)
+        for i in range(1, n + 1):
+            yield pose_of(i)
+
+    def sampler(self, step: float) -> Tuple[int, Callable[[int], Pose]]:
+        """`(n, pose_of)`: the segment is sampled at `pose_of(1)` .. `pose_of(n)`.
+
+        The sample points `iter_sample` walks through, but addressable in any
+        order. The same arithmetic as `pose_at`, with the circle worked out once
+        per segment rather than once per sample -- this is the planner's hot loop.
+        """
         if self.length <= 1e-9:
-            return
+            return 0, lambda i: self.start
         step = max(step, 1e-6)
         start = self.start
         if self.steering == STRAIGHT or self.radius <= 0.0:
             n = max(1, int(math.ceil(self.length / step)))
             dx = self.gear * math.cos(start.theta) * self.length / n
             dy = self.gear * math.sin(start.theta) * self.length / n
-            for i in range(1, n + 1):
-                yield Pose(start.x + dx * i, start.y + dy * i, start.theta)
-            return
+            return n, lambda i: Pose(start.x + dx * i, start.y + dy * i, start.theta)
 
-        # The same arithmetic as `pose_at`, with the circle worked out once per
-        # segment rather than once per sample -- this is the planner's hot loop.
         step = min(step, cfg.COLLISION_SAMPLE_ANGLE * self.radius)
         n = max(1, int(math.ceil(self.length / step)))
         cx, cy = turn_centre(start, self.radius, self.steering)
         phi0 = math.atan2(start.y - cy, start.x - cx)
         sweep = self.steering * self.gear * (self.length / self.radius) / n
         radius, cos, sin = self.radius, math.cos, math.sin
-        for i in range(1, n + 1):
+
+        def pose_of(i: int) -> Pose:
             swept = sweep * i
-            yield Pose(cx + radius * cos(phi0 + swept), cy + radius * sin(phi0 + swept),
-                       normalise_angle(start.theta + swept))
+            return Pose(cx + radius * cos(phi0 + swept), cy + radius * sin(phi0 + swept),
+                        normalise_angle(start.theta + swept))
+
+        return n, pose_of
 
     def sample(self, step: float) -> List[Pose]:
         return list(self.iter_sample(step))
@@ -325,6 +335,27 @@ class Trajectory:
         for seg in self.segments:
             for pose in seg.iter_sample(step):
                 yield pose
+
+    def iter_sample_coarse_first(self, step: float = cfg.COLLISION_SAMPLE_STEP,
+                                 stride: int = 4) -> Iterator[Pose]:
+        """The same poses as `iter_sample`, every `stride`-th one first.
+
+        For collision checking, where only "is any of them blocked?" matters and
+        most candidate paths are blocked somewhere in the middle: the coarse pass
+        finds that about `stride` times sooner. A clear path still has every one
+        of its poses checked. Poses are computed only as they are reached.
+        """
+        if not self.segments:
+            return
+        yield self.segments[0].start
+        samplers = [seg.sampler(step) for seg in self.segments]
+        for n, pose_of in samplers:
+            for i in range(stride, n + 1, stride):
+                yield pose_of(i)
+        for n, pose_of in samplers:
+            for i in range(1, n + 1):
+                if i % stride:
+                    yield pose_of(i)
 
     def sample(self, step: float = cfg.COLLISION_SAMPLE_STEP) -> List[Pose]:
         return list(self.iter_sample(step))

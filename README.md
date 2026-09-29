@@ -58,7 +58,7 @@ simulator. Do **not** send the `START_TASK` message there: it expects
 | `data.strategy` | no | `nearest`, `greedy_swap` or `exhaustive` (default). Use `exhaustive`. |
 | `data.metric` | no | `time` (default) or `distance`. Use `time`. |
 
-Planning takes about 6s on average and up to 9.3s on the test layouts, so give
+Planning takes about 4s on average and up to 6s on the test layouts, so give
 the HTTP call a timeout of at least 15s.
 
 **Response body**, HTTP 200 (this is the real reply to the request above):

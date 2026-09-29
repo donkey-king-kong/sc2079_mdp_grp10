@@ -347,7 +347,7 @@ Read `tests/` before changing anything in `dubins.py`, `hybrid_astar.py` or
   *Since then* (measured outline, rotated collision check, reversed Dubins
   legs, nearest-first rescue searches), on `tools/replay/layouts.json` -- the
   first robot run's layout plus 10 seeded random ones -- the planner reaches
-  54 of 55 obstacles in 6-9.3s each. The one it misses has no legal photo
+  54 of 55 obstacles in 3.4-5.8s each. The one it misses has no legal photo
   pose: every candidate parks within 1.9cm of the neighbouring block, inside
   `SAFETY_MARGIN`.
 

@@ -260,8 +260,10 @@ def plan(start: Pose, goal: Pose, radius: RadiusSpec = None,
 
     `is_free` is called on poses sampled every COLLISION_SAMPLE_STEP cm; pass
     `Arena.is_pose_free`. With no `is_free` this is just the shortest word.
+    Most candidate words are blocked, so the samples are checked coarse-first.
     """
     for word, traj in plan_all(start, goal, radius):
-        if is_free is None or all(is_free(p) for p in traj.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
+        if is_free is None or all(is_free(p) for p in
+                                  traj.iter_sample_coarse_first(cfg.COLLISION_SAMPLE_STEP)):
             return word, traj
     return None
