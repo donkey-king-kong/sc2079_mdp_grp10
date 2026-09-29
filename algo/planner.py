@@ -37,12 +37,13 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
+import commands as commands_module
 import config as cfg
 import dubins
 import hybrid_astar
 from arena import Arena, CapturePose, start_pose
 from motion import (BACKWARD, STRAIGHT, Pose, Segment, Trajectory, footprint_centre,
-                    merge_segments, pose_from_footprint_centre)
+                    merge_segments, normalise_angle, pose_from_footprint_centre)
 
 STRATEGIES = ("nearest", "greedy_swap", "exhaustive")
 
@@ -605,8 +606,59 @@ def plan_route(arena: Arena, strategy: str = "exhaustive",
         route.legs.append(Leg(obstacle_id=order[position], trajectory=trajectory,
                               method=method))
 
+    anchor_legs(arena, route, model.start)
     route.unreachable = sorted(set(route.unreachable))
     return route
+
+
+def anchor_legs(arena: Arena, route: Route, start: Pose) -> None:
+    """Start every leg from where the previous leg's COMMANDS leave the robot.
+
+    The STM takes whole centimetres and whole degrees, so each leg's commands
+    stop a little off the planned capture pose (the heading stays within half a
+    degree; the position can be ~1cm out). If the next leg is driven as
+    planned from the exact pose, those errors pile up leg after leg -- the
+    stress test saw 2-3cm by the end of a run, eaten straight out of the
+    safety margin. So each leg is re-planned from the pose the robot really
+    reaches, and the error never outlives one leg.
+
+    The re-plan rejoins the original leg at one of its segment ends (the
+    capture pose itself, or a transit pose on a multi-hop leg), with the same
+    analytic moves `_plan_leg` uses and the same collision check; the cheapest
+    rejoin wins. If none fits, the leg is driven as planned from where the
+    robot is -- no worse than before.
+    """
+    heading = commands_module.HeadingTracker()
+    pose = start
+    for index, leg in enumerate(route.legs):
+        begin = leg.trajectory.start_pose()
+        if (math.hypot(pose.x - begin.x, pose.y - begin.y) > 1e-6
+                or abs(normalise_angle(pose.theta - begin.theta)) > 1e-9):
+            rejoined = _rejoin(arena, pose, leg.trajectory, route.metric,
+                               allow_backoff=index > 0)
+            if rejoined is not None:
+                leg.method, leg.trajectory = rejoined
+        driven = commands_module.leg_commands(leg.trajectory, heading, start.theta)
+        if driven:
+            pose = commands_module.commands_to_trajectory(driven, pose).end_pose()
+
+
+def _rejoin(arena: Arena, pose: Pose, trajectory: Trajectory, metric: str,
+            allow_backoff: bool) -> Optional[Tuple[str, Trajectory]]:
+    """Cheapest collision-free way from `pose` onto `trajectory`, then along it."""
+    segments = trajectory.segments
+    best: Optional[Tuple[str, Trajectory]] = None
+    best_cost = INF
+    for k in range(len(segments)):
+        result = _plan_leg(arena, pose, segments[k].end, allow_search=False,
+                           allow_backoff=allow_backoff)
+        if result is None:
+            continue
+        joined = Trajectory(merge_segments(result[1].segments + segments[k + 1:]))
+        cost = leg_cost(joined, metric)
+        if cost < best_cost:
+            best, best_cost = ("rejoin-" + result[0], joined), cost
+    return best
 
 
 def compare_strategies(arena: Arena, start: Optional[Pose] = None,

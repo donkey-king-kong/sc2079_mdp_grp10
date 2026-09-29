@@ -40,6 +40,7 @@ from motion import (
     Segment,
     Trajectory,
     merge_segments,
+    normalise_angle,
     turning_radii,
 )
 
@@ -183,6 +184,24 @@ def trajectory_to_commands(trajectory: Trajectory,
     return commands
 
 
+def leg_commands(trajectory: Trajectory, heading: HeadingTracker,
+                 origin_theta: float) -> List[str]:
+    """The next leg's commands, given everything already sent on `heading`.
+
+    `origin_theta` is the heading the run started at, so the STM's target
+    heading right now is that plus what has been sent. The planner starts each
+    leg from where the commands really leave the robot (see
+    `planner.anchor_legs`), which can differ from where the plan had it by a
+    fraction of a degree. The tracker is lined up with the leg's own starting
+    heading first, so the leg's turns are rounded from where the robot really
+    points. When legs join up exactly this changes nothing.
+    """
+    target = origin_theta + math.radians(heading.sent)
+    heading.planned = heading.sent + math.degrees(
+        normalise_angle(trajectory.start_pose().theta - target))
+    return trajectory_to_commands(trajectory, heading)
+
+
 def route_leg_commands(route) -> List[List[str]]:
     """The commands for each leg of a route, in order.
 
@@ -190,8 +209,11 @@ def route_leg_commands(route) -> List[List[str]]:
     is absolute for the whole run, not per leg. So a leg's commands depend on
     the legs before it, and this is the only correct way to get them.
     """
+    if not route.legs:
+        return []
     heading = HeadingTracker()
-    return [trajectory_to_commands(leg.trajectory, heading) for leg in route.legs]
+    origin = route.legs[0].trajectory.start_pose().theta
+    return [leg_commands(leg.trajectory, heading, origin) for leg in route.legs]
 
 
 def route_to_commands(route, snap: bool = True, finish: bool = True) -> List[str]:

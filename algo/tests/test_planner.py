@@ -11,6 +11,7 @@ import unittest
 
 import conftest  # noqa: F401
 
+import commands
 import config as cfg
 import dubins
 import planner
@@ -26,6 +27,15 @@ LAYOUT = [
     Obstacle(4, 60.0, 60.0, "E"),
     Obstacle(5, 100.0, 170.0, "S"),
 ]
+
+
+def commanded_starts(route):
+    """Each leg with the pose its commands start from: where the ones before it leave the robot."""
+    pose = start_pose()
+    for leg, leg_commands in zip(route.legs, commands.route_leg_commands(route)):
+        yield leg, pose
+        if leg_commands:
+            pose = commands.commands_to_trajectory(leg_commands, pose).end_pose()
 
 
 class Routes(unittest.TestCase):
@@ -60,16 +70,16 @@ class Routes(unittest.TestCase):
         self.assertLessEqual(swapped.total_cost, greedy.total_cost + 1e-6)
 
     def test_legs_chain_end_to_end(self):
-        # Each leg must begin exactly where the previous one stopped, or the
-        # commands sent to the STM describe a path with teleports in it.
+        # Each leg must begin exactly where the commands before it really leave
+        # the robot -- whole centimetres and degrees, not the planned pose --
+        # or the commands sent to the STM describe a path with teleports in it.
         route = self.route("exhaustive")
-        pose = start_pose()
-        for leg in route.legs:
+        for leg, pose in commanded_starts(route):
             begin = leg.trajectory.start_pose()
             self.assertAlmostEqual(begin.x, pose.x, places=6)
             self.assertAlmostEqual(begin.y, pose.y, places=6)
-            self.assertAlmostEqual(begin.theta, pose.theta, places=6)
-            pose = leg.trajectory.end_pose()
+            self.assertAlmostEqual(math.remainder(begin.theta - pose.theta, 2 * math.pi), 0.0,
+                                   places=6)
 
     def test_every_leg_is_collision_free(self):
         for strategy in planner.STRATEGIES:
@@ -202,6 +212,9 @@ class Reachability(unittest.TestCase):
         # Two stress-test layouts where a Hybrid A* leg used to stop within its
         # 4cm / 10 degree goal box, so the next leg started 3-4cm away from
         # where the robot really was and the replay came within 1cm of a block.
+        # Every leg must end exactly on its planned photo pose. It starts where
+        # the commands before it leave the robot -- or, when that pose is too
+        # tight to re-plan from, within one leg's whole-number rounding of it.
         layouts = {
             "n7_14": [(1, 9, 13, "W"), (2, 10, 8, "E"), (3, 13, 4, "E"), (4, 15, 8, "N"),
                       (5, 15, 15, "S"), (6, 2, 14, "N"), (7, 4, 9, "N")],
@@ -211,13 +224,17 @@ class Reachability(unittest.TestCase):
         for name, cells in layouts.items():
             with self.subTest(layout=name):
                 arena = Arena([Obstacle(i, x * 10.0, y * 10.0, face) for i, x, y, face in cells])
-                route = planner.plan_route(arena, "exhaustive")
-                pose = start_pose()
-                for leg in route.legs:
-                    begin = leg.trajectory.start_pose()
-                    self.assertLess(math.hypot(begin.x - pose.x, begin.y - pose.y), 1e-6)
-                    self.assertLess(abs(math.remainder(begin.theta - pose.theta, 2 * math.pi)), 1e-6)
-                    pose = leg.trajectory.end_pose()
+                model = planner.CostModel(arena)
+                route = planner.plan_route(arena, "exhaustive", model=model)
+                _, chain = model.evaluate_order(route.order)
+                for (leg, pose), node in zip(commanded_starts(route), chain):
+                    begin, end = leg.trajectory.start_pose(), leg.trajectory.end_pose()
+                    photo = model.nodes[node].pose
+                    self.assertLess(math.hypot(begin.x - pose.x, begin.y - pose.y), 1.5)
+                    self.assertLess(abs(math.degrees(math.remainder(begin.theta - pose.theta,
+                                                                    2 * math.pi))), 0.5 + 1e-9)
+                    self.assertLess(math.hypot(end.x - photo.x, end.y - photo.y), 1e-6)
+                    self.assertLess(abs(math.remainder(end.theta - photo.theta, 2 * math.pi)), 1e-6)
 
     def test_a_reversed_path_drives_the_same_poses_backwards(self):
         forward = dubins.plan(Pose(50.0, 50.0, 0.0), Pose(120.0, 110.0, math.pi / 2))[1]
