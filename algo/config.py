@@ -110,20 +110,46 @@ TURNING_CENTRE_OFFSET = (ROBOT_FRONT - ROBOT_REAR) / 2.0
 # Obstacle avoidance (briefing slide 36)
 # --------------------------------------------------------------------------
 
-# "A simple way is to make virtual obstacles and consider the robot as a dot.
-# The robot's footprint is 30cm x 30cm so the virtual obstacle should be
-# 40cm x 40cm" -> inflate the 10cm block by 15cm on every side.
-OBSTACLE_INFLATION = ROBOT_HALF                 # 15cm
-VIRTUAL_OBSTACLE_SIZE = OBSTACLE_SIZE + 2 * OBSTACLE_INFLATION   # 40cm
+# Collisions are judged on the robot's real outline (ROBOT_FRONT/REAR/WIDTH),
+# ROTATED with its heading, against the real 10cm blocks and the walls -- see
+# footprint.py. Every pose along a path must keep at least this much clear of
+# every obstacle and every wall. It absorbs the robot's 1-3cm turn error and the
+# ribbon cable that can stick out a little. One knob for both.
+SAFETY_MARGIN = 3.0
 
-# Same idea for the walls: the robot's centre can never be closer than half a
-# footprint to the arena boundary.
-BOUNDARY_MARGIN = ROBOT_HALF                    # 15cm
+# How finely a trajectory is sampled for that check: at most this far (cm, at
+# the rear axle) and at most this much rotation between samples.
+COLLISION_SAMPLE_STEP = 1.0
+COLLISION_SAMPLE_ANGLE = math.radians(2.0)
 
-# How finely a trajectory is sampled when checking it for collisions. 2cm is
-# well under the 15cm of slack the inflation gives us, so nothing can tunnel
-# through a corner between samples.
-COLLISION_SAMPLE_STEP = 3.0
+
+def _sweep_pad() -> float:
+    """Half the furthest any point of the body moves between two samples.
+
+    A point that moves d between two samples is never more than d/2 from where
+    it was sampled, so checking the samples at SAFETY_MARGIN + this keeps the
+    whole continuous sweep at least SAFETY_MARGIN clear. The worst point is the
+    corner farthest from the turning circle's centre.
+    """
+    reach = max(ROBOT_FRONT, ROBOT_REAR)
+    worst = COLLISION_SAMPLE_STEP                    # a straight moves every point this far
+    for radius in (TURNING_RADIUS_LEFT, TURNING_RADIUS_RIGHT):
+        corner = math.hypot(reach, radius + ROBOT_WIDTH / 2.0)
+        worst = max(worst, corner * min(COLLISION_SAMPLE_STEP / radius, COLLISION_SAMPLE_ANGLE))
+    return worst / 2.0
+
+
+SWEEP_PAD = _sweep_pad()                         # ~0.72cm with the values above
+
+# Briefing slide 36's "virtual obstacles" -- each block inflated so the robot can
+# be treated as a dot -- are no longer the collision test, because no single
+# inflation is right for a rotating rectangle. They survive as a cheap, slightly
+# optimistic picture of where the body's MIDDLE can go: the Hybrid A* distance
+# heuristic, the reachability flood fill, layout generation and the simulator's
+# overlay. Half the width plus the margin is the nearest the middle can ever be.
+OBSTACLE_INFLATION = ROBOT_WIDTH / 2.0 + SAFETY_MARGIN          # 13.7cm
+VIRTUAL_OBSTACLE_SIZE = OBSTACLE_SIZE + 2 * OBSTACLE_INFLATION   # 37.4cm
+BOUNDARY_MARGIN = OBSTACLE_INFLATION
 
 # --------------------------------------------------------------------------
 # Where to park for a photo (briefing slides 4 and 8)

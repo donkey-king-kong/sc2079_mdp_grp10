@@ -128,7 +128,9 @@ class Api(unittest.TestCase):
             self.assertAlmostEqual(times[-1], clock + leg["duration"], places=2)
             clock += leg["duration"] + scan
 
-        self.assertAlmostEqual(clock, data["total_duration"], places=2)
+        # total_duration is reported to 2dp and the legs to 3dp, so a sum that
+        # lands on x.xx5 is off by exactly 0.005 -- allow a hundredth.
+        self.assertAlmostEqual(clock, data["total_duration"], delta=0.01)
 
     def test_legs_do_not_repeat_the_joining_pose(self):
         # Leg N+1 starts where leg N stopped; emitting that pose twice makes the

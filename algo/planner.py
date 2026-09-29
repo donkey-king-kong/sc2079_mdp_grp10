@@ -212,9 +212,10 @@ class CostModel:
                 for theta in TRANSIT_HEADINGS:
                     # The lattice places the robot's body; the pose is its
                     # turning centre, a little behind that.
-                    self._add(Node(index=len(self.nodes),
-                                   pose=pose_from_footprint_centre(x, y, theta),
-                                   kind="transit"))
+                    pose = pose_from_footprint_centre(x, y, theta)
+                    if not arena.is_pose_free(pose):
+                        continue
+                    self._add(Node(index=len(self.nodes), pose=pose, kind="transit"))
 
         self.obstacle_ids: List[int] = list(self.nodes_by_obstacle.keys())
 

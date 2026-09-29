@@ -60,13 +60,14 @@ If a supervisor asks to see a particular motion rather than waiting for the run
 to produce it, the **Manual drive** buttons move the robot one STM command at a
 time &mdash; forward, backward, and left/right arcs in both gears. They go
 through the same parser, the same kinematics and the same collision check as the
-planner, so a move that would clip a virtual obstacle or leave the arena is
-refused and says so. Note there is no on-the-spot turn: every turn is an arc at
+planner, so a move that would bring the robot's outline within the safety
+margin of an obstacle or a wall is refused and says so. Note there is no on-the-spot turn: every turn is an arc at
 full lock -- 20.2cm radius to the left, 36.2cm to the right -- which is the honest
 behaviour of the real chassis.
 
-Tick **Virtual obstacles** to show the inflated no-go regions the planner
-actually reasons about, and **Capture poses** to show every pose it considered
+Tick **Virtual obstacles** to show roughly where the middle of the robot cannot
+go (an approximation for heuristics -- the real check uses the rotated
+outline), and **Capture poses** to show every pose it considered
 standing at. Between them they explain any "unreachable" result on the spot,
 which is worth having in front of you when a supervisor asks.
 
@@ -110,9 +111,15 @@ of angles rather than the best few poses by rank, which would all share one
 heading. An obstacle in a 20cm strip under the top wall cannot be entered
 head-on at any standoff and is easy to enter at 45&deg;.
 
-Collision checking follows slide 36: inflate each 10cm obstacle by half a robot
-into a 40cm "virtual obstacle", inset the walls by the same 15cm, and treat the
-robot as a point at its centre.
+Collision checking (`footprint.py`) uses the robot's real outline -- 22.0cm
+ahead of the rear axle, 3.35cm behind it, 21.4cm wide -- rotated with its
+heading, and requires `SAFETY_MARGIN` (3cm) to every block and wall. Paths are
+sampled every 1cm and 2 degrees, and `SWEEP_PAD` (half the furthest any corner
+moves between samples, ~0.7cm) is added to the margin so it holds along the
+whole sweep, not just at the samples. Slide 36's trick of inflating each block
+and treating the robot as a dot is exact only for a shape that never rotates;
+for our 25 x 21cm rectangle it either lets the corners clip blocks or blocks
+gaps the robot fits through, so it survives only as a heuristic.
 
 ### 2. `dubins.py` and `hybrid_astar.py` &mdash; how does it get there?
 

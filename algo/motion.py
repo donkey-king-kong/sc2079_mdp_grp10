@@ -210,13 +210,21 @@ class Segment:
     def iter_sample(self, step: float) -> Iterator[Pose]:
         """Poses along the segment every `step` cm, excluding the start pose.
 
+        On an arc the step is also capped so the heading turns at most
+        `config.COLLISION_SAMPLE_ANGLE` between samples: the body's far corner
+        moves much further than the rear axle does, and `config.SWEEP_PAD` is
+        computed on the assumption that both limits hold.
+
         A generator rather than a list because collision checking is the hot
         loop of the whole planner and most blocked paths collide early -- the
         caller's `all()` short-circuits instead of sampling the full arc.
         """
         if self.length <= 1e-9:
             return
-        n = max(1, int(math.ceil(self.length / max(step, 1e-6))))
+        step = max(step, 1e-6)
+        if self.steering != STRAIGHT and self.radius > 0.0:
+            step = min(step, cfg.COLLISION_SAMPLE_ANGLE * self.radius)
+        n = max(1, int(math.ceil(self.length / step)))
         for i in range(1, n + 1):
             yield self.pose_at(self.length * i / n)
 

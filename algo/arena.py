@@ -2,14 +2,12 @@
 
 Two jobs live here.
 
-1. **Collision checking.** Following briefing slide 36 we do not model the
-   robot's rectangle at all. Instead every 10cm obstacle is inflated by half a
-   robot footprint on each side into a 40cm "virtual obstacle", the walls are
-   inset by the same 15cm, and the robot is treated as a single point at its
-   centre. If the centre stays out of every virtual obstacle, the real 30x30
-   robot cannot touch the real 10x10 block. That point is the middle of the
-   *footprint*, which on our robot is 7.4cm ahead of the turning centre a
-   `Pose` describes -- so the nose swings wider than the tail, and is checked.
+1. **Collision checking.** A pose is free when the robot's real outline,
+   rotated with its heading, keeps `SAFETY_MARGIN` clear of every 10cm block
+   and every wall (footprint.py). Briefing slide 36's "virtual obstacles" --
+   blocks inflated so the robot's middle can be treated as a dot -- are kept
+   only as a cheap map of where that middle can roughly go (`is_point_free`),
+   for heuristics; they are never what accepts or rejects a path.
 
 2. **Capture poses.** Each obstacle shows its image on one of N/S/E/W. The
    robot has to end up standing off that face, pointing back at it. The single
@@ -24,6 +22,7 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import config as cfg
+import footprint
 from motion import (Pose, face_to_heading, footprint_centre, normalise_angle,
                     pose_from_footprint_centre)
 
@@ -132,16 +131,29 @@ class Arena:
         ]
         self._min_xy = cfg.BOUNDARY_MARGIN
         self._max_xy = cfg.ARENA_SIZE - cfg.BOUNDARY_MARGIN
+        # The real blocks, for the exact outline test.
+        self._boxes: List[Tuple[float, float, float, float]] = [
+            (ob.x, ob.y, ob.x + cfg.OBSTACLE_SIZE, ob.y + cfg.OBSTACLE_SIZE)
+            for ob in self.obstacles
+        ]
+        # Clear means at least SAFETY_MARGIN away, plus SWEEP_PAD so that the
+        # margin also holds between the sampled poses of a path.
+        self._is_clear = footprint.make_checker(
+            self._boxes, cfg.SAFETY_MARGIN + cfg.SWEEP_PAD - _EDGE_TOLERANCE)
 
     # -- collision ---------------------------------------------------------
 
     def in_bounds(self, x: float, y: float) -> bool:
-        """Is the robot's centre far enough from every wall?"""
+        """Is the body's middle far enough from every wall? (Heuristic only.)"""
         low, high = self._min_xy - _EDGE_TOLERANCE, self._max_xy + _EDGE_TOLERANCE
         return low <= x <= high and low <= y <= high
 
     def is_point_free(self, x: float, y: float) -> bool:
-        """Slide 36's test: robot as a dot against the 40x40 virtual obstacles."""
+        """Slide 36's dot test for the body's middle against the virtual obstacles.
+
+        A cheap, heading-free approximation used by heuristics and flood fills.
+        It does not decide whether a pose is safe -- `is_pose_free` does.
+        """
         if not self.in_bounds(x, y):
             return False
         for x0, y0, x1, y1 in self._blocked:
@@ -150,10 +162,8 @@ class Arena:
         return True
 
     def is_pose_free(self, pose: Pose) -> bool:
-        """Is the robot's body clear? Tested at the footprint's middle, which is
-        where slide 36's virtual obstacles assume the dot is -- not at the
-        turning centre the pose describes."""
-        return self.is_point_free(*footprint_centre(pose))
+        """Is the robot's real, rotated outline clear of every block and wall?"""
+        return self._is_clear(pose)
 
     def is_trajectory_free(self, trajectory, step: float = cfg.COLLISION_SAMPLE_STEP) -> bool:
         return all(self.is_pose_free(p) for p in trajectory.iter_sample(step))
@@ -170,7 +180,7 @@ class Arena:
 
         Ordered best-first by how much of a compromise each pose is, so the
         planner tries the well-aligned ones before the oblique ones. Poses that
-        would sit inside a wall or another obstacle's virtual box are dropped
+        would put the body within the safety margin of a wall or a block are dropped
         here, so the planner never wastes a Dubins call on them.
 
         `standoff` is to the middle of the robot's footprint, as slide 8 and
@@ -194,16 +204,15 @@ class Arena:
             bearing = normalise_angle(outward + math.radians(angle))
             x = fx + standoff * math.cos(bearing)
             y = fy + standoff * math.sin(bearing)
-            if not self.is_point_free(x, y):
-                continue
             # Checklist A.2 accepts the image 20-50cm from the robot's midpoint.
             if not (cfg.CAPTURE_MIN_DISTANCE <= standoff <= cfg.CAPTURE_MAX_DISTANCE):
                 continue
             # Turn to face back down the bearing, at the image.
             heading = normalise_angle(bearing + math.pi)
-            results.append(CapturePose(obstacle.id,
-                                       pose_from_footprint_centre(x, y, heading),
-                                       standoff, angle, rank))
+            pose = pose_from_footprint_centre(x, y, heading)
+            if not self.is_pose_free(pose):
+                continue
+            results.append(CapturePose(obstacle.id, pose, standoff, angle, rank))
         return results
 
     def select_capture_poses(self, obstacle: Obstacle, count: int) -> List[CapturePose]:
