@@ -144,6 +144,16 @@ class Api(unittest.TestCase):
         # lands on x.xx5 is off by exactly 0.005 -- allow a hundredth.
         self.assertAlmostEqual(clock, data["total_duration"], delta=0.01)
 
+    def test_leg_commands_add_up_to_the_full_list(self):
+        # Turns are rounded against the heading of the whole run, so each leg's
+        # list must be exactly its slice of the full one, not converted alone.
+        _, data = self.post("/api/plan", {"obstacles": LAYOUT, "strategy": "exhaustive"})
+        joined = []
+        for leg in data["legs"]:
+            joined.extend(leg["commands"])
+            joined.append("SNAP%d" % leg["obstacle_id"])
+        self.assertEqual(joined + ["FIN"], data["commands"])
+
     def test_legs_do_not_repeat_the_joining_pose(self):
         # Leg N+1 starts where leg N stopped; emitting that pose twice makes the
         # animation stall for a frame at every obstacle.

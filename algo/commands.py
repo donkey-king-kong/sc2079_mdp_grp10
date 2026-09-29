@@ -88,13 +88,48 @@ def _split(total: float, limit: float) -> List[float]:
     return chunks
 
 
-def segment_to_commands(segment: Segment) -> List[str]:
+class HeadingTracker:
+    """Rounds turns to whole degrees without letting the heading drift.
+
+    The STM only takes whole degrees, and it keeps an ABSOLUTE heading: every
+    turn moves its target heading by exactly the number it is sent. Rounding
+    each turn on its own lets the up-to-half-degree errors add up over a run of
+    thirty commands. Rounding the running total instead -- send whatever whole
+    number brings the target closest to the planned heading so far -- keeps the
+    target within half a degree of the plan after every single command. A turn
+    too small to send is not lost either: it carries into the next one.
+    """
+
+    def __init__(self) -> None:
+        self.planned = 0.0      # degrees of heading change the plan has asked for
+        self.sent = 0           # degrees actually sent, as signed whole numbers
+
+    def take(self, planned: float) -> int:
+        """Signed whole degrees to send for a turn of `planned` degrees (0: skip it)."""
+        self.planned += planned
+        if abs(planned) < math.degrees(cfg.MIN_COMMAND_ANGLE):
+            return 0
+        owed = self.planned - self.sent
+        whole = int(math.floor(abs(owed) + 0.5)) * (1 if owed >= 0 else -1)
+        # A turn can only be sent in its own direction; if the carried error
+        # outweighs it, send nothing now and let the next turn settle up.
+        if whole == 0 or (whole > 0) != (planned > 0):
+            return 0
+        self.sent += whole
+        return whole
+
+
+def segment_to_commands(segment: Segment,
+                        heading: Optional[HeadingTracker] = None) -> List[str]:
     """One segment -> the commands that drive it.
 
     Usually one command. It becomes several when the sweep is longer than the
     STM firmware will accept in a single instruction -- two arcs around the same
     circle merge into one segment, and that can legitimately be a 300-degree
     turn.
+
+    Pass the route's `HeadingTracker` to round turns against the running
+    heading rather than on their own; without one, each turn is rounded alone.
     """
     if segment.steering == STRAIGHT:
         if segment.length < cfg.MIN_COMMAND_DISTANCE:
@@ -102,6 +137,13 @@ def segment_to_commands(segment: Segment) -> List[str]:
         prefix = _STRAIGHT_PREFIXES[segment.gear]
         return [prefix + _field(part)
                 for part in _split(segment.length, cfg.MAX_STRAIGHT_COMMAND_CM)]
+
+    prefix = _TURN_PREFIXES[(segment.gear, segment.steering)]
+    if heading is not None and not cfg.SNAP_TO_90_TURNS:
+        whole = heading.take(math.degrees(segment.turn_angle))
+        if whole == 0:
+            return []
+        return [prefix + _field(part) for part in _split(abs(whole), cfg.MAX_TURN_COMMAND_DEG)]
 
     angle = abs(segment.turn_angle)
     if angle < cfg.MIN_COMMAND_ANGLE:
@@ -114,7 +156,6 @@ def segment_to_commands(segment: Segment) -> List[str]:
         degrees = round(degrees / 90.0) * 90.0
         if degrees < 1.0:
             return []
-    prefix = _TURN_PREFIXES[(segment.gear, segment.steering)]
     return [prefix + _field(part) for part in _split(degrees, cfg.MAX_TURN_COMMAND_DEG)]
 
 
@@ -124,18 +165,33 @@ def segment_to_command(segment: Segment) -> Optional[str]:
     return produced[0] if len(produced) == 1 else None
 
 
-def trajectory_to_commands(trajectory: Trajectory) -> List[str]:
+def trajectory_to_commands(trajectory: Trajectory,
+                           heading: Optional[HeadingTracker] = None) -> List[str]:
     """Every command needed to drive one leg.
 
     Segments are merged first: Hybrid A* emits one segment per 5cm primitive,
     and sending forty `SF005`s instead of one `SF200` means forty accelerate-
     and-stop cycles, which is both far slower and far less accurate on the real
     chassis than a single continuous run.
+
+    Turns are rounded against `heading`, a fresh tracker if none is given.
     """
+    heading = heading if heading is not None else HeadingTracker()
     commands: List[str] = []
     for segment in merge_segments(trajectory.segments):
-        commands.extend(segment_to_commands(segment))
+        commands.extend(segment_to_commands(segment, heading))
     return commands
+
+
+def route_leg_commands(route) -> List[List[str]]:
+    """The commands for each leg of a route, in order.
+
+    One `HeadingTracker` runs across the whole route, because the STM's heading
+    is absolute for the whole run, not per leg. So a leg's commands depend on
+    the legs before it, and this is the only correct way to get them.
+    """
+    heading = HeadingTracker()
+    return [trajectory_to_commands(leg.trajectory, heading) for leg in route.legs]
 
 
 def route_to_commands(route, snap: bool = True, finish: bool = True) -> List[str]:
@@ -145,8 +201,8 @@ def route_to_commands(route, snap: bool = True, finish: bool = True) -> List[str
     is parked and pointing at obstacle <id>, and `FIN` marks the end of the run.
     """
     commands: List[str] = []
-    for leg in route.legs:
-        commands.extend(trajectory_to_commands(leg.trajectory))
+    for leg, leg_commands in zip(route.legs, route_leg_commands(route)):
+        commands.extend(leg_commands)
         if snap:
             commands.append("%s%d" % (cfg.CMD_SNAP, leg.obstacle_id))
     if finish:

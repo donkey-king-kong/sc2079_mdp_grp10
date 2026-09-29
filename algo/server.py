@@ -100,8 +100,12 @@ def _cells(poses) -> List[List[int]]:
     return cells
 
 
-def _leg_dict(leg: planner.Leg, start_time: float) -> Dict[str, Any]:
-    """One leg, with every pose stamped with the clock reading it happens at."""
+def _leg_dict(leg: planner.Leg, start_time: float, commands: List[str]) -> Dict[str, Any]:
+    """One leg, with every pose stamped with the clock reading it happens at.
+
+    `commands` come from `commands.route_leg_commands`: turns are rounded
+    against the heading of the whole run, so a leg cannot be converted alone.
+    """
     timed = leg.trajectory.sample_with_time(ANIMATION_STEP, start_time)
     return {
         "obstacle_id": leg.obstacle_id,
@@ -109,7 +113,7 @@ def _leg_dict(leg: planner.Leg, start_time: float) -> Dict[str, Any]:
         "distance": round(leg.distance, 2),
         "duration": round(leg.duration, 3),
         "starts_at": round(start_time, 3),
-        "commands": commands_module.trajectory_to_commands(leg.trajectory),
+        "commands": commands,
         "end": _pose_dict(leg.trajectory.end_pose(), start_time + leg.duration),
         # Drop the first pose of each leg after the first: it is the previous
         # leg's last pose, and duplicating it makes the animation stall.
@@ -122,8 +126,8 @@ def _plan_response(route: planner.Route, layout: arena_module.Arena,
     """The full plan, in the shape the simulator and the RPi both consume."""
     legs = []
     clock = 0.0
-    for leg in route.legs:
-        legs.append(_leg_dict(leg, clock))
+    for leg, leg_commands in zip(route.legs, commands_module.route_leg_commands(route)):
+        legs.append(_leg_dict(leg, clock, leg_commands))
         # Driving time, then parked while the photo is taken.
         clock += leg.duration + cfg.SCAN_TIME
 

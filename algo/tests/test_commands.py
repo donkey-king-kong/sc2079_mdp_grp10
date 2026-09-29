@@ -15,7 +15,8 @@ import commands
 import config as cfg
 import planner
 from arena import Arena, Obstacle, start_pose
-from motion import BACKWARD, FORWARD, LEFT, RIGHT, STRAIGHT, Pose, Segment, Trajectory
+from motion import (BACKWARD, FORWARD, LEFT, RIGHT, STRAIGHT, Pose, Segment, Trajectory,
+                    normalise_angle)
 
 
 class Formatting(unittest.TestCase):
@@ -164,6 +165,39 @@ class RouteCommands(unittest.TestCase):
         text = commands.describe(self.commands)
         self.assertIn("photograph obstacle", text)
         self.assertTrue(text.endswith("finish"))
+
+
+class WholeDegrees(unittest.TestCase):
+    """The STM takes whole degrees and keeps an absolute heading."""
+
+    def test_rounding_the_running_total_stops_drift(self):
+        # Four 89.6 degree turns: rounding each alone sends 4 x 90 = 360 and the
+        # heading ends 1.6 degrees out. Rounding the running total never lets
+        # it get more than half a degree out.
+        heading = commands.HeadingTracker()
+        sent = [heading.take(89.6) for _ in range(4)]
+        self.assertEqual(sent, [90, 89, 90, 89])
+        self.assertLessEqual(abs(heading.planned - heading.sent), 0.5)
+
+    def test_a_turn_too_small_to_send_carries_into_the_next(self):
+        heading = commands.HeadingTracker()
+        self.assertEqual(heading.take(0.6), 0)
+        self.assertEqual(heading.take(90.0), 91)
+
+    def test_a_route_never_ends_a_leg_more_than_half_a_degree_out(self):
+        layout = [Obstacle(1, 60.0, 120.0, "S"), Obstacle(2, 140.0, 60.0, "W"),
+                  Obstacle(3, 150.0, 150.0, "S"), Obstacle(4, 60.0, 60.0, "E"),
+                  Obstacle(5, 100.0, 170.0, "S")]
+        route = planner.plan_route(Arena(layout), "exhaustive")
+        sent = []
+        for leg, leg_commands in zip(route.legs, commands.route_leg_commands(route)):
+            sent.extend(leg_commands)
+            # What the STM's absolute heading target is after this leg's commands.
+            target = commands.commands_to_trajectory(sent, start_pose()).end_pose().theta
+            planned = leg.trajectory.end_pose().theta
+            with self.subTest(obstacle=leg.obstacle_id):
+                self.assertLessEqual(abs(math.degrees(normalise_angle(target - planned))),
+                                     0.5 + 1e-9)
 
 
 if __name__ == "__main__":
