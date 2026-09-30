@@ -1,4 +1,5 @@
 import sys
+import time
 
 sys.path.append("..")
 
@@ -6,11 +7,17 @@ from connectors.imaging import ImagingConnector
 from imaging.detector import symbol_for_target
 
 
-obstacle_id = input("Obstacle ID [1]: ").strip() or "1"
+OBSTACLE_ID = "1"
+SCAN_INTERVAL_SECONDS = 0.2
 
 imaging = ImagingConnector()
-result = imaging.capture_and_predict(obstacle_id)
-symbol = symbol_for_target(result["image_id"])
 
-print(f"Result: {result}")
-print(f"Symbol: {symbol}")
+print("Scanning continuously. Press Ctrl-C to stop.")
+try:
+    while True:
+        result = imaging.capture_and_predict(OBSTACLE_ID)
+        symbol = symbol_for_target(result["image_id"])
+        print(f"Result: {result}; Symbol: {symbol}")
+        time.sleep(SCAN_INTERVAL_SECONDS)
+except KeyboardInterrupt:
+    print("\nScanning stopped.")

@@ -4,8 +4,10 @@ from connectors.bluetooth import BluetoothConnector
 from connectors.stm import STMConnector
 from connectors.imaging import ImagingConnector
 from router import CommandRouter
-
-
+from pathlib import Path
+from image_tracker import ImageTracker
+from image_stitcher import stitch_images
+from image_sender import AndroidImageSender
 class RPiManager:
     def __init__(self):
         self.android = AndroidConnector()
@@ -14,6 +16,12 @@ class RPiManager:
         self.stm = STMConnector()
         self.imaging = ImagingConnector()
         self.router = CommandRouter()
+        self.image_tracker = ImageTracker(
+           Path(__file__).resolve().parent / "imaging" / "data"
+        )
+        self.image_sender = AndroidImageSender(
+        self.bluetooth
+        )
 
     def send_to_stm(self, command):
         print(f"[MANAGER] STM <- {command}")
@@ -136,15 +144,32 @@ class RPiManager:
             f"[MANAGER] CAMERA SNAP obstacle {obstacle_id}"
         )
 
+        # Remember which images existed before this SNAP.
+        before = self.image_tracker.snapshot()
+
+        # Existing imaging code remains unchanged.
         result = self.imaging.capture_and_predict(
             obstacle_id
+        )
+
+        # Associate the newly saved image with this obstacle.
+        selected_image = self.image_tracker.record_new_image(
+            obstacle_id,
+            before,
         )
 
         print(
             f"[MANAGER] IMAGING RESULT -> {result}"
         )
 
+        if selected_image is not None:
+            print(
+                f"[MANAGER] SELECTED IMAGE -> "
+                f"{selected_image.name}"
+            )
+
         self.handle_imaging_result(result)
+       
 
     def handle_imaging_result(self, result):
         if not isinstance(result, dict):
@@ -162,14 +187,63 @@ class RPiManager:
             f"confidence={confidence}"
         )
 
-        # Later:
-        # Send the recognition result back to Android.
+        # No valid target was detected.
+        if obstacle_id is None or image_id is None:
+            print(
+                "[MANAGER] No valid target to send to Android"
+            )
+            return
 
+        # Android expects:
+        # TARGET,<obstacle_id>,<image_id>
+        message = f"TARGET,{obstacle_id},{image_id}\n"
+
+        self.bluetooth.send(message)
+
+        print(
+            f"[MANAGER] ANDROID <- "
+            f"TARGET,{obstacle_id},{image_id}"
+        )
     def handle_finish(self):
         print("[MANAGER] FINISHED")
 
-        # Later:
-        # Notify Android that navigation is complete.
+        selected_images = self.image_tracker.get_selected_images()
+
+        if not selected_images:
+            print("[MANAGER] No images available to send to Android")
+            return
+
+        print(
+            f"[MANAGER] Stitching {len(selected_images)} selected images"
+        )
+
+        output_path = (
+            Path(__file__).resolve().parent
+            / "imaging"
+            / "data"
+            / "stitched.jpg"
+        )
+
+        stitched_path = stitch_images(
+            selected_images,
+            output_path,
+        )
+
+        if stitched_path is None:
+            print("[MANAGER] Failed to create stitched image")
+            return
+
+        sent = self.image_sender.send_image(
+            stitched_path
+        )
+
+        if sent:
+            print("[MANAGER] Final image sent to Android")
+        else:
+            print("[MANAGER] Failed to send final image to Android")
+
+        # Prepare tracker for the next Task 1 run.
+        self.image_tracker.clear()    
 
     def run_bluetooth_loop(self):
         print("[MANAGER] Starting Bluetooth connection...")

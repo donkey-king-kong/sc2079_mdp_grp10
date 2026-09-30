@@ -2,13 +2,36 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
+from PIL import Image, ImageDraw
+
 from .camera import CameraCapture
-from .detector import DetectionResult, DetectorSetupError, LocalYoloDetector
+from .detector import DetectionResult, DetectorSetupError, LocalYoloDetector, symbol_for_target
 
 
 DEFAULT_MODEL_PATH = Path(__file__).with_name("models") / "best.pt"
+DATA_DIR = Path(__file__).with_name("data")
+
+
+def save_detection(frame, result: DetectionResult) -> None:
+    """Save one detected target with its bounding box, ID and symbol."""
+    image = Image.fromarray(frame)
+    draw = ImageDraw.Draw(image)
+    draw.rectangle(result.bbox, outline="lime", width=6)
+
+    symbol = symbol_for_target(result.target_id)
+    label = f"ID {result.target_id}" + (f" ({symbol})" if symbol else "")
+    x1, y1, _, _ = result.bbox
+    label_y = max(0, y1 - 20)
+    draw.rectangle((x1, label_y, x1 + len(label) * 7, label_y + 20), fill="black")
+    draw.text((x1 + 2, label_y + 2), label, fill="lime")
+
+    DATA_DIR.mkdir(exist_ok=True)
+    path = DATA_DIR / f"{datetime.now():%Y%m%d_%H%M%S_%f}_{result.target_id}.jpg"
+    image.save(path, format="JPEG")
+    print(f"[IMAGING] Saved {path}")
 
 
 class ImagingService:
@@ -38,6 +61,8 @@ class ImagingService:
             print(f"[IMAGING] Model weights not found at {self.model_path}; capture only")
         elif not result.found:
             print("[IMAGING] No target detected")
+        elif result.bbox is not None:
+            save_detection(frame, result)
 
         return {
             "obstacle_id": str(obstacle_id),
