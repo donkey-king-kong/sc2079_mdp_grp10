@@ -61,7 +61,7 @@ TRANSIT_HEADINGS = (0.0, 1.5707963267948966, 3.141592653589793, -1.5707963267948
 # Ceiling on Hybrid A* calls while patching whatever the analytic passes could
 # not connect. The search is milliseconds when it succeeds but has to exhaust
 # its budget to prove a leg impossible, and mostly it is proving.
-SEARCH_BUDGET = 20
+SEARCH_BUDGET = 50
 
 
 @dataclass
@@ -152,7 +152,7 @@ def _plan_leg(
                 arena.is_pose_free(p)
                 for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)
             ):
-                break
+                continue
             departure, prefix = reverse.end, [reverse]
 
         result = dubins.plan(
@@ -287,15 +287,16 @@ class CostModel:
         self._close_transitively()
 
     def _solve(self, i: int, j: int, allow_search: bool) -> float:
+        # Allow reverse backoffs from start, transit, or capture poses
         result = _plan_leg(self.arena, self.nodes[i].pose, self.nodes[j].pose,
                            allow_search, max_expansions=cfg.HA_MATRIX_EXPANSIONS,
-                           allow_backoff=self.nodes[i].kind == "capture")
+                           allow_backoff=True)
         if result is None:
             return self._cost[i][j]
         cost = leg_cost(result[1], self.metric)
-        self._direct[(i, j)] = result
         if cost < self._cost[i][j]:
             self._cost[i][j] = cost
+            self._direct[(i, j)] = result
             self._via[i][j] = -1
         return self._cost[i][j]
 
@@ -350,7 +351,7 @@ class CostModel:
                     break
                 if self._pair_is_connected(source_index, target_id):
                     continue
-                for target_index in self.nodes_by_obstacle[target_id][:2]:
+                for target_index in self.nodes_by_obstacle[target_id]:
                     if budget <= 0 or time.monotonic() > deadline:
                         break
                     budget -= 1

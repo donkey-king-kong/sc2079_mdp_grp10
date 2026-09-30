@@ -95,13 +95,14 @@ class _DistanceField:
                         continue
                     neighbour = ny * self.n + nx
                     if not arena.is_point_free((nx + 0.5) * resolution,
-                                               (ny + 0.5) * resolution):
+                                               (ny + 0.5) * resolution,
+                                               clearance=cfg.ROBOT_HALF_WIDTH + 1.0):
                         continue
 
                     # Prevent passing diagonally through touching obstacles
                     if dx != 0 and dy != 0:
-                        ortho1_free = arena.is_point_free((cx + dx + 0.5) * resolution, (cy + 0.5) * resolution)
-                        ortho2_free = arena.is_point_free((cx + 0.5) * resolution, (cy + dy + 0.5) * resolution)
+                        ortho1_free = arena.is_point_free((cx + dx + 0.5) * resolution, (cy + 0.5) * resolution, clearance=cfg.ROBOT_CLEARANCE)
+                        ortho2_free = arena.is_point_free((cx + 0.5) * resolution, (cy + dy + 0.5) * resolution, clearance=cfg.ROBOT_CLEARANCE)
                         if not (ortho1_free and ortho2_free):
                             continue
 
@@ -222,8 +223,9 @@ def plan(
         if _at_goal(node.pose, goal):
             return _reconstruct(node)
 
-        for gear, steering in PRIMITIVES:
         # Apply specific turning radius based on steering direction
+        for gear, steering in PRIMITIVES:
+            # Apply specific turning radius based on steering direction
             if steering == LEFT:
                 r_step = getattr(cfg, "TURNING_RADIUS_LEFT", radius)
             elif steering == RIGHT:
@@ -231,7 +233,11 @@ def plan(
             else:
                 r_step = radius
 
-            segment = Segment(gear, steering, cfg.HA_STEP, r_step, node.pose)
+            # Scale turn step length so each primitive rotates by at least 1 theta bin
+            bin_angle = (2.0 * math.pi) / cfg.HA_THETA_BINS
+            step_len = min(r_step * bin_angle, cfg.HA_STEP) if steering != STRAIGHT else cfg.HA_STEP
+
+            segment = Segment(gear, steering, step_len, r_step, node.pose)
             # Check the whole swept step, not just where it lands, or the robot
             # will happily clip a corner mid-primitive.
             if not all(arena.is_pose_free(p) for p in segment.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
