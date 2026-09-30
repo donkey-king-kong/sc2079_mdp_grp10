@@ -363,21 +363,47 @@ function strokePoses(poses, from, to) {
 }
 
 function drawRobot(pose) {
-  const half = CONFIG.robot_size / 2 * scale();
+  const s = scale();
+  // Dimensions in cm (uses CONFIG if available, fallback to defaults)
+  const rear = (CONFIG.robot_rear_to_axle || 3.35) * s;   // 3.35 cm behind axle
+  const front = (CONFIG.robot_front_to_axle || 22.0) * s;  // 22.0 cm ahead of axle
+  const halfW = (CONFIG.robot_half_width || 10.7) * s;     // 10.7 cm half-width
+
   ctx.save();
   ctx.translate(px(pose.x), py(pose.y));
-  ctx.rotate(-pose.theta);                       // canvas y is flipped, so negate
+  ctx.rotate(-pose.theta);
+
+  // Draw asymmetrical chassis box:
+  // Local X: -rear to +front
+  // Local Y: -halfW to +halfW
   ctx.fillStyle = "rgba(15,118,110,.22)";
-  ctx.strokeStyle = getVar("--robot"); ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.rect(-half, -half, half * 2, half * 2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = getVar("--robot");
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.rect(-rear, -halfW, rear + front, halfW * 2);
+  ctx.fill();
+  ctx.stroke();
 
   // Camera at the front centre (briefing slide 3), drawn as its view cone so
   // it is obvious which way the robot is pointing.
   ctx.fillStyle = "rgba(245,158,11,.30)";
-  ctx.beginPath(); ctx.moveTo(half, 0);
-  ctx.arc(half, 0, half * 1.5, -Math.PI / 5, Math.PI / 5); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(front, 0);
+  ctx.arc(front, 0, halfW * 1.5, -Math.PI / 5, Math.PI / 5);
+  ctx.closePath();
+  ctx.fill();
+
   ctx.fillStyle = getVar("--robot");
-  ctx.beginPath(); ctx.arc(half, 0, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.arc(front, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Red dot indicating the axle / center-of-rotation (0,0)
+  ctx.fillStyle = "#ef4444";
+  ctx.beginPath();
+  ctx.arc(0, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 }
 

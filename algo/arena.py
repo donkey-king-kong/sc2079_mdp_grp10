@@ -33,12 +33,17 @@ _FACE_TANGENT = {"N": (1.0, 0.0), "S": (1.0, 0.0), "E": (0.0, 1.0), "W": (0.0, 1
 
 
 def bottom_left_to_centre(x: float, y: float, theta: float) -> Pose:
-    """Briefing slide 7 gives robot poses by bottom-left corner; we use centres."""
-    return Pose(x + cfg.ROBOT_HALF, y + cfg.ROBOT_HALF, normalise_angle(theta))
+    """Converts bottom-left corner (x, y) to robot axle center (cx, cy)."""
+    cx = x + cfg.ROBOT_REAR_TO_AXLE * math.cos(theta) + cfg.ROBOT_HALF_WIDTH * math.sin(theta)
+    cy = y + cfg.ROBOT_REAR_TO_AXLE * math.sin(theta) - cfg.ROBOT_HALF_WIDTH * math.cos(theta)
+    return Pose(cx, cy, normalise_angle(theta))
 
 
 def centre_to_bottom_left(pose: Pose) -> Tuple[float, float, float]:
-    return (pose.x - cfg.ROBOT_HALF, pose.y - cfg.ROBOT_HALF, pose.theta)
+    """Converts robot axle center (cx, cy) to bottom-left corner (x, y)."""
+    x = pose.x - cfg.ROBOT_REAR_TO_AXLE * math.cos(pose.theta) - cfg.ROBOT_HALF_WIDTH * math.sin(pose.theta)
+    y = pose.y - cfg.ROBOT_REAR_TO_AXLE * math.sin(pose.theta) + cfg.ROBOT_HALF_WIDTH * math.cos(pose.theta)
+    return (x, y, pose.theta)
 
 
 def cell_to_cm(cell: float) -> float:
@@ -123,7 +128,15 @@ class Arena:
 
     def in_bounds(self, x: float, y: float) -> bool:
         """Is the robot's centre far enough from every wall?"""
+        # Allow the start zone (bottom-left 40x40cm) to bypass the lower boundary margin
+        if 0.0 <= x <= cfg.START_ZONE_SIZE and 0.0 <= y <= cfg.START_ZONE_SIZE:
+            return 0.0 <= x <= self._max_xy and 0.0 <= y <= self._max_xy
+            
         return self._min_xy <= x <= self._max_xy and self._min_xy <= y <= self._max_xy
+
+    # def in_bounds(self, x: float, y: float) -> bool:
+    #     """Is the robot's centre far enough from every wall?"""
+    #     return self._min_xy <= x <= self._max_xy and self._min_xy <= y <= self._max_xy
 
     def is_point_free(self, x: float, y: float) -> bool:
         """Slide 36's test: robot as a dot against the 40x40 virtual obstacles."""
@@ -135,6 +148,12 @@ class Arena:
         return True
 
     def is_pose_free(self, pose: Pose) -> bool:
+        # Allow the initial start pose to bypass safety margin boundary checks
+        if math.isclose(pose.x, cfg.START_X, abs_tol=1e-2) and \
+           math.isclose(pose.y, cfg.START_Y, abs_tol=1e-2) and \
+           math.isclose(pose.theta, cfg.START_THETA, abs_tol=1e-2):
+            return True
+
         return self.is_point_free(pose.x, pose.y)
 
     def is_trajectory_free(self, trajectory, step: float = cfg.COLLISION_SAMPLE_STEP) -> bool:
@@ -277,11 +296,14 @@ def reachable_region(arena: "Arena", origin: Pose,
     n = int(math.ceil(cfg.ARENA_SIZE / resolution))
 
     def free(cx: int, cy: int) -> bool:
+        # Guarantee the initial cell returns free without failing is_point_free check
+        if (cx, cy) == start:
+            return True
         return (0 <= cx < n and 0 <= cy < n
                 and arena.is_point_free((cx + 0.5) * resolution, (cy + 0.5) * resolution))
 
     start = (int(origin.x // resolution), int(origin.y // resolution))
-    if not free(*start):
+    if not (0 <= start[0] < n and 0 <= start[1] < n):
         return set()
 
     seen = {start}

@@ -32,31 +32,24 @@ NUM_OBSTACLES = 5           # the task always has exactly five (slide 3)
 
 START_ZONE_SIZE = 40.0      # 40cm x 40cm start zone at the bottom-left (slide 3)
 
-# Slide 3 gives the true footprint as 20cm x 21cm, but slide 7 recommends
-# planning with 30cm x 30cm so that the margin absorbs steering error. We plan
-# with the recommended figure.
-ROBOT_SIZE = 30.0
-ROBOT_HALF = ROBOT_SIZE / 2.0
+# --------------------------------------------------------------------------
+# Robot Dimensions & Start Pose (Option A - Facing North)
+# --------------------------------------------------------------------------
+ROBOT_LENGTH = 25.35          # cm (front-to-back)
+ROBOT_WIDTH = 21.4            # cm (side-to-side)
+ROBOT_REAR_TO_AXLE = 3.35     # cm (rear edge to center axle)
+ROBOT_FRONT_TO_AXLE = 22.0    # cm (25.35 - 3.35)
+ROBOT_HALF_WIDTH = 10.7       # cm (21.4 / 2)
 
-# Keep-clear square around the start zone, used when generating demo layouts.
-# An obstacle whose virtual box abuts the start zone leaves the robot in a
-# 10cm-tall band, and a 25cm turning radius cannot turn round in one -- the
-# robot is walled in before it has moved. Real arenas leave the start clear;
-# generated ones should too. Half a footprint of slack past the zone is enough.
+ROBOT_SIZE = 25.35
+ROBOT_HALF = 10.7
+
 START_KEEP_CLEAR = START_ZONE_SIZE + ROBOT_HALF
 
-# Robot starts in the start zone facing North.
-#
-# Slide 7 puts the bottom-left corner at (0, 0), i.e. the centre at (15, 15).
-# That is exactly BOUNDARY_MARGIN from both walls, which makes the very first
-# left turn a boundary violation before the robot has moved a centimetre --
-# the turning circle dips a couple of millimetres past x = 15 and every
-# left-handed Dubins word out of the start zone is rejected. Since the start
-# zone is 40cm and the planning footprint is 30cm, centring the robot in it
-# costs nothing, keeps it entirely inside the zone, and buys 5cm of slack on
-# each wall. Set these back to ROBOT_HALF if your robot really is corner-parked.
-START_X = 20.0
-START_Y = 20.0
+# Start pose: Bottom-left corner at (0, 0), facing North (pi/2)
+# Center axle position: X = 10.7 cm, Y = 3.35 cm
+START_X = 10.7
+START_Y = 3.35
 START_THETA = math.pi / 2.0
 
 # --------------------------------------------------------------------------
@@ -69,10 +62,10 @@ START_THETA = math.pi / 2.0
 # TURNING_RADIUS = 25.0. //old hardcoded
 
 # Physical turning radii (cm) based on STM calibration testing
-TURNING_RADIUS_LEFT = 20.0   # Physical turning radius for left turns
-TURNING_RADIUS_RIGHT = 36.0  # Physical turning radius for right turns
+TURNING_RADIUS_LEFT = 20.2   # Physical turning radius for left turns
+TURNING_RADIUS_RIGHT = 36.2  # Physical turning radius for right turns
 
-# Conservative turning radius used for Dubins & Hybrid A* path planning
+# Conservative turning radius used for D\\\\\\\\ubins & Hybrid A* path planning
 TURNING_RADIUS = max(TURNING_RADIUS_LEFT, TURNING_RADIUS_RIGHT)  # 36.0 cm
 
 # --------------------------------------------------------------------------
