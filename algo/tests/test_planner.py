@@ -208,6 +208,22 @@ class Reachability(unittest.TestCase):
         for leg in route.legs:
             self.assertTrue(arena.is_trajectory_free(leg.trajectory))
 
+    def test_a_stranded_obstacle_is_searched_at_all_its_photo_poses(self):
+        # The 7-obstacle layout from the second robot session. Obstacle 2's two
+        # best-ranked photo poses sit straight above it under the top wall,
+        # where the car cannot turn in; a slanted one between blocks 2 and 5 is
+        # easy. The search used to try only the first two, and gave up.
+        layout = [Obstacle(1, 140.0, 130.0, "E"), Obstacle(2, 40.0, 140.0, "N"),
+                  Obstacle(3, 70.0, 90.0, "N"), Obstacle(4, 140.0, 90.0, "E"),
+                  Obstacle(5, 80.0, 140.0, "W"), Obstacle(6, 140.0, 20.0, "N"),
+                  Obstacle(7, 80.0, 20.0, "W")]
+        arena = Arena(layout)
+        route = planner.plan_route(arena, "exhaustive")
+        self.assertEqual(sorted(route.order), [1, 2, 3, 4, 5, 6, 7])
+        self.assertEqual(route.unreachable, [])
+        for leg in route.legs:
+            self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
     def test_legs_chain_exactly_after_a_hybrid_astar_leg(self):
         # Two stress-test layouts where a Hybrid A* leg used to stop within its
         # 4cm / 10 degree goal box, so the next leg started 3-4cm away from

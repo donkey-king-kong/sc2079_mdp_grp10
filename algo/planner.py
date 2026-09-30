@@ -342,6 +342,14 @@ class CostModel:
         modes cost wildly different amounts and only the clock bounds the thing
         a person actually waits for. Whatever is reached in the time available
         is kept; anything still stranded is reported as unreachable.
+
+        Each search aims at every photo pose of the obstacle at once, and stops
+        at whichever it can get into: the best-ranked pose is often the one the
+        car cannot fit into (straight-on under a wall, say) while a slanted one
+        is easy. The clock is shared fairly: each stranded obstacle may use an
+        equal share of the time left, as a hard stop inside the search, so one
+        hopeless obstacle cannot starve the rest; time an obstacle does not
+        need rolls on to the next.
         """
         if self._gaps_filled:
             return
@@ -349,19 +357,20 @@ class CostModel:
         budget = SEARCH_BUDGET
         deadline = time.monotonic() + cfg.SEARCH_TIME_BUDGET
 
-        for target_id in self.obstacle_ids:
+        stranded = [oid for oid in self.obstacle_ids if not self._reachable_from_start(oid)]
+        for position, target_id in enumerate(stranded):
             if self._reachable_from_start(target_id):
-                continue
+                continue            # an earlier search opened a route to it
+            waiting = sum(1 for oid in stranded[position:] if not self._reachable_from_start(oid))
+            now = time.monotonic()
+            share_end = now + max(0.0, deadline - now) / waiting
             reached = False
             for source_index in self._representative_sources(target_id):
-                for target_index in self.nodes_by_obstacle[target_id][:2]:
-                    if budget <= 0 or time.monotonic() > deadline:
-                        break
-                    budget -= 1
-                    if self._solve(source_index, target_index, allow_search=True) < INF:
-                        reached = True
-                        break
-                if reached or budget <= 0 or time.monotonic() > deadline:
+                if budget <= 0 or time.monotonic() > share_end:
+                    break
+                budget -= 1
+                if self._search_into(source_index, target_id, share_end):
+                    reached = True
                     break
             if reached:
                 # Route the new edge through the roadmap now, so the next
@@ -369,6 +378,23 @@ class CostModel:
                 self._close_transitively()
 
         self._close_transitively()      # new edges open up new multi-hop routes
+
+    def _search_into(self, source_index: int, target_id: int, deadline: float) -> bool:
+        """One Hybrid A* search from a node into any photo pose of an obstacle."""
+        targets = self.nodes_by_obstacle[target_id]
+        found = hybrid_astar.plan_any(self.arena, self.nodes[source_index].pose,
+                                      [self.nodes[j].pose for j in targets],
+                                      max_expansions=cfg.HA_MATRIX_EXPANSIONS,
+                                      deadline=deadline)
+        if found is None:
+            return False
+        target_index, trajectory = targets[found[0]], found[1]
+        cost = leg_cost(trajectory, self.metric)
+        if cost < self._cost[source_index][target_index]:
+            self._cost[source_index][target_index] = cost
+            self._via[source_index][target_index] = -1
+            self._direct[(source_index, target_index)] = ("hybrid_astar", trajectory)
+        return True
 
     def _reachable_from_start(self, target_id: int) -> bool:
         return any(self._cost[0][j] < INF for j in self.nodes_by_obstacle[target_id])

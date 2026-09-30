@@ -14,6 +14,7 @@ can actually drive.
 
 import heapq
 import math
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -185,8 +186,23 @@ def _reconstruct(node: _Node, tail: Optional[Trajectory] = None) -> Trajectory:
 
 def plan(arena: Arena, start: Pose, goal: Pose,
          radius: RadiusSpec = None,
-         max_expansions: int = cfg.HA_MAX_EXPANSIONS) -> Optional[Trajectory]:
-    """Shortest drivable path from `start` to `goal` avoiding obstacles.
+         max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+         deadline: Optional[float] = None) -> Optional[Trajectory]:
+    """Shortest drivable path from `start` to `goal`; see `plan_any`."""
+    found = plan_any(arena, start, [goal], radius, max_expansions, deadline)
+    return found[1] if found is not None else None
+
+
+def plan_any(arena: Arena, start: Pose, goals: List[Pose],
+             radius: RadiusSpec = None,
+             max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+             deadline: Optional[float] = None) -> Optional[Tuple[int, Trajectory]]:
+    """Shortest drivable path from `start` to whichever of `goals` it reaches first.
+
+    Returns `(index into goals, trajectory)`. One search aimed at every photo
+    pose of an obstacle costs about as much as a search for one of them, and
+    finds a way in when the best-looking pose is the one the car cannot fit
+    into -- e.g. straight-on under a wall -- while a slanted one is easy.
 
     `radius` defaults to the robot's configured left/right radii; see
     `motion.turning_radii` for the other forms it accepts.
@@ -194,12 +210,17 @@ def plan(arena: Arena, start: Pose, goal: Pose,
     Returns None if no path is found within `max_expansions` -- a bound that
     exists so an unreachable capture pose costs a fraction of a second instead
     of hanging the demo. The planner just moves on to the next pose in the menu.
+    `deadline` (a `time.monotonic()` reading) is a second, wall-clock bound.
     """
-    if not arena.is_pose_free(start) or not arena.is_pose_free(goal):
+    goals = [g for g in goals if arena.is_pose_free(g)]
+    if not goals or not arena.is_pose_free(start):
         return None
     radii = turning_radii(radius)
 
-    heuristic = _distance_field(arena, goal)
+    fields = [_distance_field(arena, g) for g in goals]
+
+    def heuristic(pose: Pose) -> float:
+        return min(field(pose) for field in fields)
     # The Dijkstra sweep only reaches cells connected to the goal. If the start
     # is not one of them the goal is walled off and no amount of searching will
     # help -- bail now rather than burning the whole expansion budget proving it.
@@ -218,6 +239,8 @@ def plan(arena: Arena, start: Pose, goal: Pose,
         if node.g > best_g.get(key, float("inf")) + 1e-9:
             continue
         expansions += 1
+        if deadline is not None and time.monotonic() > deadline:
+            return None
 
         # Analytic expansion. Every so often -- and always once we are close --
         # try to close the remaining gap with a single exact Dubins path, so
@@ -225,17 +248,22 @@ def plan(arena: Arena, start: Pose, goal: Pose,
         # search may finish: the next leg starts from the exact goal pose, and
         # the STM is never told about any gap in between, so a leg that stops
         # "close enough" leaves every later command that far off course.
-        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * radii.widest:
-            shot = dubins.plan(node.pose, goal, radii, arena.is_pose_free)
+        # Only the goal nearest this node is worth an analytic shot: shooting
+        # at every one of an obstacle's photo poses from every node near it
+        # costs several times the rest of the search put together.
+        estimates = [field(node.pose) for field in fields]
+        nearest = min(range(len(goals)), key=estimates.__getitem__)
+        if expansions % 8 == 0 or estimates[nearest] < 3.0 * radii.widest:
+            shot = dubins.plan(node.pose, goals[nearest], radii, arena.is_pose_free)
             if shot is not None:
-                return _reconstruct(node, shot[1])
-
-        # Near the goal but no forward shot fits: try reversing onto it. If
-        # that is blocked too, keep searching from here rather than stopping.
-        if _at_goal(node.pose, goal):
-            shot = dubins.plan(goal, node.pose, radii, arena.is_pose_free)
-            if shot is not None:
-                return _reconstruct(node, _reversed(shot[1]))
+                return nearest, _reconstruct(node, shot[1])
+        for index, goal in enumerate(goals):
+            # Near the goal but no forward shot fits: try reversing onto it. If
+            # that is blocked too, keep searching from here rather than stopping.
+            if _at_goal(node.pose, goal):
+                shot = dubins.plan(goal, node.pose, radii, arena.is_pose_free)
+                if shot is not None:
+                    return index, _reconstruct(node, _reversed(shot[1]))
 
         for gear, steering in PRIMITIVES:
             # Each side turns at its own radius, so a left step swings the nose
