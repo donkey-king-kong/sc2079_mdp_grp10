@@ -47,16 +47,15 @@
   #define SPEED_PROFILE       2       // [CAL] See section 4
 #else
 /* ---- OUTDOOR (tiled corridor) ----
- * NOT CALIBRATED YET: these are copies of the indoor values. Before an
- * outdoor task, run SD +100 x3, SD +20 x2, TN LF090 / RF090 and LF180 / RF180
- * on that floor, and update them.                                          */
-  #warning "ARENA_OUTDOOR = 1 but the outdoor values are still copies of indoor - calibrate them"
+ * Calibrated 1 Oct 2026 on the corridor tiles: all values as indoors, except
+ * the radii (measured 20.0 / 35.9) and the centre (1500 tested straight).
+ * Expect 1-3 cm/m of sideways drift from the slope and grout lines.         */
   #define TICKS_PER_CM        75.5f
   #define STOP_T              0.050f
   #define TURN_STOP_T         0.075f
-  #define TURN_RADIUS_L       20.2f
-  #define TURN_RADIUS_R       36.2f
-  #define SERVO_TRUE_CENTRE   1504
+  #define TURN_RADIUS_L       20.0f
+  #define TURN_RADIUS_R       35.9f
+  #define SERVO_TRUE_CENTRE   1500
   #define MOTOR_FF_BASE       2100.0f
   #define MOTOR_KICK_PWM      3300.0f
   #define SPEED_PROFILE       2
