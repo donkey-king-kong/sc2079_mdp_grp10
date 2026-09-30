@@ -953,7 +953,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 			}
 
 			// Convert raw timer ticks to centimeters
-			dash_ultraDist = (echo * 0.0343 / 2) + 1;
+			dash_ultraDist = (float)echo * ULTRA_CM_PER_US + ULTRA_OFFSET_CM;   // calibrated: see robot_config.h
 
 			// Reset state machine for the next reading
 			first_captured = 0;

@@ -1,9 +1,6 @@
 /*
  * robot_config.h
  *
- *  Created on: Sep 27, 2026
- *      Author: Ryan Tan
- *
  * Every tunable value for the robot, in one place.
  * During calibration this is the only file you should need to edit.
  * Values marked [CAL] are the ones Phase 5 calibration adjusts.
@@ -26,7 +23,7 @@
 /* Knob-and-button test modes (SD straights, TN turns) and the TD / TV serial
  * commands. Needed for calibration. Set to 0 for the actual task run, so the
  * user button can never start a test move.                                 */
-#define FIELD_TOOLS         1
+#define FIELD_TOOLS         0
 
 /* Replies to the RPi. 0 = short ("A d=99.9 e=+0.4"), 1 = full diagnostics.
  * The TD log always has the full diagnostics either way.                   */
@@ -42,23 +39,22 @@
   #define TICKS_PER_CM        75.5f   // [CAL] Encoder ticks per cm (measured by tape)
   #define STOP_T              0.050f  // [CAL] Straights: robot rolls this many seconds after deciding to stop
   #define TURN_STOP_T         0.075f  // [CAL] Turns: robot keeps rotating this many seconds after deciding to stop
-  #define TURN_RADIUS_L       19.7f   // [CAL] Left-lock turning radius at the rear-axle centre (cm), LF180 diameter
-  #define TURN_RADIUS_R       36.0f   // [CAL] Right-lock turning radius (cm), RF180 diameter
-  #define SERVO_TRUE_CENTRE   1500    // [CAL] Servo value for straight ahead (approached from below)
+  #define TURN_RADIUS_L       20.2f   // [CAL] Left-lock turning radius at the rear-axle centre (cm), LF180 diameter
+  #define TURN_RADIUS_R       36.2f   // [CAL] Right-lock turning radius (cm), RF180 diameter
+  #define SERVO_TRUE_CENTRE   1504    // [CAL] Servo value for straight ahead (approached from below)
   #define MOTOR_FF_BASE       2100.0f // [CAL] PWM that just keeps the robot rolling (Phase 2 floor test)
   #define MOTOR_KICK_PWM      3300.0f // [CAL] Start burst; must beat the worst start seen (3205)
   #define SPEED_PROFILE       2       // [CAL] See section 4
 #else
 /* ---- OUTDOOR (tiled corridor) ----
- * NOT CALIBRATED YET: these are copies of the indoor values. Before an
- * outdoor task, run SD +100 x3, SD +20 x2, TN LF090 / RF090 and LF180 / RF180
- * on that floor, and update them.                                          */
-  #warning "ARENA_OUTDOOR = 1 but the outdoor values are still copies of indoor - calibrate them"
+ * Calibrated 1 Oct 2026 on the corridor tiles: all values as indoors, except
+ * the radii (measured 20.0 / 35.9) and the centre (1500 tested straight).
+ * Expect 1-3 cm/m of sideways drift from the slope and grout lines.         */
   #define TICKS_PER_CM        75.5f
   #define STOP_T              0.050f
   #define TURN_STOP_T         0.075f
-  #define TURN_RADIUS_L       19.7f
-  #define TURN_RADIUS_R       36.0f
+  #define TURN_RADIUS_L       20.0f
+  #define TURN_RADIUS_R       35.9f
   #define SERVO_TRUE_CENTRE   1500
   #define MOTOR_FF_BASE       2100.0f
   #define MOTOR_KICK_PWM      3300.0f
@@ -92,21 +88,30 @@
  *     Every stop finishes from the slow approach speed, so accuracy barely
  *     depends on the cruise speed. Confirm on the robot after any change.
  * ========================================================================== */
+/* Turns speed up and slow down at the SAME rate, which keeps the turn's
+ * path symmetric. Measured: a 180 deg turn ends within ~1-3 cm of its start
+ * line (measure axle to axle - a tyre's back edge moves 6.7 cm after 180). */
 #if SPEED_PROFILE == 0
   #define STRAIGHT_V_MAX    35.0f   // Straight cruise speed (cm/s)
   #define TURN_V_MAX        25.0f   // Turn cruise speed at the rear-axle centre (cm/s)
-  #define STRAIGHT_ACCEL    60.0f   // Speeding up (cm/s per second)
-  #define STRAIGHT_DECEL    50.0f   // Slowing down (cm/s per second)
+  #define STRAIGHT_ACCEL    60.0f   // Straights: speeding up (cm/s per second)
+  #define STRAIGHT_DECEL    50.0f   // Straights: slowing down (cm/s per second)
+  #define TURN_ACCEL        50.0f   // Turns: speeding up and ...
+  #define TURN_DECEL        50.0f   // ... slowing down - keep these equal
 #elif SPEED_PROFILE == 1
   #define STRAIGHT_V_MAX    50.0f
   #define TURN_V_MAX        35.0f
   #define STRAIGHT_ACCEL    80.0f
   #define STRAIGHT_DECEL    70.0f
+  #define TURN_ACCEL        70.0f
+  #define TURN_DECEL        70.0f
 #else  /* 2 = fastest with no accuracy loss in simulation */
   #define STRAIGHT_V_MAX    65.0f
   #define TURN_V_MAX        45.0f
   #define STRAIGHT_ACCEL    100.0f
-  #define STRAIGHT_DECEL    90.0f
+  #define STRAIGHT_DECEL    60.0f   // [CAL] was 90: tyres skidded ~1 cm while slowing from 65 cm/s (Step 2)
+  #define TURN_ACCEL        60.0f   // [CAL] equal to TURN_DECEL (symmetric turns)
+  #define TURN_DECEL        60.0f   // [CAL]
 #endif
 #define STRAIGHT_V_MIN      12.0f   // Slowest speed used: above the stick-slip region
 #define STRAIGHT_APPROACH   2.0f    // Last few cm of a straight are driven at STRAIGHT_V_MIN
@@ -155,5 +160,26 @@
 #define BTN_LONG_MS         800     // Hold the button this long to switch SD / TN
 #define TV_MIN              800     // Allowed range for the TV command
 #define TV_MAX              2200
+
+
+/* ==========================================================================
+ *  7b. ULTRASONIC SENSOR (HC-SR04) - calibrated with the 10x10 cm obstacle block
+ * ========================================================================== */
+#define ULTRA_CM_PER_US     0.017673f // [CAL] cm per microsecond of echo (speed of sound + clock)
+#define ULTRA_OFFSET_CM     0.65f     // [CAL] fixed offset (cm), measured from the sensor face
+
+
+/* ==========================================================================
+ *  8. IR DISTANCE SENSORS (Sharp GP2Y0A21YK0F, 10-80 cm)
+ *     Power them from 5 V (4.5-5.5 V). Output is ~0.4 V (80 cm) to ~3.1 V (10 cm).
+ * ========================================================================== */
+#define OLED_SHOW_IR        1       // 1 = OLED shows the IR sensors instead of the encoder totals
+#define IR1_ADC_CHANNEL     ADC_CHANNEL_14   // IR1 on PC4 (ADC1 channel 14)
+#define IR2_ADC_CHANNEL     ADC_CHANNEL_5    // IR2 on PA5 (ADC1 channel 5)
+#define IR_SAMPLES          8       // ADC readings averaged per update (the output is noisy)
+/* Distance (cm) = IR_FIT_A x volts ^ IR_FIT_B. Fitted to the datasheet's typical
+ * curve; each sensor differs by up to ~10%, so check against a ruler later. */
+#define IR_FIT_A            27.5f
+#define IR_FIT_B            (-1.21f)
 
 #endif /* ROBOT_CONFIG_H */
