@@ -21,6 +21,9 @@ class EventType(str, Enum):
     CV_ERROR = "CV_ERROR"
     IMAGE_TRANSFER_ERROR = "IMAGE_TRANSFER_ERROR"
     IMAGE_TRANSFER_QUEUE_FULL = "IMAGE_TRANSFER_QUEUE_FULL"
+    ANDROID_ARENA_RECEIVED = "ANDROID_ARENA_RECEIVED"
+    ANDROID_STM_COMMAND = "ANDROID_STM_COMMAND"
+    ANDROID_ERROR = "ANDROID_ERROR"
     SHUTDOWN = "SHUTDOWN"
 
 
@@ -52,3 +55,12 @@ class CameraRequest:
 class ImageTransferRequest:
     image_path: str
     metadata_path: str
+
+@dataclass(frozen=True)
+class AndroidMessage:
+    message: str
+
+
+@dataclass(frozen=True)
+class AndroidImageRequest:
+    image_paths: list[str]

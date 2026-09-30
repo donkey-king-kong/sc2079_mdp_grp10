@@ -15,9 +15,17 @@ from typing import Any, Mapping, Optional
 
 from connectors.stm import MOVEMENT_COMMAND, STMRXWorker, STMTXWorker
 from task1_events import (
-    AlgoRequest, CameraRequest, Event, EventType, ImageTransferRequest, STMCommand,
+    AlgoRequest,
+    AndroidImageRequest,
+    AndroidMessage,
+    CameraRequest,
+    Event,
+    EventType,
+    ImageTransferRequest,
+    STMCommand,
 )
 
+from task1_android import AndroidRXWorker, AndroidTXWorker
 
 class MissionState(str, Enum):
     IDLE = "IDLE"
@@ -203,9 +211,19 @@ class ImageTransferWorker(threading.Thread):
 class Task1Kernel:
     """Single writer for Task 1 route and execution state."""
 
-    def __init__(self, algo_requests, stm_commands, camera_requests, events, shutdown):
+    def __init__(
+        self,
+        algo_requests,
+        stm_commands,
+        camera_requests,
+        events,
+        shutdown,
+        android_requests=None,
+    ):
         self.algo_requests, self.stm_commands = algo_requests, stm_commands
         self.camera_requests, self.events, self.shutdown = camera_requests, events, shutdown
+        self.android_requests = android_requests
+        self.detected_images = []
         self.state = MissionState.IDLE
         self.route: list[str] = []
         self.route_index = 0
@@ -226,6 +244,46 @@ class Task1Kernel:
     def handle_event(self, event: Event):
         if event.type is EventType.SHUTDOWN:
             self.state = MissionState.STOPPED
+        elif event.type is EventType.ANDROID_ARENA_RECEIVED:
+            if self.state is not MissionState.IDLE:
+                print("[KERNEL] Ignoring arena: mission already active")
+                return
+
+            robot = event.payload.get("robot")
+            obstacles = event.payload.get("obstacles")
+
+            if not isinstance(robot, dict) or not isinstance(obstacles, list):
+                self._fail("invalid Android arena data")
+                return
+
+            print(
+                "[KERNEL] Android arena received: "
+                "%d obstacles" % len(obstacles)
+            )
+
+            self.start(robot, obstacles)
+        elif event.type is EventType.ANDROID_STM_COMMAND:
+            command = event.payload.get("command")
+
+            if not isinstance(command, str):
+                print("[KERNEL] Invalid Android STM command")
+                return
+
+            if self.state is not MissionState.IDLE:
+                print(
+                    "[KERNEL] Ignoring manual STM command "
+                    "while mission is active"
+                )
+                return
+
+            print(
+                f"[KERNEL] Android manual STM command: {command}"
+            )
+
+            self.stm_commands.put(
+                STMCommand(command)
+            )
+
         elif event.type is EventType.ALGO_ROUTE_RECEIVED:
             self._load_route(event.payload.get("commands"))
         elif event.type is EventType.ALGO_ERROR:
@@ -241,6 +299,24 @@ class Task1Kernel:
             self._dispatch_route_item()
         elif event.type is EventType.CV_RESULT_ACCEPTED and self.state is MissionState.WAITING_FOR_CV:
             print("[KERNEL] image accepted for obstacle %s" % event.payload.get("obstacle_id"))
+            result = event.payload.get("result", {})
+            obstacle_id = event.payload.get("obstacle_id")
+            image_id = result.get("image_id")
+            image_path = result.get("image_path")
+
+            if image_path:
+                self.detected_images.append(str(image_path))
+
+            if (
+                self.android_requests is not None
+                and obstacle_id is not None
+                and image_id is not None
+            ):
+                self.android_requests.put(
+                    AndroidMessage(
+                        f"TARGET,{obstacle_id},{image_id}\n"
+                    )
+                )
             self.route_index += 1
             self.active_scan_obstacle = None
             self._dispatch_route_item()
@@ -288,6 +364,17 @@ class Task1Kernel:
                 return
             if command == "FIN":
                 print("[KERNEL] FIN received")
+
+                if (
+                    self.android_requests is not None
+                    and self.detected_images
+                ):
+                    self.android_requests.put(
+                        AndroidImageRequest(
+                            list(self.detected_images)
+                        )
+                    )
+
                 self.state = MissionState.COMPLETE
                 return
             self._fail("unknown Algo route command: %s" % command)
@@ -306,16 +393,18 @@ class Task1Runtime:
         self, algo_connector, stm_connection, imaging=None, transfer_config=None,
         detections_dir="imaging/data", continuous_camera_scan: bool = False,
         continuous_scan_interval_seconds: float = 1.0,
+        bluetooth=None, android=None,
     ):
         self.shutdown = threading.Event()
         self.events = queue.Queue()
         self.algo_requests = queue.Queue()
         self.stm_commands = queue.Queue()
         self.camera_requests = queue.Queue()
+        self.android_requests = queue.Queue()
         self.transfer_requests = queue.Queue(maxsize=32)
         self.kernel = Task1Kernel(
             self.algo_requests, self.stm_commands, self.camera_requests,
-            self.events, self.shutdown,
+            self.events, self.shutdown,self.android_requests,
         )
         self.workers = [
             AlgoWorker(algo_connector, self.algo_requests, self.events, self.shutdown),
@@ -328,6 +417,22 @@ class Task1Runtime:
                 imaging, self.camera_requests, self.transfer_requests, self.events, self.shutdown,
                 Path(detections_dir), continuous_camera_scan, continuous_scan_interval_seconds,
             ))
+        if bluetooth is not None and android is not None:
+            self.workers.extend([
+                AndroidRXWorker(
+                    bluetooth,
+                    android,
+                    self.events,
+                    self.shutdown,
+                ),
+                AndroidTXWorker(
+                    bluetooth,
+                    self.android_requests,
+                    self.events,
+                    self.shutdown,
+                    Path(detections_dir),
+                ),
+            ])
 
     def start(self):
         for worker in self.workers:
@@ -335,7 +440,7 @@ class Task1Runtime:
 
     def stop(self):
         self.shutdown.set()
-        for work_queue in (self.algo_requests, self.stm_commands, self.camera_requests, self.transfer_requests):
+        for work_queue in (self.algo_requests, self.stm_commands, self.camera_requests, self.transfer_requests,self.android_requests,):
             try:
                 work_queue.put_nowait(None)
             except queue.Full:
