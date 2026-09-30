@@ -19,7 +19,7 @@ class AndroidImageSender:
         message = json.dumps({
             "cat": "stitch-image",
             "value": value,
-        })
+        }) + "\n"
 
         self.bluetooth.send(message)
         time.sleep(self.delay_seconds)
