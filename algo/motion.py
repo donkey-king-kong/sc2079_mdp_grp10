@@ -396,6 +396,24 @@ def merge_segments(segments: List[Segment]) -> List[Segment]:
         if seg is not None and seg.length > 1e-9:
             merged.append(seg)
 
+    # **Dropping whole laps.** Fusing the arcs of two stitched legs can give a
+    # single arc that sweeps more than 360 degrees -- the robot drives a full
+    # circle and carries on. Every lap removed leaves the end pose unchanged and
+    # visits only poses the original arc already visited, so it is collision
+    # free whenever the original was, and strictly shorter.
+    lapped = False
+    for index, seg in enumerate(merged):
+        if seg.steering == STRAIGHT or seg.radius <= 0.0:
+            continue
+        lap = TWO_PI * seg.radius
+        laps = math.floor((seg.length + 1e-9) / lap)
+        if laps >= 1:
+            merged[index] = Segment(seg.gear, seg.steering, seg.length - laps * lap,
+                                    seg.radius, seg.start)
+            lapped = True
+    if lapped:
+        return merge_segments(merged)
+
     if segments and not merged:
         # Everything cancelled out: the robot ends where it began. Keep one
         # zero-length segment so the trajectory still knows its own pose rather

@@ -284,34 +284,94 @@ class CostModel:
         """Last resort: buy connectivity with Hybrid A* where nothing analytic worked.
 
         Runs at most once per model and the result is shared by every strategy.
-        One search per stranded pair -- a failed search has to exhaust its
-        budget to prove the leg impossible, so we do not work down the menu.
+        Bounded by wall clock as well as call count, because a failed search has
+        to exhaust its budget to prove a leg impossible, and only the clock
+        bounds the thing a person actually waits for.
 
-        Bounded by wall clock as well as call count, because the two failure
-        modes cost wildly different amounts and only the clock bounds the thing
-        a person actually waits for. Whatever is reached in the time available
-        is kept; anything still stranded is reported as unreachable.
+        The budget is spent in priority order, so that one awkward obstacle
+        cannot starve the rest:
+
+        1. **Reach every obstacle at all.** For each obstacle nothing can get
+           to yet, search from the start and from every obstacle that *is*
+           reachable -- nearest source first, since a short search is a cheap
+           one. An obstacle wedged in a pocket is usually seconds from the
+           start but a fraction of a second from its neighbour's capture pose.
+        2. **Then connect the rest** -- pairs of reachable obstacles with no leg
+           between them, which is what lets the exhaustive search find a
+           complete tour.
+
+        Sources are only ever poses the robot can actually get to: a search
+        *from* an obstacle nobody can reach buys nothing.
         """
         if self._gaps_filled:
             return
         self._gaps_filled = True
-        budget = SEARCH_BUDGET
-        deadline = time.monotonic() + cfg.SEARCH_TIME_BUDGET
+        self._budget = SEARCH_BUDGET
+        self._deadline = time.monotonic() + cfg.SEARCH_TIME_BUDGET
 
-        for target_id in self.obstacle_ids:
-            for source_index in self._representative_sources(target_id):
-                if budget <= 0 or time.monotonic() > deadline:
+        # Phase 1: make every obstacle reachable from the start. Re-check after
+        # each success, because one new leg can make other sources usable.
+        progress = True
+        while progress and not self._out_of_budget():
+            progress = False
+            for target_id in self.obstacle_ids:
+                if self._out_of_budget():
                     break
-                if self._pair_is_connected(source_index, target_id):
+                if self._reachable_from_start(target_id):
                     continue
-                for target_index in self.nodes_by_obstacle[target_id][:2]:
-                    if budget <= 0 or time.monotonic() > deadline:
+                for source_index in self._reachable_sources(target_id):
+                    if self._out_of_budget():
                         break
-                    budget -= 1
-                    if self._solve(source_index, target_index, allow_search=True) < INF:
+                    if self._search_into(source_index, target_id):
+                        self._close_transitively()
+                        progress = True
                         break
+
+        # Phase 2: connect reachable obstacles to each other where no leg exists.
+        for target_id in self.obstacle_ids:
+            for source_index in self._reachable_sources(target_id):
+                if self._out_of_budget():
+                    break
+                if source_index == 0 or self._pair_is_connected(source_index, target_id):
+                    continue
+                self._search_into(source_index, target_id)
 
         self._close_transitively()      # new edges open up new multi-hop routes
+
+    def _out_of_budget(self) -> bool:
+        return self._budget <= 0 or time.monotonic() > self._deadline
+
+    def _search_into(self, source_index: int, target_id: int) -> bool:
+        """One Hybrid A* attempt at each of the target's two best poses."""
+        for target_index in self.nodes_by_obstacle[target_id][:2]:
+            if self._out_of_budget():
+                return False
+            self._budget -= 1
+            if self._solve(source_index, target_index, allow_search=True) < INF:
+                return True
+        return False
+
+    def _reachable_from_start(self, obstacle_id: int) -> bool:
+        return any(self._cost[0][j] < INF for j in self.nodes_by_obstacle[obstacle_id])
+
+    def _reachable_sources(self, target_id: int) -> List[int]:
+        """The start, plus one reachable pose of every other reachable obstacle,
+        nearest to the target first."""
+        tx, ty = self.nodes[self.nodes_by_obstacle[target_id][0]].pose.x, \
+            self.nodes[self.nodes_by_obstacle[target_id][0]].pose.y
+        sources = [0]
+        for other_id, indices in self.nodes_by_obstacle.items():
+            if other_id == target_id:
+                continue
+            reachable = [i for i in indices if self._cost[0][i] < INF]
+            if reachable:
+                sources.append(reachable[0])
+
+        def distance(index: int) -> float:
+            pose = self.nodes[index].pose
+            return (pose.x - tx) ** 2 + (pose.y - ty) ** 2
+        # The start first: it is the one source every obstacle is judged from.
+        return [0] + sorted(sources[1:], key=distance)
 
     def _representative_sources(self, target_id: int) -> List[int]:
         """The start node, plus the best pose of every other obstacle."""

@@ -188,7 +188,7 @@ HA_MATRIX_EXPANSIONS = 2500
 # itself proving a leg impossible. Bounding the time directly is what keeps a
 # nasty layout from turning a 2s plan into an 18s one. Raise it if you would
 # rather wait than lose an obstacle; planning happens once, before the run.
-SEARCH_TIME_BUDGET = 4.0    # seconds
+SEARCH_TIME_BUDGET = 6.0    # seconds
 
 # --------------------------------------------------------------------------
 # Time model -- this is what makes B.3 "shortest-TIME" and not "shortest-path"
