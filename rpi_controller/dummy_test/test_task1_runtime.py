@@ -47,6 +47,14 @@ class KernelTests(unittest.TestCase):
         self.kernel.handle_event(Event(EventType.CV_RESULT_ACCEPTED, {"obstacle_id": "1"}))
         self.assertEqual(self.stm.get_nowait().command, "SF010")
 
+    def test_no_detection_saves_capture_and_advances_route(self):
+        self.load_route(["SNAP1", "FIN"])
+        self.stm.get_nowait()
+        self.kernel.handle_event(Event(EventType.STM_ZH_COMPLETE))
+        self.assertEqual(self.camera.get_nowait().obstacle_id, "1")
+        self.kernel.handle_event(Event(EventType.CV_RETRY_REQUIRED, {"obstacle_id": "1"}))
+        self.assertEqual(self.kernel.state, MissionState.COMPLETE)
+
     def test_abort_and_timeout_do_not_advance(self):
         for event_type in (EventType.STM_ABORT, EventType.STM_TIMEOUT):
             with self.subTest(event_type=event_type):
@@ -70,6 +78,24 @@ class KernelTests(unittest.TestCase):
 
 
 class CameraWorkerTests(unittest.TestCase):
+    def test_worker_starts_and_closes_persistent_imaging_once(self):
+        class FakeImaging:
+            def __init__(self):
+                self.started = self.closed = 0
+
+            def start(self):
+                self.started += 1
+
+            def close(self):
+                self.closed += 1
+
+        imaging = FakeImaging()
+        requests, transfers, events = queue.Queue(), queue.Queue(), queue.Queue()
+        requests.put(None)
+        worker = CameraCVWorker(imaging, requests, transfers, events, threading.Event(), Path("."))
+        worker.start(); worker.join(1)
+        self.assertEqual((imaging.started, imaging.closed), (1, 1))
+
     def test_accepted_detection_persists_metadata_and_queues_transfer(self):
         with tempfile.TemporaryDirectory() as directory:
             image_path = Path(directory) / "capture.jpg"
@@ -89,6 +115,51 @@ class CameraWorkerTests(unittest.TestCase):
             self.assertEqual(transfer.image_path, str(image_path))
             self.assertTrue(Path(transfer.metadata_path).is_file())
             self.assertEqual(events.get_nowait().type, EventType.CV_RESULT_ACCEPTED)
+
+    def test_no_symbol_capture_is_still_queued_for_transfer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image_path = Path(directory) / "capture_no_symbol.jpg"
+            image_path.write_bytes(b"jpeg")
+
+            class FakeImaging:
+                def capture_and_predict(self, obstacle_id):
+                    return {"image_id": None, "confidence": None, "bbox": None, "image_path": str(image_path)}
+
+            requests, transfers, events = queue.Queue(), queue.Queue(maxsize=1), queue.Queue()
+            requests.put(CameraRequest("1"))
+            requests.put(None)
+            worker = CameraCVWorker(FakeImaging(), requests, transfers, events, threading.Event(), Path(directory))
+            worker.start()
+            worker.join(1)
+            self.assertEqual(transfers.get_nowait().image_path, str(image_path))
+            self.assertEqual(events.get_nowait().type, EventType.CV_RETRY_REQUIRED)
+
+    def test_continuous_scan_saves_detection_without_a_snap_event(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image_path = Path(directory) / "continuous.jpg"
+            image_path.write_bytes(b"jpeg")
+            called = threading.Event()
+            observed = {}
+
+            class FakeImaging:
+                def capture_and_predict(self, obstacle_id, **options):
+                    observed.update(obstacle_id=obstacle_id, options=options)
+                    called.set()
+                    return {"image_id": "38", "confidence": 0.94, "bbox": (1, 2, 3, 4), "image_path": str(image_path)}
+
+            requests, transfers, events = queue.Queue(), queue.Queue(maxsize=1), queue.Queue()
+            worker = CameraCVWorker(
+                FakeImaging(), requests, transfers, events, threading.Event(), Path(directory),
+                continuous_scan=True, continuous_scan_interval_seconds=0.01,
+            )
+            worker.start()
+            self.assertTrue(called.wait(1))
+            requests.put(None)
+            worker.join(1)
+            self.assertEqual(observed["obstacle_id"], "continuous")
+            self.assertFalse(observed["options"]["save_on_no_detection"])
+            self.assertEqual(transfers.get_nowait().image_path, str(image_path))
+            self.assertEqual(events.get_nowait().type, EventType.CV_CONTINUOUS_RESULT)
 
 
 class ShutdownTests(unittest.TestCase):

@@ -12,7 +12,7 @@ class ImagingConnector:
     def __init__(self, service: ImagingService | None = None):
         self.service = service or ImagingService()
 
-    def capture_and_predict(self, obstacle_id):
+    def capture_and_predict(self, obstacle_id, **options):
         """
         Capture an image for the given obstacle and run recognition.
 
@@ -38,4 +38,12 @@ class ImagingConnector:
         #     "image_id": None,
         #     "confidence": None,
         # }
-        return self.service.capture_and_predict(obstacle_id)
+        return self.service.capture_and_predict(obstacle_id, **options)
+
+    def start(self):
+        """Prepare the camera/model once when the CameraCV worker starts."""
+        return self.service.start()
+
+    def close(self):
+        """Release camera resources when the CameraCV worker stops."""
+        return self.service.close()

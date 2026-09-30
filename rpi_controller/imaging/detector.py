@@ -58,6 +58,11 @@ class LocalYoloDetector:
             raise DetectorSetupError("Ultralytics is not installed.") from error
         self._model = YOLO(str(self.model_path))
 
+    def load(self) -> None:
+        """Load weights ahead of time without performing an inference."""
+        if self._model is None:
+            self._load_model()
+
     def detect(self, image: np.ndarray) -> DetectionResult:
         """Return target ID, confidence and bounding box."""
         if self._model is None:
