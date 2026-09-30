@@ -22,6 +22,7 @@ from typing import Callable, List, Optional, Tuple
 
 import config as cfg
 from motion import (
+    BACKWARD,
     FORWARD,
     LEFT,
     RIGHT,
@@ -222,15 +223,93 @@ def shortest_length(start: Pose, goal: Pose,
     return candidates[0][1].length if candidates else float("inf")
 
 
+def _clear(traj: Trajectory, is_free: Optional[Callable[[Pose], bool]],
+           is_clear: Optional[Callable[[Trajectory], bool]]) -> bool:
+    """Collision check: a whole-trajectory test if given, else pose by pose."""
+    if is_clear is not None:
+        return is_clear(traj)
+    return is_free is None or all(is_free(p) for p in traj.iter_sample(cfg.COLLISION_SAMPLE_STEP))
+
+
+def _flip(pose: Pose) -> Pose:
+    """The same spot with the heading turned round -- the robot seen from behind."""
+    return Pose(pose.x, pose.y, normalise_angle(pose.theta + math.pi))
+
+
+def _to_reverse(forward: Trajectory, start: Pose, radius: float) -> Trajectory:
+    """Replay a path planned for the flipped robot as a reversing path.
+
+    Driving backwards with heading `theta` traces exactly the curve a robot
+    facing `theta + pi` traces driving forwards, except that its left and right
+    are swapped: a forward LEFT arc of the flipped robot is a reverse RIGHT arc
+    (`RB`) of the real one. So each segment keeps its length, flips its
+    steering and gear, and is re-anchored on the real robot's pose.
+    """
+    segments = []
+    pose = start
+    for seg in forward.segments:
+        real = Segment(BACKWARD, -seg.steering, seg.length, radius, pose)
+        segments.append(real)
+        pose = real.end
+    return Trajectory(segments)
+
+
+def plan_all_reverse(start: Pose, goal: Pose,
+                     radius: float = cfg.TURNING_RADIUS) -> List[Tuple[str, Trajectory]]:
+    """Every Dubins word driven entirely in REVERSE, shortest first.
+
+    A forward-only planner with a wide turning circle cannot reach a pose that
+    sits behind the robot, or one it would have to swing its nose past a wall
+    to enter. Reversing the whole way often gets there directly. Word letters
+    name the real steering, so "rLSR" starts with an LB command.
+    """
+    candidates: List[Tuple[str, Trajectory]] = []
+    for word, traj in plan_all(_flip(start), _flip(goal), radius):
+        real = _to_reverse(traj, start, radius)
+        end = real.end_pose()
+        if (math.hypot(end.x - goal.x, end.y - goal.y) > 1e-4
+                or abs(normalise_angle(end.theta - goal.theta)) > 1e-4):
+            continue            # defensive: the mirror trick must land on the goal
+        mirrored = "".join({"L": "R", "R": "L", "S": "S"}[c] for c in word)
+        candidates.append(("r" + mirrored, real))
+    return candidates
+
+
+def plan_reverse(start: Pose, goal: Pose, radius: float = cfg.TURNING_RADIUS,
+                 is_free: Optional[Callable[[Pose], bool]] = None,
+                 max_length: float = math.inf,
+                 is_clear: Optional[Callable[[Trajectory], bool]] = None
+                 ) -> Optional[Tuple[str, Trajectory]]:
+    """Shortest collision-free all-reverse Dubins path, or None."""
+    if math.hypot(goal.x - start.x, goal.y - start.y) > max_length:
+        return None             # even a straight line would be too long
+    for word, traj in plan_all_reverse(start, goal, radius):
+        if traj.length > max_length:
+            break               # sorted shortest first: nothing later can win
+        if _clear(traj, is_free, is_clear):
+            return word, traj
+    return None
+
+
 def plan(start: Pose, goal: Pose, radius: float = cfg.TURNING_RADIUS,
-         is_free: Optional[Callable[[Pose], bool]] = None
+         is_free: Optional[Callable[[Pose], bool]] = None,
+         max_length: float = math.inf,
+         is_clear: Optional[Callable[[Trajectory], bool]] = None
          ) -> Optional[Tuple[str, Trajectory]]:
     """Shortest Dubins path that stays clear of obstacles, or None.
 
     `is_free` is called on poses sampled every COLLISION_SAMPLE_STEP cm; pass
     `Arena.is_pose_free`. With no `is_free` this is just the shortest word.
+    `is_clear`, if given, replaces `is_free` with one call per candidate path
+    (pass `Arena.is_trajectory_free`, which is several times faster).
+    Words longer than `max_length` are not collision-checked at all -- the
+    caller already has something better, and checking is the expensive part.
     """
+    if math.hypot(goal.x - start.x, goal.y - start.y) > max_length:
+        return None             # even a straight line would be too long
     for word, traj in plan_all(start, goal, radius):
-        if is_free is None or all(is_free(p) for p in traj.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
+        if traj.length > max_length:
+            break               # sorted shortest first: nothing later can win
+        if _clear(traj, is_free, is_clear):
             return word, traj
     return None

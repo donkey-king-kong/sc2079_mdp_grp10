@@ -194,8 +194,14 @@ def plan(arena: Arena, start: Pose, goal: Pose,
         # it works the robot lands on the goal pose *exactly* rather than
         # within the lattice tolerance, which matters because the next leg
         # starts from wherever this one ended.
-        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * radius:
-            shot = dubins.plan(node.pose, goal, radius, arena.is_pose_free)
+        if (expansions % cfg.HA_SHOT_PERIOD == 0
+                or heuristic(node.pose) < cfg.HA_SHOT_DISTANCE):
+            shot = dubins.plan(node.pose, goal, radius, is_clear=arena.is_trajectory_free)
+            if shot is None:
+                # A wide turning circle often leaves the goal reachable only by
+                # backing into it, so try the all-reverse words as well.
+                shot = dubins.plan_reverse(node.pose, goal, radius,
+                                           is_clear=arena.is_trajectory_free)
             if shot is not None:
                 return _reconstruct(node, shot[1])
 
@@ -206,7 +212,7 @@ def plan(arena: Arena, start: Pose, goal: Pose,
             segment = Segment(gear, steering, cfg.HA_STEP, radius, node.pose)
             # Check the whole swept step, not just where it lands, or the robot
             # will happily clip a corner mid-primitive.
-            if not all(arena.is_pose_free(p) for p in segment.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
+            if not arena.is_segment_free(segment):
                 continue
 
             child_pose = segment.end

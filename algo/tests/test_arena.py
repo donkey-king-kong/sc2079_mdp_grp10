@@ -102,6 +102,23 @@ class Collision(unittest.TestCase):
         self.assertTrue(self.arena.is_point_free(140.0, 105.0))
         self.assertFalse(self.arena.is_trajectory_free(through))
 
+    def test_fast_trajectory_check_agrees_with_pose_by_pose(self):
+        # is_trajectory_free skips building a Pose per sample for speed; it must
+        # still give exactly the answer the plain per-pose check gives.
+        from motion import BACKWARD, FORWARD, LEFT, RIGHT, STRAIGHT, Segment, Trajectory
+        rng = random.Random(3)
+        for _ in range(400):
+            pose = Pose(rng.uniform(10, 190), rng.uniform(10, 190), rng.uniform(-math.pi, math.pi))
+            segments = []
+            for _ in range(3):
+                seg = Segment(rng.choice((FORWARD, BACKWARD)), rng.choice((LEFT, STRAIGHT, RIGHT)),
+                              rng.uniform(0, 80), cfg.TURNING_RADIUS, pose)
+                segments.append(seg)
+                pose = seg.end
+            trajectory = Trajectory(segments)
+            slow = all(self.arena.is_pose_free(p) for p in trajectory.iter_sample())
+            self.assertEqual(self.arena.is_trajectory_free(trajectory), slow)
+
 
 class WireFormat(unittest.TestCase):
     def test_cell_units_are_the_default(self):

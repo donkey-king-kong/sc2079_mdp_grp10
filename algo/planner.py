@@ -32,6 +32,7 @@ simulator's "compare all strategies" view fast.
 """
 
 import itertools
+import math
 import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -40,7 +41,7 @@ import config as cfg
 import dubins
 import hybrid_astar
 from arena import Arena, CapturePose, start_pose
-from motion import BACKWARD, STRAIGHT, Pose, Segment, Trajectory, merge_segments
+from motion import BACKWARD, LEFT, RIGHT, STRAIGHT, Pose, Segment, Trajectory, merge_segments
 
 STRATEGIES = ("nearest", "greedy_swap", "exhaustive")
 
@@ -62,6 +63,10 @@ TRANSIT_HEADINGS = (0.0, 1.5707963267948966, 3.141592653589793, -1.5707963267948
 # not connect. The search is milliseconds when it succeeds but has to exhaust
 # its budget to prove a leg impossible, and mostly it is proving.
 SEARCH_BUDGET = 20
+
+# How many of an obstacle's capture poses one gap-filling attempt searches
+# for, nearest the source first.
+SEARCH_POSES_PER_TARGET = 2
 
 
 @dataclass
@@ -135,41 +140,105 @@ def leg_cost(trajectory: Trajectory, metric: str = "time") -> float:
     raise ValueError("metric must be 'time' or 'distance', got %r" % (metric,))
 
 
+def _departures(arena: Arena, source: Pose, allow_backoff: bool
+                ) -> List[Tuple[str, List[Segment]]]:
+    """Every collision-free way of pulling away from `source` before the leg proper.
+
+    With a 36.2cm turning radius the robot needs a lot of room to swing its
+    nose round, and a capture pose leaves it 15cm from the block it is staring
+    at. So besides reversing straight out (slide 33) we also try reversing
+    out on full lock to either side -- `LB045`, `RB090` and so on -- which
+    turns the robot while it backs away and is often the only way out of a
+    pose tucked against a wall or a neighbouring obstacle.
+    """
+    departures: List[Tuple[str, List[Segment]]] = [("", [])]
+    if not allow_backoff:
+        return departures
+
+    clear = arena.is_segment_free
+
+    for backoff in cfg.DEPARTURE_BACKOFF_OPTIONS:
+        if backoff <= 0.0:
+            continue
+        reverse = Segment(BACKWARD, STRAIGHT, backoff, cfg.TURNING_RADIUS, source)
+        if not clear(reverse):
+            break                # blocked behind: reversing further cannot help
+        departures.append(("SB+", [reverse]))
+
+    for degrees in cfg.DEPARTURE_REVERSE_TURN_OPTIONS:
+        for steering, name in ((LEFT, "LB"), (RIGHT, "RB")):
+            length = math.radians(degrees) * cfg.TURNING_RADIUS
+            arc = Segment(BACKWARD, steering, length, cfg.TURNING_RADIUS, source)
+            if clear(arc):
+                departures.append((name + "+", [arc]))
+    return departures
+
+
 def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
               max_expansions: int = cfg.HA_MAX_EXPANSIONS,
-              allow_backoff: bool = True) -> Optional[Tuple[str, Trajectory]]:
-    """One leg: back out of the capture pose, then Dubins; Hybrid A* as a last resort.
+              allow_backoff: bool = True,
+              metric: str = "time") -> Optional[Tuple[str, Trajectory]]:
+    """One leg: the cheapest analytic path, with Hybrid A* as a last resort.
+
+    Analytic candidates, all exact and collision-checked:
+
+    * a forward Dubins path, straight from `source`;
+    * a forward Dubins path after first backing away (straight back, or
+      reversing on full lock to either side) -- see `_departures`;
+    * a Dubins path driven entirely in reverse.
 
     The back-out is not an optimisation, it is a necessity. A capture pose sits
     30cm from an obstacle face pointing straight at it, and the turning radius
-    is 25cm, so the tightest forward arc the robot can drive still ends up
+    is 36.2cm, so the tightest forward arc the robot can drive still ends up
     inside the block. Briefing slide 33 says as much: reverse first.
 
+    The cheapest candidate under `metric` wins, rather than the first one found:
+    with a wide turning circle a short reverse followed by a direct path is
+    often much faster than the forward path that goes the long way round.
+
     Pass `allow_backoff=False` when the robot is not parked in front of anything
-    -- the start pose, or a transit pose. There is nothing to reverse away from,
-    and since a failed leg costs one Dubins attempt per option, skipping them is
-    most of the cost of building the roadmap.
+    -- the start pose, or a transit pose. There is nothing to reverse away from.
     """
-    options = cfg.DEPARTURE_BACKOFF_OPTIONS if allow_backoff else (0.0,)
-    for backoff in options:
-        if backoff <= 0.0:
-            departure, prefix = source, []
-        else:
-            reverse = Segment(BACKWARD, STRAIGHT, backoff, cfg.TURNING_RADIUS, source)
-            if not all(arena.is_pose_free(p)
-                       for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
-                break            # blocked behind: reversing further cannot help
-            departure, prefix = reverse.end, [reverse]
+    best: Optional[Tuple[str, Trajectory]] = None
+    best_cost = INF
 
-        result = dubins.plan(departure, target, cfg.TURNING_RADIUS, arena.is_pose_free)
-        if result is None:
+    def consider(word: str, segments: List[Segment]) -> None:
+        nonlocal best, best_cost
+        trajectory = Trajectory(merge_segments(segments))
+        cost = leg_cost(trajectory, metric)
+        if cost < best_cost - 1e-9:
+            best, best_cost = (word, trajectory), cost
+
+    def length_budget(prefix: List[Segment]) -> float:
+        """Longest remaining path that could still beat the best so far.
+
+        Nothing drives faster than the faster of the two speeds, so a path
+        longer than this cannot win on time either. Lets Dubins skip
+        collision-checking words that are already out of the running.
+        """
+        if best_cost >= INF:
+            return INF
+        top = best_cost * (max(cfg.SPEED_STRAIGHT, cfg.SPEED_TURN) if metric == "time" else 1.0)
+        return top - sum(s.length for s in prefix)
+
+    for label, prefix in _departures(arena, source, allow_backoff):
+        departure = prefix[-1].end if prefix else source
+        budget = length_budget(prefix)
+        if budget <= 0.0:
             continue
-        word, trajectory = result
-        combined = Trajectory(merge_segments(prefix + trajectory.segments))
-        return (word if not prefix else "SB+" + word, combined)
+        result = dubins.plan(departure, target, cfg.TURNING_RADIUS,
+                             max_length=budget, is_clear=arena.is_trajectory_free)
+        if result is not None:
+            consider(label + result[0], prefix + result[1].segments)
 
-    if not allow_search:
-        return None
+    result = dubins.plan_reverse(source, target, cfg.TURNING_RADIUS,
+                                 max_length=length_budget([]),
+                                 is_clear=arena.is_trajectory_free)
+    if result is not None:
+        consider(result[0], result[1].segments)
+
+    if best is not None or not allow_search:
+        return best
     trajectory = hybrid_astar.plan(arena, source, target, max_expansions=max_expansions)
     return ("hybrid_astar", trajectory) if trajectory is not None else None
 
@@ -239,7 +308,8 @@ class CostModel:
     def _solve(self, i: int, j: int, allow_search: bool) -> float:
         result = _plan_leg(self.arena, self.nodes[i].pose, self.nodes[j].pose,
                            allow_search, max_expansions=cfg.HA_MATRIX_EXPANSIONS,
-                           allow_backoff=self.nodes[i].kind == "capture")
+                           allow_backoff=self.nodes[i].kind == "capture",
+                           metric=self.metric)
         if result is None:
             return self._cost[i][j]
         cost = leg_cost(result[1], self.metric)
@@ -280,42 +350,97 @@ class CostModel:
         """Last resort: buy connectivity with Hybrid A* where nothing analytic worked.
 
         Runs at most once per model and the result is shared by every strategy.
-        One search per stranded pair -- a failed search has to exhaust its
-        budget to prove the leg impossible, so we do not work down the menu.
+        Bounded by wall clock as well as call count, because a failed search has
+        to exhaust its budget to prove a leg impossible, and only the clock
+        bounds the thing a person actually waits for.
 
-        Bounded by wall clock as well as call count, because the two failure
-        modes cost wildly different amounts and only the clock bounds the thing
-        a person actually waits for. Whatever is reached in the time available
-        is kept; anything still stranded is reported as unreachable.
+        The budget is spent in priority order, so that one awkward obstacle
+        cannot starve the rest:
+
+        1. **Reach every obstacle at all.** For each obstacle nothing can get
+           to yet, search from the start and from every obstacle that *is*
+           reachable -- nearest source first, since a short search is a cheap
+           one and far likelier to succeed. With a 36.2cm turning radius an
+           obstacle tucked against a wall is often a hopeless search from the
+           start but a fraction of a second from its neighbour's capture pose.
+        2. **Then connect the rest** -- pairs of reachable obstacles with no leg
+           between them, which is what lets the exhaustive search find a
+           complete tour.
+
+        Sources are only ever poses the robot can actually get to: a search
+        *from* an obstacle nobody can reach buys nothing.
         """
         if self._gaps_filled:
             return
         self._gaps_filled = True
-        budget = SEARCH_BUDGET
-        deadline = time.monotonic() + cfg.SEARCH_TIME_BUDGET
+        self._budget = SEARCH_BUDGET
+        self._deadline = time.monotonic() + cfg.SEARCH_TIME_BUDGET
 
-        for target_id in self.obstacle_ids:
-            for source_index in self._representative_sources(target_id):
-                if budget <= 0 or time.monotonic() > deadline:
+        # Phase 1: make every obstacle reachable from the start. Re-check after
+        # each success, because one new leg can make other sources usable.
+        progress = True
+        while progress and not self._out_of_budget():
+            progress = False
+            for target_id in self.obstacle_ids:
+                if self._out_of_budget():
                     break
-                if self._pair_is_connected(source_index, target_id):
+                if self._reachable_from_start(target_id):
                     continue
-                for target_index in self.nodes_by_obstacle[target_id][:2]:
-                    if budget <= 0 or time.monotonic() > deadline:
+                for source_index in self._reachable_sources(target_id):
+                    if self._out_of_budget():
                         break
-                    budget -= 1
-                    if self._solve(source_index, target_index, allow_search=True) < INF:
+                    if self._search_into(source_index, target_id):
+                        self._close_transitively()
+                        progress = True
                         break
+
+        # Phase 2: connect reachable obstacles to each other where no leg exists.
+        for target_id in self.obstacle_ids:
+            for source_index in self._reachable_sources(target_id):
+                if self._out_of_budget():
+                    break
+                if source_index == 0 or self._pair_is_connected(source_index, target_id):
+                    continue
+                self._search_into(source_index, target_id)
 
         self._close_transitively()      # new edges open up new multi-hop routes
 
-    def _representative_sources(self, target_id: int) -> List[int]:
-        """The start node, plus the best pose of every other obstacle."""
+    def _out_of_budget(self) -> bool:
+        return self._budget <= 0 or time.monotonic() > self._deadline
+
+    def _search_into(self, source_index: int, target_id: int) -> bool:
+        """One Hybrid A* attempt at each of the target's poses nearest the source."""
+        source = self.nodes[source_index].pose
+        targets = sorted(self.nodes_by_obstacle[target_id],
+                         key=lambda j: (self.nodes[j].pose.x - source.x) ** 2
+                         + (self.nodes[j].pose.y - source.y) ** 2)
+        for target_index in targets[:SEARCH_POSES_PER_TARGET]:
+            if self._out_of_budget():
+                return False
+            self._budget -= 1
+            if self._solve(source_index, target_index, allow_search=True) < INF:
+                return True
+        return False
+
+    def _reachable_from_start(self, obstacle_id: int) -> bool:
+        return any(self._cost[0][j] < INF for j in self.nodes_by_obstacle[obstacle_id])
+
+    def _reachable_sources(self, target_id: int) -> List[int]:
+        """The start, plus one reachable pose of every other reachable obstacle,
+        nearest to the target first."""
+        target = self.nodes[self.nodes_by_obstacle[target_id][0]].pose
         sources = [0]
         for other_id, indices in self.nodes_by_obstacle.items():
-            if other_id != target_id and indices:
-                sources.append(indices[0])
-        return sources
+            if other_id == target_id:
+                continue
+            reachable = [i for i in indices if self._cost[0][i] < INF]
+            if reachable:
+                sources.append(min(reachable, key=lambda i: self._cost[0][i]))
+
+        def distance(index: int) -> float:
+            pose = self.nodes[index].pose
+            return (pose.x - target.x) ** 2 + (pose.y - target.y) ** 2
+        return sorted(sources, key=distance)
 
     def _pair_is_connected(self, source_index: int, target_id: int) -> bool:
         """Does any known leg run from this source into this obstacle?"""

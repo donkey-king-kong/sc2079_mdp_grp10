@@ -85,16 +85,50 @@ class Parsing(unittest.TestCase):
                 commands.parse(text)
 
 
+class PhysicalTurningRadius(unittest.TestCase):
+    """The STM turns on the robot's real radius; the planner must plan on it too."""
+
+    def test_the_configured_radius_is_the_measured_one(self):
+        self.assertAlmostEqual(cfg.TURNING_RADIUS, 36.2)
+
+    def test_quarter_turns_end_one_radius_over_and_one_up(self):
+        # Facing North at (100, 40), RF090 ends facing East one radius to the
+        # right and one radius ahead; LF090 mirrors it. RF045 is half the sweep.
+        r = cfg.TURNING_RADIUS
+        start = Pose(100.0, 40.0, math.pi / 2)
+        right = commands.commands_to_trajectory(["RF090"], start).end_pose()
+        self.assertAlmostEqual(right.x, 100.0 + r, places=6)
+        self.assertAlmostEqual(right.y, 40.0 + r, places=6)
+        left = commands.commands_to_trajectory(["LF090"], start).end_pose()
+        self.assertAlmostEqual(left.x, 100.0 - r, places=6)
+        self.assertAlmostEqual(left.y, 40.0 + r, places=6)
+        half = commands.commands_to_trajectory(["RF045"], start).end_pose()
+        self.assertAlmostEqual(half.x, 100.0 + r * (1 - math.cos(math.pi / 4)), places=6)
+        self.assertAlmostEqual(half.y, 40.0 + r * math.sin(math.pi / 4), places=6)
+
+    def test_every_planned_turn_uses_the_configured_radius(self):
+        layout = [Obstacle(1, 60.0, 120.0, "S"), Obstacle(2, 140.0, 60.0, "W"),
+                  Obstacle(3, 150.0, 150.0, "S")]
+        route = planner.plan_route(Arena(layout), "exhaustive")
+        for leg in route.legs:
+            for segment in leg.trajectory.segments:
+                if segment.steering != STRAIGHT:
+                    self.assertAlmostEqual(segment.radius, cfg.TURNING_RADIUS)
+
+
 class RoundTrip(unittest.TestCase):
     def replay(self, trajectory, start):
         return commands.commands_to_trajectory(
             commands.trajectory_to_commands(trajectory), start)
 
     def test_a_handmade_path_survives_the_round_trip(self):
+        # Built at the configured radius: the STM turns at the robot's real
+        # radius whatever the planner assumed, so the replay uses it too.
+        r = cfg.TURNING_RADIUS
         start = Pose(30.0, 30.0, math.pi / 2)
-        first = Segment(FORWARD, STRAIGHT, 60.0, 25.0, start)
-        second = Segment(FORWARD, RIGHT, math.pi / 2 * 25.0, 25.0, first.end)
-        third = Segment(BACKWARD, LEFT, math.pi / 4 * 25.0, 25.0, second.end)
+        first = Segment(FORWARD, STRAIGHT, 60.0, r, start)
+        second = Segment(FORWARD, RIGHT, math.pi / 2 * r, r, first.end)
+        third = Segment(BACKWARD, LEFT, math.pi / 4 * r, r, second.end)
         original = Trajectory([first, second, third])
 
         replayed = self.replay(original, start)

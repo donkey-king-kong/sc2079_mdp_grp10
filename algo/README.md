@@ -62,7 +62,8 @@ time &mdash; forward, backward, and left/right arcs in both gears. They go
 through the same parser, the same kinematics and the same collision check as the
 planner, so a move that would clip a virtual obstacle or leave the arena is
 refused and says so. Note there is no on-the-spot turn: every turn is an arc at
-the 25cm turning radius, which is the honest behaviour of the real chassis.
+the robot's measured 36.2cm turning radius, which is the honest behaviour of the
+real chassis.
 
 Tick **Virtual obstacles** to show the inflated no-go regions the planner
 actually reasons about, and **Capture poses** to show every pose it considered
@@ -136,9 +137,11 @@ Two details matter more than they look:
 
 - **Reversing out of a capture pose is mandatory, not an optimisation.** The
   robot finishes a photo 30cm from an obstacle face pointing straight at it, and
-  the turning radius is 25cm &mdash; so every forward-only path out drives into
+  the turning radius is 36.2cm &mdash; so every forward-only path out drives into
   the block it just photographed. Slide 33 says the same thing. Each leg
-  therefore tries backing straight out first, shortest reverse that works.
+  therefore also tries backing out first &mdash; straight back 15/30/45cm, or
+  reversing on full lock 45&deg; or 90&deg; to either side &mdash; plus a Dubins
+  path driven entirely in reverse, and keeps whichever is fastest.
 - **Three segments is not always enough.** A Dubins path cannot express "along
   the bottom, up the right-hand side, then in", which a cluttered arena needs
   constantly. So the roadmap carries `transit` poses in the open parts of the
@@ -208,7 +211,8 @@ Every tunable constant lives there with the slide it came from written next to
 it. It is the only file that should need touching when calibrating against the
 real robot. The ones most likely to be wrong:
 
-- `TURNING_RADIUS` (25cm from slide 4, and larger the faster the robot goes)
+- `TURNING_RADIUS` (36.2cm, measured on the robot for both left and right
+  turns; slide 4's 25cm was only a guess, and it grows if the turns get faster)
 - `CAPTURE_STANDOFF` (30cm, derived from slide 8)
 - `SPEED_STRAIGHT`, `SPEED_TURN`, `DIRECTION_CHANGE_TIME`, `STEERING_CHANGE_TIME`
   &mdash; **measure these with a stopwatch**; they are estimates, and they are

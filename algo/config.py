@@ -40,7 +40,7 @@ ROBOT_HALF = ROBOT_SIZE / 2.0
 
 # Keep-clear square around the start zone, used when generating demo layouts.
 # An obstacle whose virtual box abuts the start zone leaves the robot in a
-# 10cm-tall band, and a 25cm turning radius cannot turn round in one -- the
+# 10cm-tall band, and a 36.2cm turning radius cannot turn round in one -- the
 # robot is walled in before it has moved. Real arenas leave the start clear;
 # generated ones should too. Half a footprint of slack past the zone is enough.
 START_KEEP_CLEAR = START_ZONE_SIZE + ROBOT_HALF
@@ -63,10 +63,14 @@ START_THETA = math.pi / 2.0
 # Kinematics (briefing slide 4)
 # --------------------------------------------------------------------------
 
-# "There is a turning radius of about 25cm but it is a larger radius if robot
-# moves faster." This and CAPTURE_STANDOFF are the two values most likely to
-# need re-measuring against the real robot.
-TURNING_RADIUS = 25.0
+# MEASURED on the physical robot: it drives a 36.2cm-radius circle on full
+# lock, turning left or right alike (briefing slide 4 guessed "about 25cm").
+# The STM executes RF045 / RF090 / LB090 ... as an arc of THIS radius through
+# the commanded angle, so if this number is wrong every turn lands the robot
+# in the wrong place -- a 90 degree turn planned at 25cm ends 11.2cm short on
+# both axes of where the real robot finishes. Re-measure it whenever the
+# steering or the speed of the turn commands changes.
+TURNING_RADIUS = 36.2
 
 # --------------------------------------------------------------------------
 # Obstacle avoidance (briefing slide 36)
@@ -96,7 +100,7 @@ COLLISION_SAMPLE_STEP = 3.0
 # from the obstacle face along the face normal, laterally centred on the block.
 CAPTURE_STANDOFF = 30.0
 
-# The single ideal pose is often unreachable (a 25cm turning radius plus a wall
+# The single ideal pose is often unreachable (a 36.2cm turning radius plus a wall
 # or a neighbouring obstacle), so every obstacle offers a *menu* of acceptable
 # poses and the planner takes the first one it can actually drive to. Ordered
 # best-first: the head of the list is slide 8's pose.
@@ -131,11 +135,18 @@ CAPTURE_MAX_DISTANCE = 50.0
 # Briefing slide 33: "After the robot has recognized an image at an obstacle,
 # this obstacle is blocking the robot -- needs to reverse first." The robot
 # finishes a photo parked 30cm from a face, pointing straight at it, and its
-# turning radius is 25cm, so EVERY forward-only path out of a capture pose
+# turning radius is 36.2cm, so EVERY forward-only path out of a capture pose
 # drives into the block it just photographed. Before planning the next leg we
 # therefore back straight out by one of these distances and plan the Dubins
 # path from there. 0.0 is tried first so the start pose costs nothing extra.
-DEPARTURE_BACKOFF_OPTIONS = (0.0, 15.0, 30.0)
+DEPARTURE_BACKOFF_OPTIONS = (0.0, 15.0, 30.0, 45.0)
+
+# Also try backing out of a capture pose on full lock, through each of these
+# angles (degrees), to both sides. With a 36.2cm radius the robot cannot swing
+# round in front of the block it just photographed, and a straight reverse is
+# often boxed in by a wall or a neighbour behind it; reversing while turning
+# gets it pointed somewhere useful before it drives off.
+DEPARTURE_REVERSE_TURN_OPTIONS = (45.0, 90.0)
 
 # --------------------------------------------------------------------------
 # Hybrid A* fallback (used only when every Dubins candidate is blocked)
@@ -149,6 +160,13 @@ HA_GOAL_THETA_TOLERANCE = math.radians(10.0)
 HA_REVERSE_COST = 2.0       # multiplier: reversing is slow and drifts
 HA_GEAR_CHANGE_COST = 8.0   # cm-equivalent penalty for shifting fwd <-> rev
 HA_STEER_CHANGE_COST = 2.0  # cm-equivalent penalty for a steering change
+# Every HA_SHOT_PERIOD expansions, and at every node within HA_SHOT_DISTANCE cm
+# of the goal, the search tries to finish with one exact Dubins path. Those
+# shots are most of a search's cost: with the old "within 3 turning radii" rule
+# and a 36.2cm radius, that is nearly the whole arena, so every expansion paid
+# for a dozen Dubins constructions.
+HA_SHOT_PERIOD = 8
+HA_SHOT_DISTANCE = 40.0     # cm
 HA_MAX_EXPANSIONS = 60000   # hard stop so a hopeless goal cannot hang a demo
 # While filling holes in the cost matrix we run the search dozens of times and
 # most of those legs turn out to be genuinely impossible. A tighter cap keeps a

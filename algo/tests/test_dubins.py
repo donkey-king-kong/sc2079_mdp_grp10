@@ -12,7 +12,7 @@ import unittest
 import conftest  # noqa: F401  (path setup)
 
 import dubins
-from motion import RIGHT, Pose, normalise_angle, turn_centre
+from motion import BACKWARD, RIGHT, Pose, normalise_angle, turn_centre
 
 
 class SlideFortyThree(unittest.TestCase):
@@ -109,6 +109,38 @@ class Correctness(unittest.TestCase):
         # Accept everything and we get the shortest word back.
         word, trajectory = dubins.plan(start, goal, 25.0, lambda p: True)
         self.assertAlmostEqual(trajectory.length, best.length, places=6)
+
+
+class Reverse(unittest.TestCase):
+    """All-reverse Dubins paths, used when the robot has to back into a pose."""
+
+    PAIRS = Correctness.PAIRS + [
+        (Pose(100.0, 100.0, math.pi / 2), Pose(100.0, 40.0, math.pi / 2)),   # dead astern
+        (Pose(100.0, 100.0, 0.0), Pose(60.0, 60.0, -math.pi / 2)),
+    ]
+
+    def test_every_reverse_candidate_lands_on_the_goal_in_reverse_gear(self):
+        for start, goal in self.PAIRS:
+            candidates = dubins.plan_all_reverse(start, goal, 36.2)
+            self.assertTrue(candidates)
+            for word, trajectory in candidates:
+                end = trajectory.end_pose()
+                with self.subTest(word=word, start=start, goal=goal):
+                    self.assertAlmostEqual(end.x, goal.x, places=4)
+                    self.assertAlmostEqual(end.y, goal.y, places=4)
+                    self.assertAlmostEqual(normalise_angle(end.theta - goal.theta), 0.0, places=4)
+                    self.assertTrue(all(s.gear == BACKWARD for s in trajectory.segments))
+
+    def test_a_pose_dead_astern_is_one_straight_reverse(self):
+        start, goal = Pose(100.0, 100.0, math.pi / 2), Pose(100.0, 40.0, math.pi / 2)
+        _, trajectory = dubins.plan_reverse(start, goal, 36.2)
+        self.assertAlmostEqual(trajectory.length, 60.0, places=4)
+
+    def test_max_length_skips_longer_words(self):
+        start, goal = Pose(20.0, 20.0, math.pi / 2), Pose(150.0, 150.0, 0.0)
+        best = dubins.plan_all(start, goal, 36.2)[0][1].length
+        self.assertIsNone(dubins.plan(start, goal, 36.2, max_length=best - 1.0))
+        self.assertIsNotNone(dubins.plan(start, goal, 36.2, max_length=best + 1.0))
 
 
 if __name__ == "__main__":

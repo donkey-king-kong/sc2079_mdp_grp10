@@ -11,7 +11,7 @@ Two jobs live here.
 
 2. **Capture poses.** Each obstacle shows its image on one of N/S/E/W. The
    robot has to end up standing off that face, pointing back at it. The single
-   ideal pose from slide 8 is frequently unreachable -- a 25cm turning radius
+   ideal pose from slide 8 is frequently unreachable -- a 36.2cm turning radius
    next to a wall leaves no room -- so each obstacle publishes a *menu* of
    acceptable poses and the planner takes the first one it can actually reach.
 """
@@ -138,7 +138,37 @@ class Arena:
         return self.is_point_free(pose.x, pose.y)
 
     def is_trajectory_free(self, trajectory, step: float = cfg.COLLISION_SAMPLE_STEP) -> bool:
-        return all(self.is_pose_free(p) for p in trajectory.iter_sample(step))
+        """Same answer as checking every pose of `trajectory.iter_sample()`, faster.
+
+        This is the planner's hot loop -- hundreds of thousands of calls per
+        layout -- so the point test is inlined rather than going through
+        `is_point_free` once per sample.
+        """
+        if not trajectory.segments:
+            return True
+        lo, hi, blocked = self._min_xy, self._max_xy, self._blocked
+        start = trajectory.segments[0].start
+        if not self.is_point_free(start.x, start.y):
+            return False
+        for seg in trajectory.segments:
+            for x, y in seg.iter_points(step):
+                if not (lo <= x <= hi and lo <= y <= hi):
+                    return False
+                for x0, y0, x1, y1 in blocked:
+                    if x0 < x < x1 and y0 < y < y1:
+                        return False
+        return True
+
+    def is_segment_free(self, segment, step: float = cfg.COLLISION_SAMPLE_STEP) -> bool:
+        """Is every sampled point along one segment clear (start point excluded)?"""
+        lo, hi, blocked = self._min_xy, self._max_xy, self._blocked
+        for x, y in segment.iter_points(step):
+            if not (lo <= x <= hi and lo <= y <= hi):
+                return False
+            for x0, y0, x1, y1 in blocked:
+                if x0 < x < x1 and y0 < y < y1:
+                    return False
+        return True
 
     # -- capture poses -----------------------------------------------------
 
@@ -321,7 +351,7 @@ def _start_can_escape(arena: "Arena") -> bool:
     """Can the robot actually drive out of the start pose?
 
     The flood fill below treats the robot as a point, so it happily reports a
-    10cm-tall corridor as reachable -- but a car with a 25cm turning radius
+    10cm-tall corridor as reachable -- but a car with a 36.2cm turning radius
     cannot turn round in one, and the real robot would be stuck on the spot.
     This asks the question properly, by trying to plan a real path to a spread
     of poses around the arena.

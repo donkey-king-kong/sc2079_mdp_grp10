@@ -148,11 +148,54 @@ class Segment:
         if self.length <= 1e-9:
             return
         n = max(1, int(math.ceil(self.length / max(step, 1e-6))))
+        start = self.start
+        if self.steering == STRAIGHT or self.radius <= 0.0:
+            dx = self.gear * math.cos(start.theta)
+            dy = self.gear * math.sin(start.theta)
+            for i in range(1, n + 1):
+                d = self.length * i / n
+                yield Pose(start.x + d * dx, start.y + d * dy, start.theta)
+            return
+        # Same maths as pose_at(), with the circle worked out once instead of
+        # once per sample -- this loop is most of the planner's running time.
+        cx, cy = turn_centre(start, self.radius, self.steering)
+        phi0 = math.atan2(start.y - cy, start.x - cx)
+        rate = self.steering * self.gear / self.radius
         for i in range(1, n + 1):
-            yield self.pose_at(self.length * i / n)
+            swept = rate * (self.length * i / n)
+            phi = phi0 + swept
+            yield Pose(cx + self.radius * math.cos(phi),
+                       cy + self.radius * math.sin(phi),
+                       normalise_angle(start.theta + swept))
 
     def sample(self, step: float) -> List[Pose]:
         return list(self.iter_sample(step))
+
+    def iter_points(self, step: float) -> Iterator[Tuple[float, float]]:
+        """Just the (x, y) of `iter_sample()` -- all a collision check needs.
+
+        Building a Pose per sample is most of the cost of collision checking,
+        and the check only ever looks at the position, so this skips it.
+        """
+        if self.length <= 1e-9:
+            return
+        n = max(1, int(math.ceil(self.length / max(step, 1e-6))))
+        start = self.start
+        if self.steering == STRAIGHT or self.radius <= 0.0:
+            dx = self.gear * math.cos(start.theta) * self.length / n
+            dy = self.gear * math.sin(start.theta) * self.length / n
+            x, y = start.x, start.y
+            for i in range(1, n + 1):
+                yield (x + i * dx, y + i * dy)
+            return
+        cx, cy = turn_centre(start, self.radius, self.steering)
+        phi0 = math.atan2(start.y - cy, start.x - cx)
+        dphi = self.steering * self.gear * self.length / (self.radius * n)
+        r = self.radius
+        cos, sin = math.cos, math.sin
+        for i in range(1, n + 1):
+            phi = phi0 + i * dphi
+            yield (cx + r * cos(phi), cy + r * sin(phi))
 
     def duration(self) -> float:
         """Seconds this segment takes, per the time model in config.py."""
