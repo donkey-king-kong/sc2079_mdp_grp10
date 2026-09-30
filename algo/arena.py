@@ -318,14 +318,6 @@ def _blocks_start_zone(obstacle: Obstacle) -> bool:
 
 
 def _start_can_escape(arena: "Arena") -> bool:
-    """Can the robot actually drive out of the start pose?
-
-    The flood fill below treats the robot as a point, so it happily reports a
-    10cm-tall corridor as reachable -- but a car with a 25cm turning radius
-    cannot turn round in one, and the real robot would be stuck on the spot.
-    This asks the question properly, by trying to plan a real path to a spread
-    of poses around the arena.
-    """
     import dubins           # local import: dubins has no need to know about arenas
     origin = start_pose()
     for x in (60.0, 100.0, 140.0):
@@ -333,8 +325,13 @@ def _start_can_escape(arena: "Arena") -> bool:
             if not arena.is_point_free(x, y):
                 continue
             for theta in (0.0, math.pi / 2, math.pi, -math.pi / 2):
-                if dubins.plan(origin, Pose(x, y, theta), cfg.TURNING_RADIUS,
-                               arena.is_pose_free) is not None:
+                if dubins.plan(
+                    origin,
+                    Pose(x, y, theta),
+                    r_left=cfg.TURNING_RADIUS_LEFT,
+                    r_right=cfg.TURNING_RADIUS_RIGHT,
+                    is_pose_free=arena.is_pose_free,
+                ) is not None:
                     return True
     return False
 
@@ -359,7 +356,7 @@ def _layout_is_solvable(obstacles: Sequence[Obstacle], resolution: float = 5.0) 
 
 def random_layout(count: int = cfg.NUM_OBSTACLES,
                   rng: Optional[random.Random] = None,
-                  max_attempts: int = 400) -> List[Obstacle]:
+                  max_attempts: int = 2000) -> List[Obstacle]:
     """A random but *legal and solvable* obstacle layout, for demoing.
 
     Three things make a layout unusable, and all three are rejected here:

@@ -142,9 +142,6 @@ def _plan_leg(
     max_expansions: int = cfg.HA_MAX_EXPANSIONS,
     allow_backoff: bool = True,
 ) -> Optional[Tuple[str, Trajectory]]:
-    """One leg: reverse away from capture pose if allowed, then plan using asymmetric turning radii
-    (20.0 cm for left turns, 36.0 cm for right turns); Hybrid A* as last resort.
-    """
     options = cfg.DEPARTURE_BACKOFF_OPTIONS if allow_backoff else (0.0,)
     for backoff in options:
         if backoff <= 0.0:
@@ -158,7 +155,6 @@ def _plan_leg(
                 break
             departure, prefix = reverse.end, [reverse]
 
-        # Plan Dubins curve using asymmetric left (20cm) and right (36cm) turning radii
         result = dubins.plan(
             departure,
             target,
@@ -174,7 +170,6 @@ def _plan_leg(
     if not allow_search:
         return None
 
-    # Fallback to Hybrid A* using asymmetric turning radii
     trajectory = hybrid_astar.plan(
         arena,
         source,

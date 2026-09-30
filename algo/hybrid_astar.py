@@ -165,9 +165,15 @@ def _reconstruct(node: _Node, tail: Optional[Trajectory] = None) -> Trajectory:
     return Trajectory(merge_segments(segments))
 
 
-def plan(arena: Arena, start: Pose, goal: Pose,
-         radius: float = cfg.TURNING_RADIUS,
-         max_expansions: int = cfg.HA_MAX_EXPANSIONS) -> Optional[Trajectory]:
+def plan(
+    arena: Arena,
+    start: Pose,
+    goal: Pose,
+    radius: float = cfg.TURNING_RADIUS,
+    r_left: float = cfg.TURNING_RADIUS_LEFT,
+    r_right: float = cfg.TURNING_RADIUS_RIGHT,
+    max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+) -> Optional[Trajectory]:
     """Shortest drivable path from `start` to `goal` avoiding obstacles.
 
     Returns None if no path is found within `max_expansions` -- a bound that
@@ -202,22 +208,28 @@ def plan(arena: Arena, start: Pose, goal: Pose,
         # it works the robot lands on the goal pose *exactly* rather than
         # within the lattice tolerance, which matters because the next leg
         # starts from wherever this one ended.
-        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * radius:
-            shot = dubins.plan(node.pose, goal, radius, arena.is_pose_free)
+        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * max(r_left, r_right):
+            shot = dubins.plan(
+                node.pose,
+                goal,
+                r_left=r_left,
+                r_right=r_right,
+                is_pose_free=arena.is_pose_free,
+            )
             if shot is not None:
                 return _reconstruct(node, shot[1])
 
         if _at_goal(node.pose, goal):
             return _reconstruct(node)
 
-            for gear, steering in PRIMITIVES:
-            # Apply specific turning radius based on steering direction
-                if steering == LEFT:
-                    r_step = getattr(cfg, "TURNING_RADIUS_LEFT", radius)
-                elif steering == RIGHT:
-                    r_step = getattr(cfg, "TURNING_RADIUS_RIGHT", radius)
-                else:
-                    r_step = radius
+        for gear, steering in PRIMITIVES:
+        # Apply specific turning radius based on steering direction
+            if steering == LEFT:
+                r_step = getattr(cfg, "TURNING_RADIUS_LEFT", radius)
+            elif steering == RIGHT:
+                r_step = getattr(cfg, "TURNING_RADIUS_RIGHT", radius)
+            else:
+                r_step = radius
 
             segment = Segment(gear, steering, cfg.HA_STEP, r_step, node.pose)
             # Check the whole swept step, not just where it lands, or the robot

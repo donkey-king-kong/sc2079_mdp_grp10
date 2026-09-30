@@ -114,35 +114,6 @@ def segment_to_commands(segment: Segment) -> List[str]:
         for part in _split(degrees, cfg.MAX_TURN_COMMAND_DEG)
     ]
 
-# def segment_to_commands(segment: Segment) -> List[str]:
-#     """One segment -> the commands that drive it.
-
-#     Usually one command. It becomes several when the sweep is longer than the
-#     STM firmware will accept in a single instruction -- two arcs around the same
-#     circle merge into one segment, and that can legitimately be a 300-degree
-#     turn.
-#     """
-#     if segment.steering == STRAIGHT:
-#         if segment.length < cfg.MIN_COMMAND_DISTANCE:
-#             return []
-#         prefix = _STRAIGHT_PREFIXES[segment.gear]
-#         return [prefix + _field(part)
-#                 for part in _split(segment.length, cfg.MAX_STRAIGHT_COMMAND_CM)]
-
-#     angle = abs(segment.turn_angle)
-#     if angle < cfg.MIN_COMMAND_ANGLE:
-#         return []
-#     degrees = math.degrees(angle)
-#     if cfg.SNAP_TO_90_TURNS:
-#         # Some STM firmwares only implement quarter turns. This throws away real
-#         # path accuracy, so leave SNAP_TO_90_TURNS off unless the firmware
-#         # genuinely requires it.
-#         degrees = round(degrees / 90.0) * 90.0
-#         if degrees < 1.0:
-#             return []
-#     prefix = _TURN_PREFIXES[(segment.gear, segment.steering)]
-#     return [prefix + _field(part) for part in _split(degrees, cfg.MAX_TURN_COMMAND_DEG)]
-
 
 def segment_to_command(segment: Segment) -> Optional[str]:
     """Convenience wrapper for single-command case."""
@@ -156,20 +127,6 @@ def trajectory_to_commands(trajectory: Trajectory) -> List[str]:
     for segment in merge_segments(trajectory.segments):
         commands.extend(segment_to_commands(segment))
     return commands
-
-
-# def trajectory_to_commands(trajectory: Trajectory) -> List[str]:
-#     """Every command needed to drive one leg.
-
-#     Segments are merged first: Hybrid A* emits one segment per 5cm primitive,
-#     and sending forty `SF005`s instead of one `SF200` means forty accelerate-
-#     and-stop cycles, which is both far slower and far less accurate on the real
-#     chassis than a single continuous run.
-#     """
-#     commands: List[str] = []
-#     for segment in merge_segments(trajectory.segments):
-#         commands.extend(segment_to_commands(segment))
-#     return commands
 
 
 def route_to_commands(route, snap: bool = True, finish: bool = True) -> List[str]:
