@@ -1,8 +1,10 @@
+import os
 import requests
 
 
 class AlgoConnector:
-    def __init__(self, host="127.0.0.1", port=5001, timeout=15):
+    def __init__(self, host=None, port=5001, timeout=15):
+        host = host or os.getenv("MDP_ALGO_HOST", "127.0.0.1")
         self.base_url = f"http://{host}:{port}"
         self.timeout = timeout
 
