@@ -224,6 +224,24 @@ class Reachability(unittest.TestCase):
         for leg in route.legs:
             self.assertTrue(arena.is_trajectory_free(leg.trajectory))
 
+    def test_an_obstacle_the_tour_cannot_leave_is_searched_out_of(self):
+        # Two obstacles whose photo poses have no known way on: only one can be
+        # visited last, so the best tour has to drop the other even though the
+        # robot can reach it. The second search round must find it a way out.
+        arena = Arena(LAYOUT)
+        model = planner.CostModel(arena)
+        for oid in (1, 3):
+            for j in model.nodes_by_obstacle[oid]:
+                for k in range(len(model.nodes)):
+                    if k != j:
+                        model._cost[j][k] = planner.INF
+                        model._direct.pop((j, k), None)
+        self.assertLess(len(planner._exhaustive_order(model, model.reachable_obstacles())), 5)
+        route = planner.plan_route(arena, "exhaustive", model=model)
+        self.assertEqual(sorted(route.order), [1, 2, 3, 4, 5])
+        for leg in route.legs:
+            self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
     def test_legs_chain_exactly_after_a_hybrid_astar_leg(self):
         # Two stress-test layouts where a Hybrid A* leg used to stop within its
         # 4cm / 10 degree goal box, so the next leg started 3-4cm away from

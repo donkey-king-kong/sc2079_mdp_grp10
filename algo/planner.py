@@ -70,6 +70,10 @@ SEARCH_BUDGET = 20
 # may start from before it is given up on. See `CostModel.fill_gaps`.
 SEARCH_SOURCES = 3
 
+# How many of the nearest onward poses a search out of a dead-end photo pose
+# aims at, all at once. See `CostModel.reconnect`.
+ONWARD_GOALS = 8
+
 
 @dataclass
 class Node:
@@ -268,6 +272,8 @@ class CostModel:
         self._via: List[List[int]] = [[-1] * size for _ in range(size)]
         self._direct: Dict[Tuple[int, int], Tuple[str, Trajectory]] = {}
         self._gaps_filled = False
+        self._search_deadline: Optional[float] = None
+        self._reconnected = False
         self._build()
 
     def _add(self, node: Node) -> int:
@@ -356,6 +362,7 @@ class CostModel:
         self._gaps_filled = True
         budget = SEARCH_BUDGET
         deadline = time.monotonic() + cfg.SEARCH_TIME_BUDGET
+        self._search_deadline = deadline
 
         stranded = [oid for oid in self.obstacle_ids if not self._reachable_from_start(oid)]
         for position, target_id in enumerate(stranded):
@@ -379,16 +386,83 @@ class CostModel:
 
         self._close_transitively()      # new edges open up new multi-hop routes
 
+    def reconnect(self, dropped: Sequence[int]) -> bool:
+        """Second round: obstacles the robot can reach but no full tour includes.
+
+        `fill_gaps` only searches for obstacles nothing reaches. An obstacle can
+        also be reachable and still left out of every tour: the photo pose the
+        robot gets into is one it cannot drive on from (tucked in against a
+        wall, say), or it can only be reached straight from the start, and so
+        can another obstacle -- and only one of them can go first. So for each
+        obstacle the best tour dropped, search OUT of the photo poses the robot
+        can reach, to the nearest places it can carry on from; failing that,
+        search back IN to it from the nearest poses the robot can reach.
+
+        Uses what is left of `fill_gaps`'s clock, shared fairly, so planning
+        stays bounded. Returns True if any new leg was found.
+        """
+        if self._reconnected:
+            return False
+        self._reconnected = True
+        deadline = self._search_deadline or time.monotonic() + cfg.SEARCH_TIME_BUDGET
+        budget = SEARCH_BUDGET
+        joined = False
+        for position, target_id in enumerate(dropped):
+            now = time.monotonic()
+            if now >= deadline or budget <= 0:
+                break
+            share_end = now + (deadline - now) / (len(dropped) - position)
+            found = False
+            for source_index in self._reached_poses(target_id)[:2]:
+                if budget <= 0 or time.monotonic() > share_end:
+                    break
+                budget -= 1
+                if self._search(source_index, self._onward_nodes(source_index), share_end):
+                    found = True
+                    break
+            if not found:
+                for source_index in self._representative_sources(target_id):
+                    if budget <= 0 or time.monotonic() > share_end:
+                        break
+                    budget -= 1
+                    if self._search_into(source_index, target_id, share_end):
+                        found = True
+                        break
+            if found:
+                joined = True
+                self._close_transitively()
+        return joined
+
+    def _reached_poses(self, target_id: int) -> List[int]:
+        """The obstacle's photo poses the robot can get to, cheapest first."""
+        reached = [j for j in self.nodes_by_obstacle[target_id] if self._cost[0][j] < INF]
+        return sorted(reached, key=lambda j: self._cost[0][j])
+
+    def _onward_nodes(self, source_index: int) -> List[int]:
+        """Nearest poses (up to ONWARD_GOALS) the robot can reach and go on from."""
+        here = footprint_centre(self.nodes[source_index].pose)
+        own = self.nodes[source_index].obstacle_id
+        onward = [k for k, node in enumerate(self.nodes)
+                  if k != 0 and node.obstacle_id != own and self._cost[0][k] < INF]
+        onward.sort(key=lambda k: math.hypot(*(a - b for a, b in zip(
+            footprint_centre(self.nodes[k].pose), here))))
+        return onward[:ONWARD_GOALS]
+
     def _search_into(self, source_index: int, target_id: int, deadline: float) -> bool:
         """One Hybrid A* search from a node into any photo pose of an obstacle."""
-        targets = self.nodes_by_obstacle[target_id]
+        return self._search(source_index, self.nodes_by_obstacle[target_id], deadline)
+
+    def _search(self, source_index: int, goals: List[int], deadline: float) -> bool:
+        """One Hybrid A* search from a node to whichever of `goals` it reaches first."""
+        if not goals:
+            return False
         found = hybrid_astar.plan_any(self.arena, self.nodes[source_index].pose,
-                                      [self.nodes[j].pose for j in targets],
+                                      [self.nodes[j].pose for j in goals],
                                       max_expansions=cfg.HA_MATRIX_EXPANSIONS,
                                       deadline=deadline)
         if found is None:
             return False
-        target_index, trajectory = targets[found[0]], found[1]
+        target_index, trajectory = goals[found[0]], found[1]
         cost = leg_cost(trajectory, self.metric)
         if cost < self._cost[source_index][target_index]:
             self._cost[source_index][target_index] = cost
@@ -614,6 +688,12 @@ def plan_route(arena: Arena, strategy: str = "exhaustive",
         model.fill_gaps()
         reachable = model.reachable_obstacles()
         optimal = _exhaustive_order(model, reachable)
+        # Reachable but still left out: search for a way on from it, or a way
+        # in from the others, with whatever search time is left.
+        dropped = [oid for oid in reachable if oid not in optimal]
+        if dropped and model.reconnect(dropped):
+            reachable = model.reachable_obstacles()
+            optimal = _exhaustive_order(model, reachable)
 
     # Every strategy returns an order it can actually drive -- a partial one if
     # a complete tour is impossible -- so whatever it leaves out is reported
