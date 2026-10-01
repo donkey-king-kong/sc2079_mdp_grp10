@@ -29,13 +29,13 @@ class AndroidRXWorkerTests(unittest.TestCase):
             "value": {
                 "robot_x": 1,
                 "robot_y": 1,
-                "robot_direction": 0,
+                "robot_direction": 1,
                 "obstacles": [
                     {
                         "id": 1,
                         "x": 5,
                         "y": 13,
-                        "d": 3,
+                        "d": 4,
                     }
                 ],
             },
