@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-
 import numpy as np
 
 
 BBox = tuple[int, int, int, int]
 
-TEMPORARY_KEAN_SYMBOLS = {
+TARGET_SYMBOLS = {
     "10": "Bullseye", "11": "1", "12": "2", "13": "3", "14": "4",
     "15": "5", "16": "6", "17": "7", "18": "8", "19": "9",
     "20": "a", "21": "b", "22": "c", "23": "d", "24": "e", "25": "f",
@@ -18,10 +17,18 @@ TEMPORARY_KEAN_SYMBOLS = {
     "32": "w", "33": "x", "34": "y", "35": "z", "36": "Up Arrow",
     "37": "Down Arrow", "38": "Right Arrow", "39": "Left Arrow", "40": "Target",
 }
+BULLSEYE_SYMBOL_NAMES = {"bullseye", "end"}
 
 
 def symbol_for_target(target_id: str | None) -> str | None:
-    return TEMPORARY_KEAN_SYMBOLS.get(target_id) if target_id is not None else None
+    return TARGET_SYMBOLS.get(target_id) if target_id is not None else None
+
+
+def is_bullseye_target(target_id: str) -> bool:
+    """Whether a model target label maps to the non-returnable bullseye marker."""
+    # ``end`` is the Bullseye semantic name in a legacy ``best.pt``;
+    # deployed numeric-label models resolve via TARGET_SYMBOLS instead.
+    return (symbol_for_target(target_id) or target_id).casefold() in BULLSEYE_SYMBOL_NAMES
 
 
 @dataclass(frozen=True)
@@ -34,6 +41,30 @@ class DetectionResult:
     @classmethod
     def not_found(cls) -> "DetectionResult":
         return cls(found=False)
+
+
+def valid_detections(
+    detections: tuple[DetectionResult, ...], image_shape: tuple[int, ...],
+) -> tuple[DetectionResult, ...]:
+    """Keep usable, non-bullseye detections for target selection.
+
+    The model is deliberately still allowed to emit bullseye.  It is excluded
+    here, before any confidence comparison performed by callers.
+    """
+    height, width = image_shape[:2]
+    return tuple(
+        detection
+        for detection in detections
+        if detection.target_id is not None
+        and not is_bullseye_target(detection.target_id)
+        and detection.bbox is not None
+        and detection.bbox[0] < detection.bbox[2]
+        and detection.bbox[1] < detection.bbox[3]
+        and 0 <= detection.bbox[0] < width
+        and 0 <= detection.bbox[1] < height
+        and 0 < detection.bbox[2] <= width
+        and 0 < detection.bbox[3] <= height
+    )
 
 
 class DetectorSetupError(RuntimeError):
@@ -63,8 +94,8 @@ class LocalYoloDetector:
         if self._model is None:
             self._load_model()
 
-    def detect(self, image: np.ndarray) -> DetectionResult:
-        """Return target ID, confidence and bounding box."""
+    def detect_all(self, image: np.ndarray) -> tuple[DetectionResult, ...]:
+        """Return every YOLO detection, including bullseye, for diagnostics."""
         if self._model is None:
             self._load_model()
 
@@ -76,12 +107,22 @@ class LocalYoloDetector:
             verbose=False,
         )
         if not results or results[0].boxes is None or len(results[0].boxes) == 0:
-            return DetectionResult.not_found()
+            return ()
 
         result = results[0]
-        best_box = max(result.boxes, key=lambda box: float(box.conf[0]))
-        class_index = int(best_box.cls[0])
-        target_id = str(result.names[class_index])
-        confidence = float(best_box.conf[0])
-        x1, y1, x2, y2 = (round(value) for value in best_box.xyxy[0].tolist())
-        return DetectionResult(True, target_id, confidence, (x1, y1, x2, y2))
+        return tuple(
+            DetectionResult(
+                found=True,
+                target_id=str(result.names[int(box.cls[0])]),
+                confidence=float(box.conf[0]),
+                bbox=tuple(round(value) for value in box.xyxy[0].tolist()),
+            )
+            for box in result.boxes
+        )
+
+    def detect(self, image: np.ndarray) -> DetectionResult:
+        """Return the strongest valid target; bullseye is never returned."""
+        candidates = valid_detections(self.detect_all(image), image.shape)
+        if not candidates:
+            return DetectionResult.not_found()
+        return max(candidates, key=lambda detection: detection.confidence or 0.0)
