@@ -356,33 +356,42 @@ class CostModel:
         equal share of the time left, as a hard stop inside the search, so one
         hopeless obstacle cannot starve the rest; time an obstacle does not
         need rolls on to the next.
+
+        Searches run in two passes. The first gives every stranded obstacle a
+        short search (HA_MATRIX_EXPANSIONS steps), so the easy ones are found
+        before anything long runs. The second gives whatever is still stranded
+        a deeper search (HA_DEEP_EXPANSIONS) on the time the first left over:
+        some ways out of a tight corner are only found by a long search.
         """
         if self._gaps_filled:
             return
         self._gaps_filled = True
-        budget = SEARCH_BUDGET
         deadline = time.monotonic() + cfg.SEARCH_TIME_BUDGET
         self._search_deadline = deadline
 
-        stranded = [oid for oid in self.obstacle_ids if not self._reachable_from_start(oid)]
-        for position, target_id in enumerate(stranded):
-            if self._reachable_from_start(target_id):
-                continue            # an earlier search opened a route to it
-            waiting = sum(1 for oid in stranded[position:] if not self._reachable_from_start(oid))
-            now = time.monotonic()
-            share_end = now + max(0.0, deadline - now) / waiting
-            reached = False
-            for source_index in self._representative_sources(target_id):
-                if budget <= 0 or time.monotonic() > share_end:
-                    break
-                budget -= 1
-                if self._search_into(source_index, target_id, share_end):
-                    reached = True
-                    break
-            if reached:
-                # Route the new edge through the roadmap now, so the next
-                # obstacle can start its search from here.
-                self._close_transitively()
+        # Two passes: a cheap search for every stranded obstacle first, then a
+        # deeper one for whatever is still stranded, on the time left over.
+        for cap in (cfg.HA_MATRIX_EXPANSIONS, cfg.HA_DEEP_EXPANSIONS):
+            budget = SEARCH_BUDGET
+            stranded = [oid for oid in self.obstacle_ids if not self._reachable_from_start(oid)]
+            for position, target_id in enumerate(stranded):
+                if self._reachable_from_start(target_id):
+                    continue            # an earlier search opened a route to it
+                waiting = sum(1 for oid in stranded[position:] if not self._reachable_from_start(oid))
+                now = time.monotonic()
+                share_end = now + max(0.0, deadline - now) / waiting
+                reached = False
+                for source_index in self._representative_sources(target_id):
+                    if budget <= 0 or time.monotonic() > share_end:
+                        break
+                    budget -= 1
+                    if self._search_into(source_index, target_id, share_end, cap):
+                        reached = True
+                        break
+                if reached:
+                    # Route the new edge through the roadmap now, so the next
+                    # obstacle can start its search from here.
+                    self._close_transitively()
 
         self._close_transitively()      # new edges open up new multi-hop routes
 
@@ -448,17 +457,20 @@ class CostModel:
             footprint_centre(self.nodes[k].pose), here))))
         return onward[:ONWARD_GOALS]
 
-    def _search_into(self, source_index: int, target_id: int, deadline: float) -> bool:
+    def _search_into(self, source_index: int, target_id: int, deadline: float,
+                     max_expansions: Optional[int] = None) -> bool:
         """One Hybrid A* search from a node into any photo pose of an obstacle."""
-        return self._search(source_index, self.nodes_by_obstacle[target_id], deadline)
+        return self._search(source_index, self.nodes_by_obstacle[target_id], deadline,
+                            max_expansions)
 
-    def _search(self, source_index: int, goals: List[int], deadline: float) -> bool:
+    def _search(self, source_index: int, goals: List[int], deadline: float,
+                max_expansions: Optional[int] = None) -> bool:
         """One Hybrid A* search from a node to whichever of `goals` it reaches first."""
         if not goals:
             return False
         found = hybrid_astar.plan_any(self.arena, self.nodes[source_index].pose,
                                       [self.nodes[j].pose for j in goals],
-                                      max_expansions=cfg.HA_MATRIX_EXPANSIONS,
+                                      max_expansions=max_expansions or cfg.HA_MATRIX_EXPANSIONS,
                                       deadline=deadline)
         if found is None:
             return False
