@@ -351,10 +351,16 @@ Read `tests/` before changing anything in `dubins.py`, `hybrid_astar.py` or
   pose: every candidate parks within 1.9cm of the neighbouring block, inside
   `SAFETY_MARGIN`.
 
-  The knob here is `SEARCH_TIME_BUDGET` (4s), the wall-clock ceiling on the
+  The knob here is `SEARCH_TIME_BUDGET` (6s), the wall-clock ceiling on the
   Hybrid A* rescue pass. It searches from the few poses the robot can already
   reach that are nearest each stranded obstacle, since a short search from
-  next door succeeds where a long one from across the arena runs out of steps. Raising it recovers a few more obstacles at the cost of
+  next door succeeds where a long one from across the arena runs out of steps.
+  It runs in two passes: a short search (2,500 steps) for every stranded
+  obstacle, then a deep one (10,000 steps) for what is left, on the leftover
+  time. On a 100-layout stress set (20 each of 4-8 obstacles) that reaches 97
+  layouts fully, against 95 with the short pass alone on 4s, and 95 with a
+  10,000-step cap alone (the long searches then starve the easy obstacles);
+  worst-case planning is 9.1s. Raising it recovers a few more obstacles at the cost of
   a longer wait: with the budget lifted entirely, those same 60 layouts give 48
   of 60, but the worst case goes from 8.8s to 18.1s. Planning happens once,
   before the robot moves, so it is worth turning up if a supervisor is watching

@@ -226,6 +226,10 @@ HA_MAX_EXPANSIONS = 60000   # hard stop so a hopeless goal cannot hang a demo
 # nasty layout from turning a 0.3s plan into a 90s one; the full budget above is
 # reserved for the final, committed path.
 HA_MATRIX_EXPANSIONS = 2500
+# Second, deeper pass for whatever the first pass left stranded, on the time it
+# did not use. Some ways in (out of a tight corner) need a long search; running
+# that first would let one hopeless obstacle eat the time the easy ones need.
+HA_DEEP_EXPANSIONS = 10000
 
 # Wall-clock ceiling on the whole gap-filling pass. A call-count budget is a
 # poor bound because the cost of one search varies by two orders of magnitude --
@@ -233,7 +237,7 @@ HA_MATRIX_EXPANSIONS = 2500
 # itself proving a leg impossible. Bounding the time directly is what keeps a
 # nasty layout from turning a 2s plan into an 18s one. Raise it if you would
 # rather wait than lose an obstacle; planning happens once, before the run.
-SEARCH_TIME_BUDGET = 4.0    # seconds
+SEARCH_TIME_BUDGET = 6.0    # seconds
 
 # --------------------------------------------------------------------------
 # Time model -- this is what makes B.3 "shortest-TIME" and not "shortest-path"
