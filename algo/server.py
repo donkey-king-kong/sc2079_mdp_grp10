@@ -232,7 +232,6 @@ def api_config():
         "start": _pose_dict(arena_module.start_pose()),
     })
 
-
 @app.route("/api/random")
 def api_random():
     """A random legal layout. Guaranteed solvable -- see `arena.random_layout`."""
@@ -242,8 +241,28 @@ def api_random():
         raise BadRequest("'count' must be an integer")
     if not 1 <= count <= 12:
         raise BadRequest("'count' must be between 1 and 12")
-    obstacles = arena_module.random_layout(count)
-    return jsonify({"obstacles": [ob.to_dict() for ob in obstacles]})
+
+    for _ in range(5):
+        try:
+            obstacles = arena_module.random_layout(count)
+            return jsonify({"obstacles": [ob.to_dict() for ob in obstacles]})
+        except RuntimeError:
+            continue
+
+    raise BadRequest("Could not generate a legal layout of %d obstacles. Please try again." % count)
+
+
+# @app.route("/api/random")
+# def api_random():
+#     """A random legal layout. Guaranteed solvable -- see `arena.random_layout`."""
+#     try:
+#         count = int(request.args.get("count", cfg.NUM_OBSTACLES))
+#     except ValueError:
+#         raise BadRequest("'count' must be an integer")
+#     if not 1 <= count <= 12:
+#         raise BadRequest("'count' must be between 1 and 12")
+#     obstacles = arena_module.random_layout(count)
+#     return jsonify({"obstacles": [ob.to_dict() for ob in obstacles]})
 
 
 @app.route("/api/plan", methods=["POST"])

@@ -61,7 +61,7 @@ TRANSIT_HEADINGS = (0.0, 1.5707963267948966, 3.141592653589793, -1.5707963267948
 # Ceiling on Hybrid A* calls while patching whatever the analytic passes could
 # not connect. The search is milliseconds when it succeeds but has to exhaust
 # its budget to prove a leg impossible, and mostly it is proving.
-SEARCH_BUDGET = 20
+SEARCH_BUDGET = 50
 
 
 @dataclass
@@ -134,44 +134,94 @@ def leg_cost(trajectory: Trajectory, metric: str = "time") -> float:
         return trajectory.length
     raise ValueError("metric must be 'time' or 'distance', got %r" % (metric,))
 
-
-def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
-              max_expansions: int = cfg.HA_MAX_EXPANSIONS,
-              allow_backoff: bool = True) -> Optional[Tuple[str, Trajectory]]:
-    """One leg: back out of the capture pose, then Dubins; Hybrid A* as a last resort.
-
-    The back-out is not an optimisation, it is a necessity. A capture pose sits
-    30cm from an obstacle face pointing straight at it, and the turning radius
-    is 25cm, so the tightest forward arc the robot can drive still ends up
-    inside the block. Briefing slide 33 says as much: reverse first.
-
-    Pass `allow_backoff=False` when the robot is not parked in front of anything
-    -- the start pose, or a transit pose. There is nothing to reverse away from,
-    and since a failed leg costs one Dubins attempt per option, skipping them is
-    most of the cost of building the roadmap.
-    """
+def _plan_leg(
+    arena: Arena,
+    source: Pose,
+    target: Pose,
+    allow_search: bool,
+    max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+    allow_backoff: bool = True,
+) -> Optional[Tuple[str, Trajectory]]:
     options = cfg.DEPARTURE_BACKOFF_OPTIONS if allow_backoff else (0.0,)
     for backoff in options:
         if backoff <= 0.0:
             departure, prefix = source, []
         else:
             reverse = Segment(BACKWARD, STRAIGHT, backoff, cfg.TURNING_RADIUS, source)
-            if not all(arena.is_pose_free(p)
-                       for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
-                break            # blocked behind: reversing further cannot help
+            if not all(
+                arena.is_pose_free(p)
+                for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)
+            ):
+                continue
             departure, prefix = reverse.end, [reverse]
 
-        result = dubins.plan(departure, target, cfg.TURNING_RADIUS, arena.is_pose_free)
-        if result is None:
-            continue
-        word, trajectory = result
-        combined = Trajectory(merge_segments(prefix + trajectory.segments))
-        return (word if not prefix else "SB+" + word, combined)
+        result = dubins.plan(
+            departure,
+            target,
+            r_left=cfg.TURNING_RADIUS_LEFT,
+            r_right=cfg.TURNING_RADIUS_RIGHT,
+            is_pose_free=arena.is_pose_free,
+        )
+        if result is not None:
+            word, trajectory = result
+            combined = Trajectory(merge_segments(prefix + trajectory.segments))
+            return (word if not prefix else "SB+" + word, combined)
 
     if not allow_search:
         return None
-    trajectory = hybrid_astar.plan(arena, source, target, max_expansions=max_expansions)
+
+    trajectory = hybrid_astar.plan(
+        arena,
+        source,
+        target,
+        r_left=cfg.TURNING_RADIUS_LEFT,
+        r_right=cfg.TURNING_RADIUS_RIGHT,
+        max_expansions=max_expansions,
+    )
     return ("hybrid_astar", trajectory) if trajectory is not None else None
+
+
+# def _plan_leg(
+#     arena: Arena,
+#     source: Pose,
+#     target: Pose,
+#     allow_search: bool,
+#     max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+#     allow_backoff: bool = True,
+# ) -> Optional[Tuple[str, Trajectory]]:
+#     """One leg: reverse away from capture pose if allowed, then plan using fixed conservative turning radius;
+#     Hybrid A* as last resort.
+#     """
+#     options = cfg.DEPARTURE_BACKOFF_OPTIONS if allow_backoff else (0.0,)
+#     for backoff in options:
+#         if backoff <= 0.0:
+#             departure, prefix = source, []
+#         else:
+#             reverse = Segment(BACKWARD, STRAIGHT, backoff, cfg.TURNING_RADIUS, source)
+#             if not all(
+#                 arena.is_pose_free(p)
+#                 for p in reverse.iter_sample(cfg.COLLISION_SAMPLE_STEP)
+#             ):
+#                 break
+#             departure, prefix = reverse.end, [reverse]
+
+#         # Plan using conservative turning radius (36.0 cm) for safe obstacle clearance
+#         result = dubins.plan(
+#             departure, target, cfg.TURNING_RADIUS, arena.is_pose_free
+#         )
+#         if result is not None:
+#             word, trajectory = result
+#             combined = Trajectory(merge_segments(prefix + trajectory.segments))
+#             return (word if not prefix else "SB+" + word, combined)
+
+#     if not allow_search:
+#         return None
+
+#     # Fallback to Hybrid A* using conservative radius
+#     trajectory = hybrid_astar.plan(
+#         arena, source, target, radius=cfg.TURNING_RADIUS, max_expansions=max_expansions
+#     )
+#     return ("hybrid_astar", trajectory) if trajectory is not None else None
 
 
 class CostModel:
@@ -237,15 +287,16 @@ class CostModel:
         self._close_transitively()
 
     def _solve(self, i: int, j: int, allow_search: bool) -> float:
+        # Allow reverse backoffs from start, transit, or capture poses
         result = _plan_leg(self.arena, self.nodes[i].pose, self.nodes[j].pose,
                            allow_search, max_expansions=cfg.HA_MATRIX_EXPANSIONS,
-                           allow_backoff=self.nodes[i].kind == "capture")
+                           allow_backoff=True)
         if result is None:
             return self._cost[i][j]
         cost = leg_cost(result[1], self.metric)
-        self._direct[(i, j)] = result
         if cost < self._cost[i][j]:
             self._cost[i][j] = cost
+            self._direct[(i, j)] = result
             self._via[i][j] = -1
         return self._cost[i][j]
 
@@ -300,7 +351,7 @@ class CostModel:
                     break
                 if self._pair_is_connected(source_index, target_id):
                     continue
-                for target_index in self.nodes_by_obstacle[target_id][:2]:
+                for target_index in self.nodes_by_obstacle[target_id]:
                     if budget <= 0 or time.monotonic() > deadline:
                         break
                     budget -= 1

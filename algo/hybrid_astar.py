@@ -95,8 +95,17 @@ class _DistanceField:
                         continue
                     neighbour = ny * self.n + nx
                     if not arena.is_point_free((nx + 0.5) * resolution,
-                                               (ny + 0.5) * resolution):
+                                               (ny + 0.5) * resolution,
+                                               clearance=cfg.ROBOT_HALF_WIDTH + 1.0):
                         continue
+
+                    # Prevent passing diagonally through touching obstacles
+                    if dx != 0 and dy != 0:
+                        ortho1_free = arena.is_point_free((cx + dx + 0.5) * resolution, (cy + 0.5) * resolution, clearance=cfg.ROBOT_CLEARANCE)
+                        ortho2_free = arena.is_point_free((cx + 0.5) * resolution, (cy + dy + 0.5) * resolution, clearance=cfg.ROBOT_CLEARANCE)
+                        if not (ortho1_free and ortho2_free):
+                            continue
+
                     step = diag if dx and dy else resolution
                     if dist + step < self.cost[neighbour]:
                         self.cost[neighbour] = dist + step
@@ -157,9 +166,15 @@ def _reconstruct(node: _Node, tail: Optional[Trajectory] = None) -> Trajectory:
     return Trajectory(merge_segments(segments))
 
 
-def plan(arena: Arena, start: Pose, goal: Pose,
-         radius: float = cfg.TURNING_RADIUS,
-         max_expansions: int = cfg.HA_MAX_EXPANSIONS) -> Optional[Trajectory]:
+def plan(
+    arena: Arena,
+    start: Pose,
+    goal: Pose,
+    radius: float = cfg.TURNING_RADIUS,
+    r_left: float = cfg.TURNING_RADIUS_LEFT,
+    r_right: float = cfg.TURNING_RADIUS_RIGHT,
+    max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+) -> Optional[Trajectory]:
     """Shortest drivable path from `start` to `goal` avoiding obstacles.
 
     Returns None if no path is found within `max_expansions` -- a bound that
@@ -194,16 +209,35 @@ def plan(arena: Arena, start: Pose, goal: Pose,
         # it works the robot lands on the goal pose *exactly* rather than
         # within the lattice tolerance, which matters because the next leg
         # starts from wherever this one ended.
-        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * radius:
-            shot = dubins.plan(node.pose, goal, radius, arena.is_pose_free)
+        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * max(r_left, r_right):
+            shot = dubins.plan(
+                node.pose,
+                goal,
+                r_left=r_left,
+                r_right=r_right,
+                is_pose_free=arena.is_pose_free,
+            )
             if shot is not None:
                 return _reconstruct(node, shot[1])
 
         if _at_goal(node.pose, goal):
             return _reconstruct(node)
 
+        # Apply specific turning radius based on steering direction
         for gear, steering in PRIMITIVES:
-            segment = Segment(gear, steering, cfg.HA_STEP, radius, node.pose)
+            # Apply specific turning radius based on steering direction
+            if steering == LEFT:
+                r_step = getattr(cfg, "TURNING_RADIUS_LEFT", radius)
+            elif steering == RIGHT:
+                r_step = getattr(cfg, "TURNING_RADIUS_RIGHT", radius)
+            else:
+                r_step = radius
+
+            # Scale turn step length so each primitive rotates by at least 1 theta bin
+            bin_angle = (2.0 * math.pi) / cfg.HA_THETA_BINS
+            step_len = min(r_step * bin_angle, cfg.HA_STEP) if steering != STRAIGHT else cfg.HA_STEP
+
+            segment = Segment(gear, steering, step_len, r_step, node.pose)
             # Check the whole swept step, not just where it lands, or the robot
             # will happily clip a corner mid-primitive.
             if not all(arena.is_pose_free(p) for p in segment.iter_sample(cfg.COLLISION_SAMPLE_STEP)):

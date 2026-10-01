@@ -33,12 +33,17 @@ _FACE_TANGENT = {"N": (1.0, 0.0), "S": (1.0, 0.0), "E": (0.0, 1.0), "W": (0.0, 1
 
 
 def bottom_left_to_centre(x: float, y: float, theta: float) -> Pose:
-    """Briefing slide 7 gives robot poses by bottom-left corner; we use centres."""
-    return Pose(x + cfg.ROBOT_HALF, y + cfg.ROBOT_HALF, normalise_angle(theta))
+    """Converts bottom-left corner (x, y) to robot axle center (cx, cy)."""
+    cx = x + cfg.ROBOT_REAR_TO_AXLE * math.cos(theta) + cfg.ROBOT_HALF_WIDTH * math.sin(theta)
+    cy = y + cfg.ROBOT_REAR_TO_AXLE * math.sin(theta) - cfg.ROBOT_HALF_WIDTH * math.cos(theta)
+    return Pose(cx, cy, normalise_angle(theta))
 
 
 def centre_to_bottom_left(pose: Pose) -> Tuple[float, float, float]:
-    return (pose.x - cfg.ROBOT_HALF, pose.y - cfg.ROBOT_HALF, pose.theta)
+    """Converts robot axle center (cx, cy) to bottom-left corner (x, y)."""
+    x = pose.x - cfg.ROBOT_REAR_TO_AXLE * math.cos(pose.theta) - cfg.ROBOT_HALF_WIDTH * math.sin(pose.theta)
+    y = pose.y - cfg.ROBOT_REAR_TO_AXLE * math.sin(pose.theta) + cfg.ROBOT_HALF_WIDTH * math.cos(pose.theta)
+    return (x, y, pose.theta)
 
 
 def cell_to_cm(cell: float) -> float:
@@ -48,6 +53,70 @@ def cell_to_cm(cell: float) -> float:
 
 def cm_to_cell(value: float) -> int:
     return int(math.floor(value / cfg.CELL_SIZE))
+
+#---------------------------------------
+# SAFETY DISTANCE BASED ON ROBOT EDGES
+#---------------------------------------
+def get_robot_corners(pose: Pose, margin: float = 3.0) -> List[Tuple[float, float]]:
+    """Calculates the 4 world-space corners of the robot chassis with safety padding."""
+    front = cfg.ROBOT_FRONT_TO_AXLE + margin
+    rear = -cfg.ROBOT_REAR_TO_AXLE - margin
+    half_w = cfg.ROBOT_HALF_WIDTH + margin
+
+    cos_t = math.cos(pose.theta)
+    sin_t = math.sin(pose.theta)
+
+    # Local corners relative to axle center (0,0)
+    local_corners = [
+        (front, half_w),   # Front-Left
+        (front, -half_w),  # Front-Right
+        (rear, -half_w),   # Rear-Right
+        (rear, half_w),    # Rear-Left
+    ]
+
+    world_corners = []
+    for lx, ly in local_corners:
+        wx = pose.x + lx * cos_t - ly * sin_t
+        wy = pose.y + lx * sin_t + ly * cos_t
+        world_corners.append((wx, wy))
+
+    return world_corners
+
+#---------------------------------------
+# SAFETY DISTANCE BASED ON ROBOT EDGES
+#---------------------------------------
+def polygon_intersects_aabb(corners: List[Tuple[float, float]], 
+                            x0: float, y0: float, x1: float, y1: float) -> bool:
+    """Checks intersection between robot OBB corners and an axis-aligned obstacle box."""
+    # 1. Quick check: check if any robot corner is inside obstacle
+    for x, y in corners:
+        if x0 <= x <= x1 and y0 <= y <= y1:
+            return True
+
+    # 2. Check bounding box overlap (AABB containment)
+    min_x = min(c[0] for c in corners)
+    max_x = max(c[0] for c in corners)
+    min_y = min(c[1] for c in corners)
+    max_y = max(c[1] for c in corners)
+
+    if max_x < x0 or min_x > x1 or max_y < y0 or min_y > y1:
+        return False
+
+    # 3. Separating Axis Theorem along robot edge normals
+    obstacle_corners = [(x0, y0), (x0, y1), (x1, y1), (x1, y0)]
+    
+    for i in range(4):
+        p1 = corners[i]
+        p2 = corners[(i + 1) % 4]
+        normal = (-(p2[1] - p1[1]), p2[0] - p1[0])
+
+        r_projs = [c[0] * normal[0] + c[1] * normal[1] for c in corners]
+        o_projs = [c[0] * normal[0] + c[1] * normal[1] for c in obstacle_corners]
+
+        if max(r_projs) < min(o_projs) or max(o_projs) < min(r_projs):
+            return False  # Separating axis found, no collision
+
+    return True
 
 
 @dataclass(frozen=True)
@@ -104,38 +173,57 @@ class Arena:
 
     def __init__(self, obstacles: Sequence[Obstacle]):
         self.obstacles: List[Obstacle] = list(obstacles)
-        # Pre-compute the inflated no-go box for each obstacle: cheaper than
-        # recomputing it for every one of the tens of thousands of collision
-        # queries a single plan makes.
-        self._blocked: List[Tuple[float, float, float, float]] = [
+        
+        # Pre-compute raw (un-inflated) obstacle bounding boxes (10x10cm)
+        self._raw_obstacles: List[Tuple[float, float, float, float]] = [
             (
-                ob.x - cfg.OBSTACLE_INFLATION,
-                ob.y - cfg.OBSTACLE_INFLATION,
-                ob.x + cfg.OBSTACLE_SIZE + cfg.OBSTACLE_INFLATION,
-                ob.y + cfg.OBSTACLE_SIZE + cfg.OBSTACLE_INFLATION,
+                ob.x,
+                ob.y,
+                ob.x + cfg.OBSTACLE_SIZE,
+                ob.y + cfg.OBSTACLE_SIZE,
             )
             for ob in self.obstacles
         ]
-        self._min_xy = cfg.BOUNDARY_MARGIN
-        self._max_xy = cfg.ARENA_SIZE - cfg.BOUNDARY_MARGIN
 
     # -- collision ---------------------------------------------------------
 
-    def in_bounds(self, x: float, y: float) -> bool:
-        """Is the robot's centre far enough from every wall?"""
-        return self._min_xy <= x <= self._max_xy and self._min_xy <= y <= self._max_xy
+    def is_pose_free(self, pose: Pose, safety_margin: float = cfg.ROBOT_CLEARANCE) -> bool:
+        """Checks if the robot's physical footprint stays inside walls and avoids obstacles."""
+        # Initial start pose exception
+        if math.isclose(pose.x, cfg.START_X, abs_tol=1e-2) and \
+           math.isclose(pose.y, cfg.START_Y, abs_tol=1e-2) and \
+           math.isclose(pose.theta, cfg.START_THETA, abs_tol=1e-2):
+            return True
 
-    def is_point_free(self, x: float, y: float) -> bool:
-        """Slide 36's test: robot as a dot against the 40x40 virtual obstacles."""
-        if not self.in_bounds(x, y):
-            return False
-        for x0, y0, x1, y1 in self._blocked:
-            if x0 < x < x1 and y0 < y < y1:
+        # 1. Wall check: ensure the physical chassis (unpadded) stays inside arena boundaries
+        unpadded_corners = get_robot_corners(pose, margin=0.0)
+        for x, y in unpadded_corners:
+            if not (0.0 <= x <= cfg.ARENA_SIZE and 0.0 <= y <= cfg.ARENA_SIZE):
                 return False
+
+        # 2. Obstacle check: check intersection against obstacles using padded safety margin
+        padded_corners = get_robot_corners(pose, margin=safety_margin)
+        for x0, y0, x1, y1 in self._raw_obstacles:
+            if polygon_intersects_aabb(padded_corners, x0, y0, x1, y1):
+                return False
+
         return True
 
-    def is_pose_free(self, pose: Pose) -> bool:
-        return self.is_point_free(pose.x, pose.y)
+    def is_point_free(self, x: float, y: float, clearance: float = cfg.ROBOT_CLEARANCE) -> bool:
+        """Checks if point (x, y) has basic clearance from walls and obstacles for flood-fill reachability."""
+        # 1. Wall clearance check
+        if not (clearance <= x <= cfg.ARENA_SIZE - clearance and 
+                clearance <= y <= cfg.ARENA_SIZE - clearance):
+            # Allow start zone (bottom-left 40x40cm) to bypass lower boundary
+            if not (0.0 <= x <= cfg.START_ZONE_SIZE and 0.0 <= y <= cfg.START_ZONE_SIZE):
+                return False
+
+        # 2. Obstacle clearance check (10x10 obstacles inflated by clearance)
+        for x0, y0, x1, y1 in self._raw_obstacles:
+            if (x0 - clearance) < x < (x1 + clearance) and (y0 - clearance) < y < (y1 + clearance):
+                return False
+
+        return True
 
     def is_trajectory_free(self, trajectory, step: float = cfg.COLLISION_SAMPLE_STEP) -> bool:
         return all(self.is_pose_free(p) for p in trajectory.iter_sample(step))
@@ -172,7 +260,9 @@ class Arena:
             bearing = normalise_angle(outward + math.radians(angle))
             x = fx + standoff * math.cos(bearing)
             y = fy + standoff * math.sin(bearing)
-            if not self.is_point_free(x, y):
+            heading = normalise_angle(bearing + math.pi)
+            candidate_pose = Pose(x, y, heading)
+            if not self.is_pose_free(candidate_pose, safety_margin=1.0):
                 continue
             # Checklist A.2 accepts the image 20-50cm from the robot's midpoint.
             if not (cfg.CAPTURE_MIN_DISTANCE <= standoff <= cfg.CAPTURE_MAX_DISTANCE):
@@ -277,11 +367,14 @@ def reachable_region(arena: "Arena", origin: Pose,
     n = int(math.ceil(cfg.ARENA_SIZE / resolution))
 
     def free(cx: int, cy: int) -> bool:
+        # Guarantee the initial cell returns free without failing is_point_free check
+        if (cx, cy) == start:
+            return True
         return (0 <= cx < n and 0 <= cy < n
                 and arena.is_point_free((cx + 0.5) * resolution, (cy + 0.5) * resolution))
 
     start = (int(origin.x // resolution), int(origin.y // resolution))
-    if not free(*start):
+    if not (0 <= start[0] < n and 0 <= start[1] < n):
         return set()
 
     seen = {start}
@@ -318,14 +411,6 @@ def _blocks_start_zone(obstacle: Obstacle) -> bool:
 
 
 def _start_can_escape(arena: "Arena") -> bool:
-    """Can the robot actually drive out of the start pose?
-
-    The flood fill below treats the robot as a point, so it happily reports a
-    10cm-tall corridor as reachable -- but a car with a 25cm turning radius
-    cannot turn round in one, and the real robot would be stuck on the spot.
-    This asks the question properly, by trying to plan a real path to a spread
-    of poses around the arena.
-    """
     import dubins           # local import: dubins has no need to know about arenas
     origin = start_pose()
     for x in (60.0, 100.0, 140.0):
@@ -333,8 +418,13 @@ def _start_can_escape(arena: "Arena") -> bool:
             if not arena.is_point_free(x, y):
                 continue
             for theta in (0.0, math.pi / 2, math.pi, -math.pi / 2):
-                if dubins.plan(origin, Pose(x, y, theta), cfg.TURNING_RADIUS,
-                               arena.is_pose_free) is not None:
+                if dubins.plan(
+                    origin,
+                    Pose(x, y, theta),
+                    r_left=cfg.TURNING_RADIUS_LEFT,
+                    r_right=cfg.TURNING_RADIUS_RIGHT,
+                    is_pose_free=arena.is_pose_free,
+                ) is not None:
                     return True
     return False
 
@@ -359,7 +449,7 @@ def _layout_is_solvable(obstacles: Sequence[Obstacle], resolution: float = 5.0) 
 
 def random_layout(count: int = cfg.NUM_OBSTACLES,
                   rng: Optional[random.Random] = None,
-                  max_attempts: int = 400) -> List[Obstacle]:
+                  max_attempts: int = 2000) -> List[Obstacle]:
     """A random but *legal and solvable* obstacle layout, for demoing.
 
     Three things make a layout unusable, and all three are rejected here:

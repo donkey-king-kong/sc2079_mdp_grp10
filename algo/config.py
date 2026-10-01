@@ -32,31 +32,24 @@ NUM_OBSTACLES = 5           # the task always has exactly five (slide 3)
 
 START_ZONE_SIZE = 40.0      # 40cm x 40cm start zone at the bottom-left (slide 3)
 
-# Slide 3 gives the true footprint as 20cm x 21cm, but slide 7 recommends
-# planning with 30cm x 30cm so that the margin absorbs steering error. We plan
-# with the recommended figure.
-ROBOT_SIZE = 30.0
-ROBOT_HALF = ROBOT_SIZE / 2.0
+# --------------------------------------------------------------------------
+# Robot Dimensions & Start Pose (Option A - Facing North)
+# --------------------------------------------------------------------------
+ROBOT_LENGTH = 25.35          # cm (front-to-back)
+ROBOT_WIDTH = 21.4            # cm (side-to-side)
+ROBOT_REAR_TO_AXLE = 3.35     # cm (rear edge to center axle)
+ROBOT_FRONT_TO_AXLE = 22.0    # cm (25.35 - 3.35)
+ROBOT_HALF_WIDTH = 10.7       # cm (21.4 / 2)
 
-# Keep-clear square around the start zone, used when generating demo layouts.
-# An obstacle whose virtual box abuts the start zone leaves the robot in a
-# 10cm-tall band, and a 25cm turning radius cannot turn round in one -- the
-# robot is walled in before it has moved. Real arenas leave the start clear;
-# generated ones should too. Half a footprint of slack past the zone is enough.
+ROBOT_SIZE = 25.35
+ROBOT_HALF = 10.7
+
 START_KEEP_CLEAR = START_ZONE_SIZE + ROBOT_HALF
 
-# Robot starts in the start zone facing North.
-#
-# Slide 7 puts the bottom-left corner at (0, 0), i.e. the centre at (15, 15).
-# That is exactly BOUNDARY_MARGIN from both walls, which makes the very first
-# left turn a boundary violation before the robot has moved a centimetre --
-# the turning circle dips a couple of millimetres past x = 15 and every
-# left-handed Dubins word out of the start zone is rejected. Since the start
-# zone is 40cm and the planning footprint is 30cm, centring the robot in it
-# costs nothing, keeps it entirely inside the zone, and buys 5cm of slack on
-# each wall. Set these back to ROBOT_HALF if your robot really is corner-parked.
-START_X = 20.0
-START_Y = 20.0
+# Start pose: Bottom-left corner at (0, 0), facing North (pi/2)
+# Center axle position: X = 10.7 cm, Y = 3.35 cm
+START_X = 10.85 # Physical robot is at (0,0), but planner assumes 1.5mm offset
+START_Y = 3.35
 START_THETA = math.pi / 2.0
 
 # --------------------------------------------------------------------------
@@ -66,7 +59,23 @@ START_THETA = math.pi / 2.0
 # "There is a turning radius of about 25cm but it is a larger radius if robot
 # moves faster." This and CAPTURE_STANDOFF are the two values most likely to
 # need re-measuring against the real robot.
-TURNING_RADIUS = 25.0
+# TURNING_RADIUS = 25.0. //old hardcoded
+
+# Physical turning radii (cm) based on STM calibration testing
+TURNING_RADIUS_LEFT = 20.2   # Physical turning radius for left turns
+TURNING_RADIUS_RIGHT = 36.2  # Physical turning radius for right turns
+
+# Conservative turning radius used for D\\\\\\\\ubins & Hybrid A* path planning
+TURNING_RADIUS = max(TURNING_RADIUS_LEFT, TURNING_RADIUS_RIGHT)  # 36.0 cm
+
+# --------------------------------------------------------------------------
+# Obstacle Clearance & Safety Padding (STM Drift Calibration)
+# --------------------------------------------------------------------------
+# Base clearance beyond robot footprint (cm)
+ROBOT_CLEARANCE = 2.0
+
+# Extra clearance padding for right turns due to larger arc drift (cm)
+RIGHT_TURN_EXTRA_CLEARANCE = 1.0  # Total 6.0 cm clearance on right turns
 
 # --------------------------------------------------------------------------
 # Obstacle avoidance (briefing slide 36)
@@ -105,7 +114,7 @@ CAPTURE_STANDOFF = 30.0
 # camera sits 15cm ahead of the centre, so a 35cm standoff puts it there. Both
 # 30 and 35 are comfortably inside checklist A.2's "20-50cm from the midpoint
 # of the robot", which is the real acceptance criterion.
-CAPTURE_STANDOFF_OPTIONS = (30.0, 35.0, 25.0, 40.0, 45.0)
+CAPTURE_STANDOFF_OPTIONS = (20.0, 30.0, 35.0, 25.0, 40.0, 45.0)
 
 # "The center of the robot does not have to be aligned exactly with the center
 # of the image/obstacle" (slide 8), and slide 4 notes the camera has a conical
@@ -116,7 +125,7 @@ CAPTURE_STANDOFF_OPTIONS = (30.0, 35.0, 25.0, 40.0, 45.0)
 # menu shares a heading if you only vary the standoff, and whether a Dubins path
 # exists depends almost entirely on the APPROACH HEADING. Offering the planner
 # a fan of approach angles is what turns "no path found" into a path.
-CAPTURE_ANGLE_OPTIONS = (0.0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0)
+CAPTURE_ANGLE_OPTIONS = (0.0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0, 60.0, -60.0)
 
 # How a compromise pose is scored against the ideal, for menu ordering.
 # An oblique view is harder for the camera than an unusual standoff, so
@@ -135,7 +144,7 @@ CAPTURE_MAX_DISTANCE = 50.0
 # drives into the block it just photographed. Before planning the next leg we
 # therefore back straight out by one of these distances and plan the Dubins
 # path from there. 0.0 is tried first so the start pose costs nothing extra.
-DEPARTURE_BACKOFF_OPTIONS = (0.0, 15.0, 30.0)
+DEPARTURE_BACKOFF_OPTIONS = (0.0, 2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0)
 
 # --------------------------------------------------------------------------
 # Hybrid A* fallback (used only when every Dubins candidate is blocked)
@@ -146,15 +155,15 @@ HA_THETA_BINS = 24          # 15 degrees per bin
 HA_XY_RESOLUTION = 5.0      # cm per lattice cell used for de-duplicating states
 HA_GOAL_XY_TOLERANCE = 4.0  # cm
 HA_GOAL_THETA_TOLERANCE = math.radians(10.0)
-HA_REVERSE_COST = 2.0       # multiplier: reversing is slow and drifts
-HA_GEAR_CHANGE_COST = 8.0   # cm-equivalent penalty for shifting fwd <-> rev
-HA_STEER_CHANGE_COST = 2.0  # cm-equivalent penalty for a steering change
+HA_REVERSE_COST = 1.0       # multiplier: reversing is slow and drifts
+HA_GEAR_CHANGE_COST = 2.0   # cm-equivalent penalty for shifting fwd <-> rev
+HA_STEER_CHANGE_COST = 1.0  # cm-equivalent penalty for a steering change
 HA_MAX_EXPANSIONS = 60000   # hard stop so a hopeless goal cannot hang a demo
 # While filling holes in the cost matrix we run the search dozens of times and
 # most of those legs turn out to be genuinely impossible. A tighter cap keeps a
 # nasty layout from turning a 0.3s plan into a 90s one; the full budget above is
 # reserved for the final, committed path.
-HA_MATRIX_EXPANSIONS = 2500
+HA_MATRIX_EXPANSIONS = 10000
 
 # Wall-clock ceiling on the whole gap-filling pass. A call-count budget is a
 # poor bound because the cost of one search varies by two orders of magnitude --
@@ -162,7 +171,7 @@ HA_MATRIX_EXPANSIONS = 2500
 # itself proving a leg impossible. Bounding the time directly is what keeps a
 # nasty layout from turning a 2s plan into an 18s one. Raise it if you would
 # rather wait than lose an obstacle; planning happens once, before the run.
-SEARCH_TIME_BUDGET = 4.0    # seconds
+SEARCH_TIME_BUDGET = 8.0    # seconds
 
 # --------------------------------------------------------------------------
 # Time model -- this is what makes B.3 "shortest-TIME" and not "shortest-path"
@@ -215,14 +224,23 @@ CMD_FINISH = "FIN"
 
 COMMAND_NUM_WIDTH = 3       # zero-padded field width, e.g. 090
 
+
 # If True, turn commands are rounded to the nearest 90 degrees, because some
 # STM firmwares only implement quarter turns. Leave False while the firmware
 # accepts arbitrary angles -- snapping throws away path accuracy.
 SNAP_TO_90_TURNS = False
 
-# Segments shorter than this are dropped rather than emitted as "SF000".
-MIN_COMMAND_DISTANCE = 1.0      # cm
-MIN_COMMAND_ANGLE = math.radians(1.0)
+# # Skip straights under 0.5 cm
+# MIN_COMMAND_DISTANCE = 0.5
+
+# # Skip turns under 0.5 degrees (~0.0087 rad)
+# MIN_COMMAND_ANGLE = math.radians(0.5)
+
+# Skip straights under 1.0 cm
+MIN_COMMAND_DISTANCE = 1.0
+
+# Skip turns under 3.0 degrees (~0.052 rad)
+MIN_COMMAND_ANGLE = math.radians(3.0)
 
 # Two arcs around the same circle merge into one command, which can legitimately
 # come out as a 300-degree sweep. Plenty of STM firmwares only accept a quarter

@@ -45,6 +45,13 @@ _STEER = {"L": LEFT, "R": RIGHT, "S": STRAIGHT}
 _POS_TOL = 1e-6
 _ANGLE_TOL = 1e-6
 
+def _get_radius(steer: int, r_left: float, r_right: float) -> float:
+    if steer == LEFT:
+        return r_left
+    elif steer == RIGHT:
+        return r_right
+    return r_left
+
 
 def _rotate(vx: float, vy: float, angle: float) -> Tuple[float, float]:
     """Rotate a vector counter-clockwise by `angle` (briefing slide 25)."""
@@ -52,121 +59,129 @@ def _rotate(vx: float, vy: float, angle: float) -> Tuple[float, float]:
     return vx * c - vy * s, vx * s + vy * c
 
 
-def _tangent_points_csc(p1: Tuple[float, float], p2: Tuple[float, float],
-                        radius: float, first: int, last: int):
-    """Tangent points of the straight segment of a CSC path.
-
-    `p1`/`p2` are the centres of the start and goal turning circles, `first`
-    and `last` the steering directions of the two arcs.
-    """
+def _tangent_points_csc(
+    p1: Tuple[float, float],
+    p2: Tuple[float, float],
+    r1: float,
+    r2: float,
+    first: int,
+    last: int,
+) -> Optional[Tuple[Tuple[float, float], Tuple[float, float]]]:
     v1x, v1y = p2[0] - p1[0], p2[1] - p1[1]
     d = math.hypot(v1x, v1y)
     if d < 1e-9:
         return None
 
     if first == last:
-        # Outer tangent (LSL / RSR), briefing slide 28. The tangent line is
-        # parallel to the centre-to-centre vector, offset by one radius on the
-        # side the robot rides. RSR rides the left side of that vector, LSL the
-        # right side.
-        if first == RIGHT:
-            v2x, v2y = -v1y, v1x        # rotate V1 counter-clockwise by pi/2
-        else:
-            v2x, v2y = v1y, -v1x        # rotate V1 clockwise by pi/2
-        scale = radius / d
-        pt1 = (p1[0] + scale * v2x, p1[1] + scale * v2y)
-        pt2 = (pt1[0] + v1x, pt1[1] + v1y)
+        # Outer tangent (LSL / RSR)
+        if d < abs(r1 - r2):
+            return None
+        cos_phi = max(-1.0, min(1.0, (r1 - r2) / d))
+        phi = math.acos(cos_phi)
+        angle = phi if first == RIGHT else -phi
+        ux, uy = _rotate(v1x / d, v1y / d, angle)
+        pt1 = (p1[0] + r1 * ux, p1[1] + r1 * uy)
+        pt2 = (p2[0] + r2 * ux, p2[1] + r2 * uy)
         return pt1, pt2
 
-    # Inner tangent (RSL / LSR), briefing slide 29. The straight segment now
-    # crosses between the circles, which is only possible if they are at least
-    # two diameters apart.
-    if d < 2.0 * radius:
+    # Inner tangent (RSL / LSR)
+    if d < (r1 + r2):
         return None
-    gamma = math.acos(min(1.0, 2.0 * radius / d))
-    # RSL turns the offset counter-clockwise off the centre line, LSR clockwise.
-    v2x, v2y = _rotate(v1x, v1y, gamma if first == RIGHT else -gamma)
-    scale = radius / d
-    pt1 = (p1[0] + scale * v2x, p1[1] + scale * v2y)
-    pt2 = (p2[0] - scale * v2x, p2[1] - scale * v2y)
+    gamma = math.acos(max(-1.0, min(1.0, (r1 + r2) / d)))
+    angle = gamma if first == RIGHT else -gamma
+    ux, uy = _rotate(v1x / d, v1y / d, angle)
+    pt1 = (p1[0] + r1 * ux, p1[1] + r1 * uy)
+    pt2 = (p2[0] - r2 * ux, p2[1] - r2 * uy)
     return pt1, pt2
 
 
-def _third_circle_ccc(p1: Tuple[float, float], p2: Tuple[float, float],
-                      radius: float, clockwise: bool):
-    """Centre of the middle circle of a CCC path (briefing slides 30-31).
-
-    The middle circle touches both outer circles, so its centre is 2r from each
-    -- one of the two intersection points of two circles of radius 2r. Passing
-    `clockwise` picks which one; the caller tries both and keeps the shorter.
-    """
+def _third_circle_ccc(
+    p1: Tuple[float, float],
+    p2: Tuple[float, float],
+    r1: float,
+    r2: float,
+    r3: float,
+    clockwise: bool,
+) -> Optional[Tuple[float, float]]:
+    d1 = r1 + r2
+    d2 = r3 + r2
     v1x, v1y = p2[0] - p1[0], p2[1] - p1[1]
     d = math.hypot(v1x, v1y)
-    # "The CCC path is only useful when C1 and C2 are very close, i.e. the
-    # distance between them is less than 4r" (slide 31).
-    if d < 1e-9 or d >= 4.0 * radius:
+
+    if d < 1e-9 or d >= (d1 + d2) or d <= abs(d1 - d2):
         return None
 
-    qx, qy = (p1[0] + p2[0]) / 2.0, (p1[1] + p2[1]) / 2.0
+    a = (d1 * d1 - d2 * d2 + d * d) / (2.0 * d)
+    h = math.sqrt(max(0.0, d1 * d1 - a * a))
+
+    px = p1[0] + (a / d) * v1x
+    py = p1[1] + (a / d) * v1y
+
     if clockwise:
         v2x, v2y = v1y, -v1x
     else:
         v2x, v2y = -v1y, v1x
-    h = math.sqrt(max(0.0, 4.0 * radius * radius - d * d / 4.0))
+
     scale = h / d
-    return (qx + scale * v2x, qy + scale * v2y)
+    return (px + scale * v2x, py + scale * v2y)
 
 
-def _build(word: str, start: Pose, goal: Pose, radius: float,
-           third_clockwise: bool = True) -> Optional[Trajectory]:
-    """Construct one Dubins word, or None if that shape cannot connect the poses.
+def _build(
+    word: str,
+    start: Pose,
+    goal: Pose,
+    r_left: float,
+    r_right: float,
+    third_clockwise: bool = True,
+) -> Optional[Trajectory]:
+    first, middle_steer, last = _STEER[word[0]], _STEER[word[1]], _STEER[word[2]]
+    r1 = _get_radius(first, r_left, r_right)
+    r3 = _get_radius(last, r_left, r_right)
 
-    Every candidate is verified against the goal pose before being returned, so
-    a shape that is geometrically impossible for this pair simply drops out.
-    """
-    first, last = _STEER[word[0]], _STEER[word[2]]
-    c1 = turn_centre(start, radius, first)
-    c2 = turn_centre(goal, radius, last)
+    c1 = turn_centre(start, r1, first)
+    c2 = turn_centre(goal, r3, last)
 
-    if word[1] == "S":
-        tangents = _tangent_points_csc(c1, c2, radius, first, last)
+    if middle_steer == STRAIGHT:
+        tangents = _tangent_points_csc(c1, c2, r1, r3, first, last)
         if tangents is None:
             return None
         pt1, pt2 = tangents
-        middle_steering = STRAIGHT
         c3 = None
+        r2 = 0.0
     else:
-        c3 = _third_circle_ccc(c1, c2, radius, third_clockwise)
+        r2 = _get_radius(middle_steer, r_left, r_right)
+        c3 = _third_circle_ccc(c1, c2, r1, r2, r3, third_clockwise)
         if c3 is None:
             return None
-        # The outer circles touch the middle one at the midpoints of the
-        # centre-to-centre lines, because all three radii are equal (slide 30).
-        pt1 = ((c1[0] + c3[0]) / 2.0, (c1[1] + c3[1]) / 2.0)
-        pt2 = ((c2[0] + c3[0]) / 2.0, (c2[1] + c3[1]) / 2.0)
-        middle_steering = _STEER[word[1]]
+        pt1 = (
+            c1[0] + (r1 / (r1 + r2)) * (c3[0] - c1[0]),
+            c1[1] + (r1 / (r1 + r2)) * (c3[1] - c1[1]),
+        )
+        pt2 = (
+            c2[0] + (r3 / (r3 + r2)) * (c3[0] - c2[0]),
+            c2[1] + (r3 / (r3 + r2)) * (c3[1] - c2[1]),
+        )
 
-    # --- first arc: start -> pt1 around c1 -------------------------------
+    # --- first arc ---
     sweep1 = arc_sweep(c1, start, pt1[0], pt1[1], first)
-    seg1 = Segment(FORWARD, first, abs(sweep1) * radius, radius, start)
+    seg1 = Segment(FORWARD, first, abs(sweep1) * r1, r1, start)
     mid = seg1.end
 
-    # --- middle segment: pt1 -> pt2 --------------------------------------
-    if middle_steering == STRAIGHT:
+    # --- middle segment ---
+    if middle_steer == STRAIGHT:
         straight_len = math.hypot(pt2[0] - pt1[0], pt2[1] - pt1[1])
-        seg2 = Segment(FORWARD, STRAIGHT, straight_len, radius, mid)
+        seg2 = Segment(FORWARD, STRAIGHT, straight_len, r1, mid)
     else:
-        sweep2 = arc_sweep(c3, mid, pt2[0], pt2[1], middle_steering)
-        seg2 = Segment(FORWARD, middle_steering, abs(sweep2) * radius, radius, mid)
+        sweep2 = arc_sweep(c3, mid, pt2[0], pt2[1], middle_steer)
+        seg2 = Segment(FORWARD, middle_steer, abs(sweep2) * r2, r2, mid)
     mid2 = seg2.end
 
-    # A wrong tangent choice shows up here: the robot arrives at pt1 pointing
-    # away from pt2 and the straight run lands somewhere else entirely.
     if math.hypot(mid2.x - pt2[0], mid2.y - pt2[1]) > 1e-6:
         return None
 
-    # --- last arc: pt2 -> goal around c2 ---------------------------------
+    # --- last arc ---
     sweep3 = arc_sweep(c2, mid2, goal.x, goal.y, last)
-    seg3 = Segment(FORWARD, last, abs(sweep3) * radius, radius, mid2)
+    seg3 = Segment(FORWARD, last, abs(sweep3) * r3, r3, mid2)
 
     end = seg3.end
     if math.hypot(end.x - goal.x, end.y - goal.y) > _POS_TOL:
@@ -176,61 +191,58 @@ def _build(word: str, start: Pose, goal: Pose, radius: float,
 
     moving = [s for s in (seg1, seg2, seg3) if s.length > 1e-9]
     if not moving:
-        # Start and goal are the same pose. Keep one zero-length segment rather
-        # than returning an empty trajectory, which would have no pose to report
-        # as its start or end.
-        moving = [Segment(FORWARD, STRAIGHT, 0.0, radius, start)]
+        moving = [Segment(FORWARD, STRAIGHT, 0.0, r1, start)]
     return Trajectory(moving)
 
 
-def plan_all(start: Pose, goal: Pose,
-             radius: float = cfg.TURNING_RADIUS) -> List[Tuple[str, Trajectory]]:
-    """Every geometrically valid Dubins word for this pose pair, shortest first.
-
-    Collisions are not considered here -- that is `plan()`'s job.
-    """
+def plan_all(
+    start: Pose,
+    goal: Pose,
+    r_left: float = cfg.TURNING_RADIUS_LEFT,
+    r_right: float = cfg.TURNING_RADIUS_RIGHT,
+) -> List[Tuple[str, Trajectory]]:
     candidates: List[Tuple[str, Trajectory]] = []
     for word in WORDS:
-        if word[1] == "S":
-            traj = _build(word, start, goal, radius)
+        if word in ("RLR", "LRL"):
+            for third_cw in (True, False):
+                traj = _build(word, start, goal, r_left, r_right, third_clockwise=third_cw)
+                if traj is not None:
+                    candidates.append((word, traj))
+        else:
+            traj = _build(word, start, goal, r_left, r_right)
             if traj is not None:
                 candidates.append((word, traj))
-        else:
-            # Two placements exist for the middle circle; slide 31 notes one is
-            # always longer, but it is cheap to build both and sort.
-            best: Optional[Trajectory] = None
-            for clockwise in (True, False):
-                traj = _build(word, start, goal, radius, third_clockwise=clockwise)
-                if traj is not None and (best is None or traj.length < best.length):
-                    best = traj
-            if best is not None:
-                candidates.append((word, best))
-
-    candidates.sort(key=lambda item: item[1].length)
     return candidates
 
+def shortest_length(
+    start: Pose,
+    goal: Pose,
+    r_left: float = cfg.TURNING_RADIUS_LEFT,
+    r_right: float = cfg.TURNING_RADIUS_RIGHT,
+) -> float:
+    candidates = plan_all(start, goal, r_left, r_right)
+    return min((traj.length for _, traj in candidates), default=float("inf"))
 
-def shortest_length(start: Pose, goal: Pose,
-                    radius: float = cfg.TURNING_RADIUS) -> float:
-    """Length of the shortest obstacle-free Dubins path, or inf if none exists.
-
-    Used as the Hybrid A* heuristic: it respects the turning radius, so it is a
-    much tighter lower bound than Euclidean distance, and it never overestimates
-    because obstacles can only make the true path longer.
-    """
-    candidates = plan_all(start, goal, radius)
-    return candidates[0][1].length if candidates else float("inf")
-
-
-def plan(start: Pose, goal: Pose, radius: float = cfg.TURNING_RADIUS,
-         is_free: Optional[Callable[[Pose], bool]] = None
-         ) -> Optional[Tuple[str, Trajectory]]:
-    """Shortest Dubins path that stays clear of obstacles, or None.
-
-    `is_free` is called on poses sampled every COLLISION_SAMPLE_STEP cm; pass
-    `Arena.is_pose_free`. With no `is_free` this is just the shortest word.
-    """
-    for word, traj in plan_all(start, goal, radius):
-        if is_free is None or all(is_free(p) for p in traj.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
-            return word, traj
+def plan(
+    start: Pose,
+    goal: Pose,
+    r_left: float = cfg.TURNING_RADIUS_LEFT,
+    r_right: float = cfg.TURNING_RADIUS_RIGHT,
+    is_pose_free: Optional[Callable[[Pose], bool]] = None,
+) -> Optional[Tuple[str, Trajectory]]:
+    candidates = plan_all(start, goal, r_left, r_right)
+    candidates.sort(key=lambda item: item[1].length)
+    
+    for word, traj in candidates:
+        if is_pose_free is None:
+            return (word, traj)
+        
+        collision = False
+        for segment in traj.segments:
+            if not all(is_pose_free(p) for p in segment.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
+                collision = True
+                break
+        if not collision:
+            return (word, traj)
+            
     return None
