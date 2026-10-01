@@ -2,16 +2,16 @@
 
 Two jobs live here.
 
-1. **Collision checking.** Following briefing slide 36 we do not model the
-   robot's rectangle at all. Instead every 10cm obstacle is inflated by half a
-   robot footprint on each side into a 40cm "virtual obstacle", the walls are
-   inset by the same 15cm, and the robot is treated as a single point at its
-   centre. If the centre stays out of every virtual obstacle, the real 30x30
-   robot cannot touch the real 10x10 block.
+1. **Collision checking.** A pose is free when the robot's real outline,
+   rotated with its heading, keeps `SAFETY_MARGIN` clear of every 10cm block
+   and every wall (footprint.py). Briefing slide 36's "virtual obstacles" --
+   blocks inflated so the robot's middle can be treated as a dot -- are kept
+   only as a cheap map of where that middle can roughly go (`is_point_free`),
+   for heuristics; they are never what accepts or rejects a path.
 
 2. **Capture poses.** Each obstacle shows its image on one of N/S/E/W. The
    robot has to end up standing off that face, pointing back at it. The single
-   ideal pose from slide 8 is frequently unreachable -- a 25cm turning radius
+   ideal pose from slide 8 is frequently unreachable -- a 20-36cm turning radius
    next to a wall leaves no room -- so each obstacle publishes a *menu* of
    acceptable poses and the planner takes the first one it can actually reach.
 """
@@ -22,9 +22,19 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import config as cfg
-from motion import Pose, face_to_heading, normalise_angle
+import footprint
+from motion import (Pose, face_to_heading, footprint_centre, normalise_angle,
+                    pose_from_footprint_centre)
 
 FACES = ("N", "S", "E", "W")
+
+# Slack on the wall margin and the virtual-obstacle edges, in cm. A path that
+# runs exactly along an edge is legal (the edge already carries 15cm of margin),
+# but a sample there can come out 4e-14cm past it after a round of
+# floating-point trigonometry -- and whether it does changes when legs are
+# stitched and re-sampled, so a strict comparison makes the collision check of
+# a plan disagree with the checks it was built from.
+_EDGE_TOLERANCE = 1e-6
 
 # Outward unit normal of each obstacle face, and the tangent we slide along
 # when trying laterally-offset capture poses.
@@ -33,17 +43,14 @@ _FACE_TANGENT = {"N": (1.0, 0.0), "S": (1.0, 0.0), "E": (0.0, 1.0), "W": (0.0, 1
 
 
 def bottom_left_to_centre(x: float, y: float, theta: float) -> Pose:
-    """Converts bottom-left corner (x, y) to robot axle center (cx, cy)."""
-    cx = x + cfg.ROBOT_REAR_TO_AXLE * math.cos(theta) + cfg.ROBOT_HALF_WIDTH * math.sin(theta)
-    cy = y + cfg.ROBOT_REAR_TO_AXLE * math.sin(theta) - cfg.ROBOT_HALF_WIDTH * math.cos(theta)
-    return Pose(cx, cy, normalise_angle(theta))
+    """Briefing slide 7 gives robot poses by bottom-left corner; we use the
+    turning centre, which is behind the middle of the footprint."""
+    return pose_from_footprint_centre(x + cfg.ROBOT_HALF, y + cfg.ROBOT_HALF, theta)
 
 
 def centre_to_bottom_left(pose: Pose) -> Tuple[float, float, float]:
-    """Converts robot axle center (cx, cy) to bottom-left corner (x, y)."""
-    x = pose.x - cfg.ROBOT_REAR_TO_AXLE * math.cos(pose.theta) - cfg.ROBOT_HALF_WIDTH * math.sin(pose.theta)
-    y = pose.y - cfg.ROBOT_REAR_TO_AXLE * math.sin(pose.theta) + cfg.ROBOT_HALF_WIDTH * math.cos(pose.theta)
-    return (x, y, pose.theta)
+    cx, cy = footprint_centre(pose)
+    return (cx - cfg.ROBOT_HALF, cy - cfg.ROBOT_HALF, pose.theta)
 
 
 def cell_to_cm(cell: float) -> float:
@@ -53,70 +60,6 @@ def cell_to_cm(cell: float) -> float:
 
 def cm_to_cell(value: float) -> int:
     return int(math.floor(value / cfg.CELL_SIZE))
-
-#---------------------------------------
-# SAFETY DISTANCE BASED ON ROBOT EDGES
-#---------------------------------------
-def get_robot_corners(pose: Pose, margin: float = 3.0) -> List[Tuple[float, float]]:
-    """Calculates the 4 world-space corners of the robot chassis with safety padding."""
-    front = cfg.ROBOT_FRONT_TO_AXLE + margin
-    rear = -cfg.ROBOT_REAR_TO_AXLE - margin
-    half_w = cfg.ROBOT_HALF_WIDTH + margin
-
-    cos_t = math.cos(pose.theta)
-    sin_t = math.sin(pose.theta)
-
-    # Local corners relative to axle center (0,0)
-    local_corners = [
-        (front, half_w),   # Front-Left
-        (front, -half_w),  # Front-Right
-        (rear, -half_w),   # Rear-Right
-        (rear, half_w),    # Rear-Left
-    ]
-
-    world_corners = []
-    for lx, ly in local_corners:
-        wx = pose.x + lx * cos_t - ly * sin_t
-        wy = pose.y + lx * sin_t + ly * cos_t
-        world_corners.append((wx, wy))
-
-    return world_corners
-
-#---------------------------------------
-# SAFETY DISTANCE BASED ON ROBOT EDGES
-#---------------------------------------
-def polygon_intersects_aabb(corners: List[Tuple[float, float]], 
-                            x0: float, y0: float, x1: float, y1: float) -> bool:
-    """Checks intersection between robot OBB corners and an axis-aligned obstacle box."""
-    # 1. Quick check: check if any robot corner is inside obstacle
-    for x, y in corners:
-        if x0 <= x <= x1 and y0 <= y <= y1:
-            return True
-
-    # 2. Check bounding box overlap (AABB containment)
-    min_x = min(c[0] for c in corners)
-    max_x = max(c[0] for c in corners)
-    min_y = min(c[1] for c in corners)
-    max_y = max(c[1] for c in corners)
-
-    if max_x < x0 or min_x > x1 or max_y < y0 or min_y > y1:
-        return False
-
-    # 3. Separating Axis Theorem along robot edge normals
-    obstacle_corners = [(x0, y0), (x0, y1), (x1, y1), (x1, y0)]
-    
-    for i in range(4):
-        p1 = corners[i]
-        p2 = corners[(i + 1) % 4]
-        normal = (-(p2[1] - p1[1]), p2[0] - p1[0])
-
-        r_projs = [c[0] * normal[0] + c[1] * normal[1] for c in corners]
-        o_projs = [c[0] * normal[0] + c[1] * normal[1] for c in obstacle_corners]
-
-        if max(r_projs) < min(o_projs) or max(o_projs) < min(r_projs):
-            return False  # Separating axis found, no collision
-
-    return True
 
 
 @dataclass(frozen=True)
@@ -173,57 +116,61 @@ class Arena:
 
     def __init__(self, obstacles: Sequence[Obstacle]):
         self.obstacles: List[Obstacle] = list(obstacles)
-        
-        # Pre-compute raw (un-inflated) obstacle bounding boxes (10x10cm)
-        self._raw_obstacles: List[Tuple[float, float, float, float]] = [
+        # Pre-compute the inflated no-go box for each obstacle: cheaper than
+        # recomputing it for every one of the tens of thousands of collision
+        # queries a single plan makes. Shrunk by _EDGE_TOLERANCE so a path
+        # running along an edge is not rejected over rounding noise.
+        self._blocked: List[Tuple[float, float, float, float]] = [
             (
-                ob.x,
-                ob.y,
-                ob.x + cfg.OBSTACLE_SIZE,
-                ob.y + cfg.OBSTACLE_SIZE,
+                ob.x - cfg.OBSTACLE_INFLATION + _EDGE_TOLERANCE,
+                ob.y - cfg.OBSTACLE_INFLATION + _EDGE_TOLERANCE,
+                ob.x + cfg.OBSTACLE_SIZE + cfg.OBSTACLE_INFLATION - _EDGE_TOLERANCE,
+                ob.y + cfg.OBSTACLE_SIZE + cfg.OBSTACLE_INFLATION - _EDGE_TOLERANCE,
             )
             for ob in self.obstacles
         ]
+        self._min_xy = cfg.BOUNDARY_MARGIN
+        self._max_xy = cfg.ARENA_SIZE - cfg.BOUNDARY_MARGIN
+        # The real blocks, for the exact outline test.
+        self._boxes: List[Tuple[float, float, float, float]] = [
+            (ob.x, ob.y, ob.x + cfg.OBSTACLE_SIZE, ob.y + cfg.OBSTACLE_SIZE)
+            for ob in self.obstacles
+        ]
+        # Clear means at least SAFETY_MARGIN away, plus SWEEP_PAD so that the
+        # margin also holds between the sampled poses of a path. The corner
+        # start touches two walls, so inside the start zone each wall only has
+        # to stay as clear as it is at the start (config.START_WALL_TOLERANCE).
+        clearance = cfg.SAFETY_MARGIN + cfg.SWEEP_PAD - _EDGE_TOLERANCE
+        at_start = footprint.wall_clearances(start_pose())
+        self._is_clear = footprint.make_checker(
+            self._boxes, clearance,
+            start_zone=(cfg.START_ZONE_SIZE,
+                        tuple(min(clearance, have - cfg.START_WALL_TOLERANCE)
+                              for have in at_start)))
 
     # -- collision ---------------------------------------------------------
 
-    def is_pose_free(self, pose: Pose, safety_margin: float = cfg.ROBOT_CLEARANCE) -> bool:
-        """Checks if the robot's physical footprint stays inside walls and avoids obstacles."""
-        # Initial start pose exception
-        if math.isclose(pose.x, cfg.START_X, abs_tol=1e-2) and \
-           math.isclose(pose.y, cfg.START_Y, abs_tol=1e-2) and \
-           math.isclose(pose.theta, cfg.START_THETA, abs_tol=1e-2):
-            return True
+    def in_bounds(self, x: float, y: float) -> bool:
+        """Is the body's middle far enough from every wall? (Heuristic only.)"""
+        low, high = self._min_xy - _EDGE_TOLERANCE, self._max_xy + _EDGE_TOLERANCE
+        return low <= x <= high and low <= y <= high
 
-        # 1. Wall check: ensure the physical chassis (unpadded) stays inside arena boundaries
-        unpadded_corners = get_robot_corners(pose, margin=0.0)
-        for x, y in unpadded_corners:
-            if not (0.0 <= x <= cfg.ARENA_SIZE and 0.0 <= y <= cfg.ARENA_SIZE):
+    def is_point_free(self, x: float, y: float) -> bool:
+        """Slide 36's dot test for the body's middle against the virtual obstacles.
+
+        A cheap, heading-free approximation used by heuristics and flood fills.
+        It does not decide whether a pose is safe -- `is_pose_free` does.
+        """
+        if not self.in_bounds(x, y):
+            return False
+        for x0, y0, x1, y1 in self._blocked:
+            if x0 < x < x1 and y0 < y < y1:
                 return False
-
-        # 2. Obstacle check: check intersection against obstacles using padded safety margin
-        padded_corners = get_robot_corners(pose, margin=safety_margin)
-        for x0, y0, x1, y1 in self._raw_obstacles:
-            if polygon_intersects_aabb(padded_corners, x0, y0, x1, y1):
-                return False
-
         return True
 
-    def is_point_free(self, x: float, y: float, clearance: float = cfg.ROBOT_CLEARANCE) -> bool:
-        """Checks if point (x, y) has basic clearance from walls and obstacles for flood-fill reachability."""
-        # 1. Wall clearance check
-        if not (clearance <= x <= cfg.ARENA_SIZE - clearance and 
-                clearance <= y <= cfg.ARENA_SIZE - clearance):
-            # Allow start zone (bottom-left 40x40cm) to bypass lower boundary
-            if not (0.0 <= x <= cfg.START_ZONE_SIZE and 0.0 <= y <= cfg.START_ZONE_SIZE):
-                return False
-
-        # 2. Obstacle clearance check (10x10 obstacles inflated by clearance)
-        for x0, y0, x1, y1 in self._raw_obstacles:
-            if (x0 - clearance) < x < (x1 + clearance) and (y0 - clearance) < y < (y1 + clearance):
-                return False
-
-        return True
+    def is_pose_free(self, pose: Pose) -> bool:
+        """Is the robot's real, rotated outline clear of every block and wall?"""
+        return self._is_clear(pose)
 
     def is_trajectory_free(self, trajectory, step: float = cfg.COLLISION_SAMPLE_STEP) -> bool:
         return all(self.is_pose_free(p) for p in trajectory.iter_sample(step))
@@ -240,8 +187,12 @@ class Arena:
 
         Ordered best-first by how much of a compromise each pose is, so the
         planner tries the well-aligned ones before the oblique ones. Poses that
-        would sit inside a wall or another obstacle's virtual box are dropped
+        would put the body within the safety margin of a wall or a block are dropped
         here, so the planner never wastes a Dubins call on them.
+
+        `standoff` is to the middle of the robot's footprint, as slide 8 and
+        checklist A.2 measure it; the pose itself is the turning centre, which
+        parks `TURNING_CENTRE_OFFSET` further back from the face.
         """
         fx, fy = obstacle.face_centre()
         outward = obstacle.image_heading
@@ -260,17 +211,15 @@ class Arena:
             bearing = normalise_angle(outward + math.radians(angle))
             x = fx + standoff * math.cos(bearing)
             y = fy + standoff * math.sin(bearing)
-            heading = normalise_angle(bearing + math.pi)
-            candidate_pose = Pose(x, y, heading)
-            if not self.is_pose_free(candidate_pose, safety_margin=1.0):
-                continue
             # Checklist A.2 accepts the image 20-50cm from the robot's midpoint.
             if not (cfg.CAPTURE_MIN_DISTANCE <= standoff <= cfg.CAPTURE_MAX_DISTANCE):
                 continue
             # Turn to face back down the bearing, at the image.
             heading = normalise_angle(bearing + math.pi)
-            results.append(CapturePose(obstacle.id, Pose(x, y, heading),
-                                       standoff, angle, rank))
+            pose = pose_from_footprint_centre(x, y, heading)
+            if not self.is_pose_free(pose):
+                continue
+            results.append(CapturePose(obstacle.id, pose, standoff, angle, rank))
         return results
 
     def select_capture_poses(self, obstacle: Obstacle, count: int) -> List[CapturePose]:
@@ -353,7 +302,23 @@ def parse_obstacles(raw: Iterable[Dict], units: str = "cell") -> List[Obstacle]:
 
 
 def start_pose() -> Pose:
-    return Pose(cfg.START_X, cfg.START_Y, cfg.START_THETA)
+    """The robot pushed into the bottom-left corner: START_X/START_Y are the rear axle."""
+    return Pose(cfg.START_X, cfg.START_Y, normalise_angle(cfg.START_THETA))
+
+
+# How far (in grid cells) a heuristic looks for a usable cell when the body's
+# middle is in one it has no value for. The body can legally be a little inside
+# the heuristic's inflated boxes -- at the corner start, or beside a block's
+# corner, where the square inflation over-reaches -- and a heuristic that calls
+# that "walled in" would stop the search dead.
+NEAREST_CELL_REACH = 2
+
+
+def nearby_cells(cx: int, cy: int, reach: int = NEAREST_CELL_REACH):
+    """Cells around (cx, cy), nearest first, with their distance in cells."""
+    around = [(math.hypot(dx, dy), cx + dx, cy + dy)
+              for dx in range(-reach, reach + 1) for dy in range(-reach, reach + 1)]
+    return sorted(around)
 
 
 def reachable_region(arena: "Arena", origin: Pose,
@@ -367,15 +332,15 @@ def reachable_region(arena: "Arena", origin: Pose,
     n = int(math.ceil(cfg.ARENA_SIZE / resolution))
 
     def free(cx: int, cy: int) -> bool:
-        # Guarantee the initial cell returns free without failing is_point_free check
-        if (cx, cy) == start:
-            return True
         return (0 <= cx < n and 0 <= cy < n
                 and arena.is_point_free((cx + 0.5) * resolution, (cy + 0.5) * resolution))
 
-    start = (int(origin.x // resolution), int(origin.y // resolution))
-    if not (0 <= start[0] < n and 0 <= start[1] < n):
+    ox, oy = footprint_centre(origin)
+    cells = [(cx, cy) for _, cx, cy in nearby_cells(int(ox // resolution), int(oy // resolution))
+             if free(cx, cy)]
+    if not cells:
         return set()
+    start = cells[0]
 
     seen = {start}
     stack = [start]
@@ -411,6 +376,14 @@ def _blocks_start_zone(obstacle: Obstacle) -> bool:
 
 
 def _start_can_escape(arena: "Arena") -> bool:
+    """Can the robot actually drive out of the start pose?
+
+    The flood fill below treats the robot as a point, so it happily reports a
+    10cm-tall corridor as reachable -- but a car with a 20-36cm turning radius
+    cannot turn round in one, and the real robot would be stuck on the spot.
+    This asks the question properly, by trying to plan a real path to a spread
+    of poses around the arena.
+    """
     import dubins           # local import: dubins has no need to know about arenas
     origin = start_pose()
     for x in (60.0, 100.0, 140.0):
@@ -418,13 +391,8 @@ def _start_can_escape(arena: "Arena") -> bool:
             if not arena.is_point_free(x, y):
                 continue
             for theta in (0.0, math.pi / 2, math.pi, -math.pi / 2):
-                if dubins.plan(
-                    origin,
-                    Pose(x, y, theta),
-                    r_left=cfg.TURNING_RADIUS_LEFT,
-                    r_right=cfg.TURNING_RADIUS_RIGHT,
-                    is_pose_free=arena.is_pose_free,
-                ) is not None:
+                if dubins.plan(origin, pose_from_footprint_centre(x, y, theta),
+                               is_free=arena.is_pose_free) is not None:
                     return True
     return False
 
@@ -441,15 +409,16 @@ def _layout_is_solvable(obstacles: Sequence[Obstacle], resolution: float = 5.0) 
         poses = arena.capture_poses(obstacle)
         if not poses:
             return False
-        if not any((int(p.pose.x // resolution), int(p.pose.y // resolution)) in region
-                   for p in poses):
+        cells = ((int(x // resolution), int(y // resolution))
+                 for x, y in (footprint_centre(p.pose) for p in poses))
+        if not any(cell in region for cell in cells):
             return False
     return True
 
 
 def random_layout(count: int = cfg.NUM_OBSTACLES,
                   rng: Optional[random.Random] = None,
-                  max_attempts: int = 2000) -> List[Obstacle]:
+                  max_attempts: int = 400) -> List[Obstacle]:
     """A random but *legal and solvable* obstacle layout, for demoing.
 
     Three things make a layout unusable, and all three are rejected here:

@@ -11,9 +11,12 @@ import unittest
 
 import conftest  # noqa: F401
 
+import commands
 import config as cfg
+import dubins
 import planner
 from arena import Arena, Obstacle, random_layout, start_pose
+from motion import BACKWARD, Pose, footprint_centre
 
 # A fixed, open layout. Deliberately not random, so a failure here is always the
 # same failure and can be debugged.
@@ -24,6 +27,15 @@ LAYOUT = [
     Obstacle(4, 60.0, 60.0, "E"),
     Obstacle(5, 100.0, 170.0, "S"),
 ]
+
+
+def commanded_starts(route):
+    """Each leg with the pose its commands start from: where the ones before it leave the robot."""
+    pose = start_pose()
+    for leg, leg_commands in zip(route.legs, commands.route_leg_commands(route)):
+        yield leg, pose
+        if leg_commands:
+            pose = commands.commands_to_trajectory(leg_commands, pose).end_pose()
 
 
 class Routes(unittest.TestCase):
@@ -58,16 +70,16 @@ class Routes(unittest.TestCase):
         self.assertLessEqual(swapped.total_cost, greedy.total_cost + 1e-6)
 
     def test_legs_chain_end_to_end(self):
-        # Each leg must begin exactly where the previous one stopped, or the
-        # commands sent to the STM describe a path with teleports in it.
+        # Each leg must begin exactly where the commands before it really leave
+        # the robot -- whole centimetres and degrees, not the planned pose --
+        # or the commands sent to the STM describe a path with teleports in it.
         route = self.route("exhaustive")
-        pose = start_pose()
-        for leg in route.legs:
+        for leg, pose in commanded_starts(route):
             begin = leg.trajectory.start_pose()
             self.assertAlmostEqual(begin.x, pose.x, places=6)
             self.assertAlmostEqual(begin.y, pose.y, places=6)
-            self.assertAlmostEqual(begin.theta, pose.theta, places=6)
-            pose = leg.trajectory.end_pose()
+            self.assertAlmostEqual(math.remainder(begin.theta - pose.theta, 2 * math.pi), 0.0,
+                                   places=6)
 
     def test_every_leg_is_collision_free(self):
         for strategy in planner.STRATEGIES:
@@ -82,7 +94,9 @@ class Routes(unittest.TestCase):
             obstacle = self.arena.obstacle_by_id(leg.obstacle_id)
             fx, fy = obstacle.face_centre()
             end = leg.trajectory.end_pose()
-            distance = math.hypot(fx - end.x, fy - end.y)
+            # Checklist A.2 measures to the robot's midpoint, not its turning centre.
+            mx, my = footprint_centre(end)
+            distance = math.hypot(fx - mx, fy - my)
             bearing = math.atan2(fy - end.y, fx - end.x)
             off_axis = abs(math.atan2(math.sin(bearing - end.theta),
                                       math.cos(bearing - end.theta)))
@@ -176,6 +190,102 @@ class RandomLayouts(unittest.TestCase):
                 self.assertEqual(len(set(route.order)), len(route.order))
                 for leg in route.legs:
                     self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
+
+class Reachability(unittest.TestCase):
+    """Obstacles the robot can reach must not be given up on."""
+
+    def test_layout_from_the_first_robot_run_reaches_all_five(self):
+        # The simulator layout from the first run on the robot, where the old
+        # planner reached only two: 2, 3 and 4 need the robot to reverse in.
+        layout = [Obstacle(1, 50.0, 70.0, "S"), Obstacle(2, 120.0, 90.0, "E"),
+                  Obstacle(3, 50.0, 130.0, "W"), Obstacle(4, 150.0, 150.0, "S"),
+                  Obstacle(5, 150.0, 40.0, "N")]
+        arena = Arena(layout)
+        route = planner.plan_route(arena, "exhaustive")
+        self.assertEqual(sorted(route.order), [1, 2, 3, 4, 5])
+        self.assertEqual(route.unreachable, [])
+        for leg in route.legs:
+            self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
+    def test_a_stranded_obstacle_is_searched_at_all_its_photo_poses(self):
+        # The 7-obstacle layout from the second robot session. Obstacle 2's two
+        # best-ranked photo poses sit straight above it under the top wall,
+        # where the car cannot turn in; a slanted one between blocks 2 and 5 is
+        # easy. The search used to try only the first two, and gave up.
+        layout = [Obstacle(1, 140.0, 130.0, "E"), Obstacle(2, 40.0, 140.0, "N"),
+                  Obstacle(3, 70.0, 90.0, "N"), Obstacle(4, 140.0, 90.0, "E"),
+                  Obstacle(5, 80.0, 140.0, "W"), Obstacle(6, 140.0, 20.0, "N"),
+                  Obstacle(7, 80.0, 20.0, "W")]
+        arena = Arena(layout)
+        route = planner.plan_route(arena, "exhaustive")
+        self.assertEqual(sorted(route.order), [1, 2, 3, 4, 5, 6, 7])
+        self.assertEqual(route.unreachable, [])
+        for leg in route.legs:
+            self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
+    def test_an_obstacle_the_tour_cannot_leave_is_searched_out_of(self):
+        # Two obstacles whose photo poses have no known way on: only one can be
+        # visited last, so the best tour has to drop the other even though the
+        # robot can reach it. The second search round must find it a way out.
+        arena = Arena(LAYOUT)
+        model = planner.CostModel(arena)
+        for oid in (1, 3):
+            for j in model.nodes_by_obstacle[oid]:
+                for k in range(len(model.nodes)):
+                    if k != j:
+                        model._cost[j][k] = planner.INF
+                        model._direct.pop((j, k), None)
+        self.assertLess(len(planner._exhaustive_order(model, model.reachable_obstacles())), 5)
+        route = planner.plan_route(arena, "exhaustive", model=model)
+        self.assertEqual(sorted(route.order), [1, 2, 3, 4, 5])
+        for leg in route.legs:
+            self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
+    def test_legs_chain_exactly_after_a_hybrid_astar_leg(self):
+        # Two stress-test layouts where a Hybrid A* leg used to stop within its
+        # 4cm / 10 degree goal box, so the next leg started 3-4cm away from
+        # where the robot really was and the replay came within 1cm of a block.
+        # Every leg must end exactly on its planned photo pose. It starts where
+        # the commands before it leave the robot -- or, when that pose is too
+        # tight to re-plan from, within one leg's whole-number rounding of it.
+        layouts = {
+            "n7_14": [(1, 9, 13, "W"), (2, 10, 8, "E"), (3, 13, 4, "E"), (4, 15, 8, "N"),
+                      (5, 15, 15, "S"), (6, 2, 14, "N"), (7, 4, 9, "N")],
+            "n7_17": [(1, 12, 9, "E"), (2, 1, 10, "N"), (3, 18, 11, "W"), (4, 13, 5, "W"),
+                      (5, 14, 13, "N"), (6, 4, 16, "S"), (7, 6, 8, "E")],
+        }
+        for name, cells in layouts.items():
+            with self.subTest(layout=name):
+                arena = Arena([Obstacle(i, x * 10.0, y * 10.0, face) for i, x, y, face in cells])
+                model = planner.CostModel(arena)
+                route = planner.plan_route(arena, "exhaustive", model=model)
+                _, chain = model.evaluate_order(route.order)
+                for (leg, pose), node in zip(commanded_starts(route), chain):
+                    begin, end = leg.trajectory.start_pose(), leg.trajectory.end_pose()
+                    photo = model.nodes[node].pose
+                    self.assertLess(math.hypot(begin.x - pose.x, begin.y - pose.y), 1.5)
+                    self.assertLess(abs(math.degrees(math.remainder(begin.theta - pose.theta,
+                                                                    2 * math.pi))), 0.5 + 1e-9)
+                    self.assertLess(math.hypot(end.x - photo.x, end.y - photo.y), 1e-6)
+                    self.assertLess(abs(math.remainder(end.theta - photo.theta, 2 * math.pi)), 1e-6)
+
+    def test_a_reversed_path_drives_the_same_poses_backwards(self):
+        forward = dubins.plan(Pose(50.0, 50.0, 0.0), Pose(120.0, 110.0, math.pi / 2))[1]
+        backward = planner._reversed(forward)
+        self.assertTrue(all(seg.gear == BACKWARD for seg in backward.segments))
+        start, end = backward.start_pose(), backward.end_pose()
+        self.assertAlmostEqual(start.x, 120.0, places=6)
+        self.assertAlmostEqual(start.y, 110.0, places=6)
+        self.assertAlmostEqual(end.x, 50.0, places=6)
+        self.assertAlmostEqual(end.y, 50.0, places=6)
+        self.assertAlmostEqual(end.theta, 0.0, places=6)
+        there = forward.sample(1.0)
+        back = backward.sample(1.0)
+        self.assertEqual(len(there), len(back))
+        for a, b in zip(there, reversed(back)):
+            self.assertAlmostEqual(a.x, b.x, places=6)
+            self.assertAlmostEqual(a.y, b.y, places=6)
 
 
 if __name__ == "__main__":

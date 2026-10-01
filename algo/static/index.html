@@ -134,7 +134,10 @@
       <p class="hint">
         Drives the robot with the same STM command strings the planner emits, through
         the same kinematics and the same collision check. The robot has no on-the-spot
-        turn, so every turn is an arc at the 25cm turning radius. A move that would
+        turn, so every turn is an arc at full lock: <span id="radius-left">20.2</span>cm radius
+        to the left, <span id="radius-right">36.2</span>cm to the right, as measured on our
+        chassis about the point it turns on -- the middle of the rear axle (the ring),
+        <span id="centre-offset">9.325</span>cm behind the middle of its body. A move that would
         clip a virtual obstacle or leave the arena is refused rather than driven.
       </p>
     </div>
@@ -362,48 +365,33 @@ function strokePoses(poses, from, to) {
   ctx.stroke();
 }
 
+// A pose is the robot's turning centre -- the middle of the rear axle -- which
+// sits behind the middle of its body; the path traced on the canvas is that
+// point too. So the real outline is drawn from ROBOT_REAR behind the pose to
+// ROBOT_FRONT ahead of it, and the turning centre marked on it.
 function drawRobot(pose) {
-  const s = scale();
-  // Dimensions in cm (uses CONFIG if available, fallback to defaults)
-  const rear = (CONFIG.robot_rear_to_axle || 3.35) * s;   // 3.35 cm behind axle
-  const front = (CONFIG.robot_front_to_axle || 22.0) * s;  // 22.0 cm ahead of axle
-  const halfW = (CONFIG.robot_half_width || 10.7) * s;     // 10.7 cm half-width
-
+  const front = CONFIG.robot_front * scale();
+  const rear = CONFIG.robot_rear * scale();
+  const half = CONFIG.robot_width / 2 * scale();
   ctx.save();
   ctx.translate(px(pose.x), py(pose.y));
-  ctx.rotate(-pose.theta);
-
-  // Draw asymmetrical chassis box:
-  // Local X: -rear to +front
-  // Local Y: -halfW to +halfW
+  ctx.rotate(-pose.theta);                       // canvas y is flipped, so negate
   ctx.fillStyle = "rgba(15,118,110,.22)";
-  ctx.strokeStyle = getVar("--robot");
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.rect(-rear, -halfW, rear + front, halfW * 2);
-  ctx.fill();
-  ctx.stroke();
+  ctx.strokeStyle = getVar("--robot"); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.rect(-rear, -half, front + rear, half * 2); ctx.fill(); ctx.stroke();
 
   // Camera at the front centre (briefing slide 3), drawn as its view cone so
   // it is obvious which way the robot is pointing.
+  const nose = front;
   ctx.fillStyle = "rgba(245,158,11,.30)";
-  ctx.beginPath();
-  ctx.moveTo(front, 0);
-  ctx.arc(front, 0, halfW * 1.5, -Math.PI / 5, Math.PI / 5);
-  ctx.closePath();
-  ctx.fill();
-
+  ctx.beginPath(); ctx.moveTo(nose, 0);
+  ctx.arc(nose, 0, half * 1.5, -Math.PI / 5, Math.PI / 5); ctx.closePath(); ctx.fill();
   ctx.fillStyle = getVar("--robot");
-  ctx.beginPath();
-  ctx.arc(front, 0, 3, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(nose, 0, 3, 0, Math.PI * 2); ctx.fill();
 
-  // Red dot indicating the axle / center-of-rotation (0,0)
-  ctx.fillStyle = "#ef4444";
-  ctx.beginPath();
-  ctx.arc(0, 0, 3, 0, Math.PI * 2);
-  ctx.fill();
-
+  // The point it turns about.
+  ctx.strokeStyle = getVar("--robot"); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 }
 
@@ -802,6 +790,9 @@ el("metric").addEventListener("change", () => { if (plan) doPlan(); });
 (async function start() {
   try {
     CONFIG = await api("/api/config");
+    el("radius-left").textContent = CONFIG.turning_radius_left;
+    el("radius-right").textContent = CONFIG.turning_radius_right;
+    el("centre-offset").textContent = CONFIG.turning_centre_offset;
     const data = await api("/api/random");
     obstacles = data.obstacles.map((o) => ({ id: o.id, x: o.x, y: o.y, face: o.face }));
     draw();

@@ -38,7 +38,9 @@ class Api(unittest.TestCase):
     def test_config_exposes_what_the_ui_needs_to_draw(self):
         data = self.client.get("/api/config").get_json()
         for key in ("arena_size", "cell_size", "grid_cells", "robot_size",
-                    "obstacle_inflation", "start", "strategies", "scan_time"):
+                    "obstacle_inflation", "start", "strategies", "scan_time",
+                    "turning_radius_left", "turning_radius_right",
+                    "turning_centre_offset"):
             self.assertIn(key, data)
         self.assertEqual(data["arena_size"], 200.0)
 
@@ -96,6 +98,18 @@ class Api(unittest.TestCase):
         self.assertIn("path", data["data"])
         self.assertTrue(all(len(cell) == 2 for cell in data["data"]["path"]))
 
+    def test_navigate_and_plan_start_from_the_same_configured_pose(self):
+        # The RPi's robot cell is ignored: whatever it says, /api/navigate plans
+        # the same run the simulator does from the corner start.
+        obstacles = [{"id": 1, "x": 6, "y": 12, "face": "S"},
+                     {"id": 2, "x": 14, "y": 6, "face": "W"}]
+        _, planned = self.post("/api/plan", {"obstacles": obstacles})
+        for robot in ({"x": 1, "y": 1, "dir": "N"}, {"x": 5, "y": 5, "dir": "E"}):
+            _, navigated = self.post("/api/navigate", {
+                "type": "START_TASK", "data": {"robot": robot, "obstacles": obstacles}})
+            with self.subTest(robot=robot):
+                self.assertEqual(navigated["data"]["commands"], planned["commands"])
+
     def test_client_errors_come_back_as_400_with_a_reason(self):
         for body in ({"obstacles": []},
                      {"obstacles": [{"id": 1, "x": 5, "y": 5, "face": "Q"}]},
@@ -126,7 +140,19 @@ class Api(unittest.TestCase):
             self.assertAlmostEqual(times[-1], clock + leg["duration"], places=2)
             clock += leg["duration"] + scan
 
-        self.assertAlmostEqual(clock, data["total_duration"], places=2)
+        # total_duration is reported to 2dp and the legs to 3dp, so a sum that
+        # lands on x.xx5 is off by exactly 0.005 -- allow a hundredth.
+        self.assertAlmostEqual(clock, data["total_duration"], delta=0.01)
+
+    def test_leg_commands_add_up_to_the_full_list(self):
+        # Turns are rounded against the heading of the whole run, so each leg's
+        # list must be exactly its slice of the full one, not converted alone.
+        _, data = self.post("/api/plan", {"obstacles": LAYOUT, "strategy": "exhaustive"})
+        joined = []
+        for leg in data["legs"]:
+            joined.extend(leg["commands"])
+            joined.append("SNAP%d" % leg["obstacle_id"])
+        self.assertEqual(joined + ["FIN"], data["commands"])
 
     def test_legs_do_not_repeat_the_joining_pose(self):
         # Leg N+1 starts where leg N stopped; emitting that pose twice makes the
@@ -160,7 +186,9 @@ class Api(unittest.TestCase):
                             {"start": start, "command": "RF090", "obstacles": []})
         self.assertAlmostEqual(data["pose"]["theta_deg"], -90.0, places=6)
         moved = math.hypot(data["pose"]["x"] - 100.0, data["pose"]["y"] - 100.0)
-        self.assertGreater(moved, 25.0, "a 90 degree arc at r=25 must displace the robot")
+        # A quarter turn on the right-hand circle moves the centre one chord,
+        # r * sqrt(2) -- and on our robot that is the wide 36cm side.
+        self.assertAlmostEqual(moved, server.cfg.TURNING_RADIUS_RIGHT * math.sqrt(2), delta=0.05)
 
     def test_drive_refuses_a_move_into_an_obstacle(self):
         # Facing an obstacle from 40cm away: driving forward would clip its

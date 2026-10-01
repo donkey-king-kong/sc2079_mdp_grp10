@@ -60,12 +60,14 @@ If a supervisor asks to see a particular motion rather than waiting for the run
 to produce it, the **Manual drive** buttons move the robot one STM command at a
 time &mdash; forward, backward, and left/right arcs in both gears. They go
 through the same parser, the same kinematics and the same collision check as the
-planner, so a move that would clip a virtual obstacle or leave the arena is
-refused and says so. Note there is no on-the-spot turn: every turn is an arc at
-the 25cm turning radius, which is the honest behaviour of the real chassis.
+planner, so a move that would bring the robot's outline within the safety
+margin of an obstacle or a wall is refused and says so. Note there is no on-the-spot turn: every turn is an arc at
+full lock -- 20.2cm radius to the left, 36.2cm to the right -- which is the honest
+behaviour of the real chassis.
 
-Tick **Virtual obstacles** to show the inflated no-go regions the planner
-actually reasons about, and **Capture poses** to show every pose it considered
+Tick **Virtual obstacles** to show roughly where the middle of the robot cannot
+go (an approximation for heuristics -- the real check uses the rotated
+outline), and **Capture poses** to show every pose it considered
 standing at. Between them they explain any "unreachable" result on the spot,
 which is worth having in front of you when a supervisor asks.
 
@@ -109,9 +111,15 @@ of angles rather than the best few poses by rank, which would all share one
 heading. An obstacle in a 20cm strip under the top wall cannot be entered
 head-on at any standoff and is easy to enter at 45&deg;.
 
-Collision checking follows slide 36: inflate each 10cm obstacle by half a robot
-into a 40cm "virtual obstacle", inset the walls by the same 15cm, and treat the
-robot as a point at its centre.
+Collision checking (`footprint.py`) uses the robot's real outline -- 22.0cm
+ahead of the rear axle, 3.35cm behind it, 21.4cm wide -- rotated with its
+heading, and requires `SAFETY_MARGIN` (3cm) to every block and wall. Paths are
+sampled every 1cm and 2 degrees, and `SWEEP_PAD` (half the furthest any corner
+moves between samples, ~0.7cm) is added to the margin so it holds along the
+whole sweep, not just at the samples. Slide 36's trick of inflating each block
+and treating the robot as a dot is exact only for a shape that never rotates;
+for our 25 x 21cm rectangle it either lets the corners clip blocks or blocks
+gaps the robot fits through, so it survives only as a heuristic.
 
 ### 2. `dubins.py` and `hybrid_astar.py` &mdash; how does it get there?
 
@@ -125,6 +133,17 @@ the shortest collision-free one wins. It is microseconds, and provably optimal
 when nothing is in the way. Slide 43's worked `rsr` example is reproduced to two
 decimal places in `tests/test_dubins.py`.
 
+**Our robot does not turn symmetrically.** Measured at the rear-axle centre, it
+turns on a 20.2cm radius to the left and a 36.2cm radius to the right, however far it
+turns. That is a fault in the chassis, so the planner models it rather than
+planning for a robot we do not have: every left arc (forward or reverse) is on
+the 20.2cm circle and every right arc on the 36.2cm one. The six Dubins shapes
+generalise directly &mdash; the inner tangent of `LSR`/`RSL` uses `r1 + r2` where
+slide 29 has `2r`, and the middle circle of `LRL`/`RLR` sits `r_outer + r_middle`
+from each outer centre where slide 30 has `2r` &mdash; and with equal radii they
+reduce exactly to the slides. Dubins' optimality proof assumes one radius, so on
+this robot the result is the best of the six rather than a proven optimum.
+
 **Hybrid A\*** (`hybrid_astar.py`) is the fallback for legs no Dubins path can
 serve. It searches continuous poses with motion primitives that include reverse,
 so it can three-point-turn into a tight spot, and de-duplicates states on a
@@ -136,9 +155,15 @@ Two details matter more than they look:
 
 - **Reversing out of a capture pose is mandatory, not an optimisation.** The
   robot finishes a photo 30cm from an obstacle face pointing straight at it, and
-  the turning radius is 25cm &mdash; so every forward-only path out drives into
+  the turning radius is 20.2cm left / 36.2cm right &mdash; so every forward-only path out drives into
   the block it just photographed. Slide 33 says the same thing. Each leg
   therefore tries backing straight out first, shortest reverse that works.
+- **Reversing in is as necessary as reversing out.** Dubins only drives
+  forward, so it cannot enter a photo pose tucked against a wall or behind
+  another block. When no forward path fits, `_plan_leg` tries the forward path
+  from the target back to the source and drives it in reverse gear: the same
+  poses, the same collision check, still analytic. On the layout from the first
+  robot run this is what took the planner from 2 obstacles to 5.
 - **Three segments is not always enough.** A Dubins path cannot express "along
   the bottom, up the right-hand side, then in", which a cluttered arena needs
   constantly. So the roadmap carries `transit` poses in the open parts of the
@@ -208,24 +233,41 @@ Every tunable constant lives there with the slide it came from written next to
 it. It is the only file that should need touching when calibrating against the
 real robot. The ones most likely to be wrong:
 
-- `TURNING_RADIUS` (25cm from slide 4, and larger the faster the robot goes)
+- `TURNING_RADIUS_LEFT` / `TURNING_RADIUS_RIGHT` (20.2cm / 36.2cm, measured on our
+  chassis at the rear-axle centre; slide 4 assumes ~25cm both ways, and larger
+  the faster the robot goes)
+- `ROBOT_FRONT` / `ROBOT_REAR` / `ROBOT_WIDTH` (22.0 / 3.35 / 21.4cm, the
+  measured outline from the rear-axle centre); `TURNING_CENTRE_OFFSET` is
+  derived from them (9.325cm, how far the body's middle sits ahead of the
+  turning centre)
 - `CAPTURE_STANDOFF` (30cm, derived from slide 8)
-- `SPEED_STRAIGHT`, `SPEED_TURN`, `DIRECTION_CHANGE_TIME`, `STEERING_CHANGE_TIME`
-  &mdash; **measure these with a stopwatch**; they are estimates, and they are
-  what B.3 optimises against
+- `SPEED_*`, `ACCEL_*`, `DECEL_*`, `COMMAND_OVERHEAD` &mdash; the measured
+  motion profile (65cm/s straights, 45cm/s turns, 0.7s per command). Every
+  command is timed as its own stop-to-stop move, and this is what B.3 optimises
+  against; `SCAN_TIME` (2s per photo) is still an estimate
 - `COMMAND_NUM_WIDTH`, `SNAP_TO_90_TURNS`, `MAX_TURN_COMMAND_DEG` &mdash; must
   match the STM firmware
 
 Coordinates are centimetres with the origin at the arena's bottom-left. A robot
-pose is `(x, y, theta)` about the robot's **centre**, not the bottom-left corner
-the briefing uses on slide 7; `arena.bottom_left_to_centre()` converts at the
-boundary. `theta` is radians, East = 0, counter-clockwise.
+pose is `(x, y, theta)` about the robot's **turning centre** -- the point it
+rotates about, the middle of the rear axle, `TURNING_CENTRE_OFFSET` (9.325cm)
+behind the middle of its
+footprint -- not the bottom-left corner the briefing uses on slide 7;
+`arena.bottom_left_to_centre()` converts at the boundary. Anything about the
+body (collision checks, capture standoff, camera distance, `path_cells`) is
+taken from the footprint's middle via `motion.footprint_centre()`, so the nose
+swinging wide on a turn is accounted for. `theta` is radians, East = 0,
+counter-clockwise.
 
-Note `START_X`/`START_Y` are 20, not 15. Slide 7's corner position puts the
-robot exactly on the boundary margin, where the first left turn dips a
-fraction of a millimetre outside the arena and every left-handed path out of the
-start zone is rejected. The start zone is 40cm and the planning footprint 30cm,
-so centring the robot in it costs nothing and buys 5cm of slack.
+The start pose is one setting, `START_X`/`START_Y`/`START_THETA`, used by both
+the simulator and `/api/navigate` (which ignores the RPi's `robot` field). It is
+the robot pushed into the bottom-left corner facing North: left side of the
+front wheels (18.9cm across) on x = 0, back of the rear tyres on y = 0, so the
+rear-axle centre is at (9.45, 3.35). Nothing is measured on the day. That pose
+touches two walls, so while the rear axle is inside the 40cm start zone each wall
+only has to stay as clear as it was at the start (less `START_WALL_TOLERANCE`,
+0.5cm); outside the zone the full `SAFETY_MARGIN` applies. The robot can leave
+the corner, but never get closer to a wall than it started.
 
 ## Talking to the rest of the system
 
@@ -284,10 +326,8 @@ Read `tests/` before changing anything in `dubins.py`, `hybrid_astar.py` or
 
 ## Known gaps
 
-- **Speeds are estimated, not measured.** Everything in the time model is a
-  guess until someone stopwatches the robot. The *relative* ordering it produces
-  is already better than optimising distance, but the absolute seconds are not
-  trustworthy yet. This is the highest-value thing to fix.
+- **Photo time is estimated.** Speeds, accelerations and the 0.7s per-command
+  overhead are measured on the robot; `SCAN_TIME` (2s per photo) is not yet.
 - **No recovery behaviour for a camera miss.** Briefing slides 37&ndash;39
   describe what to do when the robot finds a bull's-eye instead of an image, or
   no obstacle at all: reverse and go round the block, or roam. That needs the
@@ -297,14 +337,24 @@ Read `tests/` before changing anything in `dubins.py`, `hybrid_astar.py` or
   rather than failing outright. Checklist B.2 scores the images actually
   recognised, so this is the right behaviour, but it is worth knowing about.
 
-  Measured over 60 random layouts (`random_layout`, seeds 1000&ndash;1059,
+  Measured over 60 random layouts, *with the old symmetric 25cm radius*
+  (`random_layout`, seeds 1000&ndash;1059,
   all three strategies each): planning takes **3.3s on average, 8.8s worst
   case**, and the exhaustive search reaches all five obstacles on **45 of 60**
   against the greedy walk's 37. Where both reach the same number, exhaustive is
   strictly faster on 34 of 48 and saves **9.5% of the run time** on average.
 
+  *Since then* (measured outline, rotated collision check, reversed Dubins
+  legs, nearest-first rescue searches), on `tools/replay/layouts.json` -- the
+  first robot run's layout plus 10 seeded random ones -- the planner reaches
+  54 of 55 obstacles in 3.4-5.8s each. The one it misses has no legal photo
+  pose: every candidate parks within 1.9cm of the neighbouring block, inside
+  `SAFETY_MARGIN`.
+
   The knob here is `SEARCH_TIME_BUDGET` (4s), the wall-clock ceiling on the
-  Hybrid A* rescue pass. Raising it recovers a few more obstacles at the cost of
+  Hybrid A* rescue pass. It searches from the few poses the robot can already
+  reach that are nearest each stranded obstacle, since a short search from
+  next door succeeds where a long one from across the arena runs out of steps. Raising it recovers a few more obstacles at the cost of
   a longer wait: with the budget lifted entirely, those same 60 layouts give 48
   of 60, but the worst case goes from 8.8s to 18.1s. Planning happens once,
   before the robot moves, so it is worth turning up if a supervisor is watching

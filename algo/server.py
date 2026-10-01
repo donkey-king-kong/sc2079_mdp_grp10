@@ -26,11 +26,20 @@ Request body for ``/api/plan``::
       "units":    "cell",           // "cell" (default, 20x20 grid) or "cm"
       "strategy": "exhaustive",     // "nearest" | "greedy_swap" | "exhaustive"
       "metric":   "time",           // "time" (default) or "distance"
-      "start":    {"x": 20, "y": 20, "theta_deg": 90}    // optional, cm
+      "start":    {"x": 9.45, "y": 3.35, "theta_deg": 90}  // optional, cm, rear axle
     }
 
 `x`/`y` on an obstacle are the BOTTOM-LEFT corner; `face` (or `dir`) is the
 side the image is on, N/S/E/W. Response is documented in `_plan_response`.
+
+Every robot pose in cm, in and out, is the robot's TURNING CENTRE -- the middle
+of the rear axle, `TURNING_CENTRE_OFFSET` (9.325cm) behind the middle of its
+body. `path_cells` are about the body's middle.
+
+The start pose is ONE setting, `config.START_X/START_Y/START_THETA` -- the robot
+pushed into the bottom-left corner. The simulator never sends `start`, and
+`/api/navigate` ignores the RPi's `robot` field, so both plan from the same
+place. `start` on `/api/plan` remains for tests and manual experiments.
 """
 
 import math
@@ -44,7 +53,7 @@ import arena as arena_module
 import commands as commands_module
 import config as cfg
 import planner
-from motion import Pose, heading_to_face, normalise_angle
+from motion import Pose, footprint_centre, heading_to_face, normalise_angle
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
@@ -77,17 +86,26 @@ def _pose_dict(pose: Pose, clock: Optional[float] = None) -> Dict[str, Any]:
 
 
 def _cells(poses) -> List[List[int]]:
-    """Trajectory as 20x20 grid cells, de-duplicated -- what the Android map draws."""
+    """Trajectory as 20x20 grid cells, de-duplicated -- what the Android map draws.
+
+    Tracks the middle of the robot's body rather than its turning centre, since
+    the map draws the robot's footprint.
+    """
     cells: List[List[int]] = []
     for pose in poses:
-        cell = [arena_module.cm_to_cell(pose.x), arena_module.cm_to_cell(pose.y)]
+        x, y = footprint_centre(pose)
+        cell = [arena_module.cm_to_cell(x), arena_module.cm_to_cell(y)]
         if not cells or cells[-1] != cell:
             cells.append(cell)
     return cells
 
 
-def _leg_dict(leg: planner.Leg, start_time: float) -> Dict[str, Any]:
-    """One leg, with every pose stamped with the clock reading it happens at."""
+def _leg_dict(leg: planner.Leg, start_time: float, commands: List[str]) -> Dict[str, Any]:
+    """One leg, with every pose stamped with the clock reading it happens at.
+
+    `commands` come from `commands.route_leg_commands`: turns are rounded
+    against the heading of the whole run, so a leg cannot be converted alone.
+    """
     timed = leg.trajectory.sample_with_time(ANIMATION_STEP, start_time)
     return {
         "obstacle_id": leg.obstacle_id,
@@ -95,7 +113,7 @@ def _leg_dict(leg: planner.Leg, start_time: float) -> Dict[str, Any]:
         "distance": round(leg.distance, 2),
         "duration": round(leg.duration, 3),
         "starts_at": round(start_time, 3),
-        "commands": commands_module.trajectory_to_commands(leg.trajectory),
+        "commands": commands,
         "end": _pose_dict(leg.trajectory.end_pose(), start_time + leg.duration),
         # Drop the first pose of each leg after the first: it is the previous
         # leg's last pose, and duplicating it makes the animation stall.
@@ -108,8 +126,8 @@ def _plan_response(route: planner.Route, layout: arena_module.Arena,
     """The full plan, in the shape the simulator and the RPi both consume."""
     legs = []
     clock = 0.0
-    for leg in route.legs:
-        legs.append(_leg_dict(leg, clock))
+    for leg, leg_commands in zip(route.legs, commands_module.route_leg_commands(route)):
+        legs.append(_leg_dict(leg, clock, leg_commands))
         # Driving time, then parked while the photo is taken.
         clock += leg.duration + cfg.SCAN_TIME
 
@@ -219,7 +237,12 @@ def api_config():
         "obstacle_size": cfg.OBSTACLE_SIZE,
         "start_zone_size": cfg.START_ZONE_SIZE,
         "robot_size": cfg.ROBOT_SIZE,
-        "turning_radius": cfg.TURNING_RADIUS,
+        "robot_front": cfg.ROBOT_FRONT,
+        "robot_rear": cfg.ROBOT_REAR,
+        "robot_width": cfg.ROBOT_WIDTH,
+        "turning_radius_left": cfg.TURNING_RADIUS_LEFT,
+        "turning_radius_right": cfg.TURNING_RADIUS_RIGHT,
+        "turning_centre_offset": cfg.TURNING_CENTRE_OFFSET,
         "obstacle_inflation": cfg.OBSTACLE_INFLATION,
         "boundary_margin": cfg.BOUNDARY_MARGIN,
         "capture_standoff": cfg.CAPTURE_STANDOFF,
@@ -232,6 +255,7 @@ def api_config():
         "start": _pose_dict(arena_module.start_pose()),
     })
 
+
 @app.route("/api/random")
 def api_random():
     """A random legal layout. Guaranteed solvable -- see `arena.random_layout`."""
@@ -241,28 +265,8 @@ def api_random():
         raise BadRequest("'count' must be an integer")
     if not 1 <= count <= 12:
         raise BadRequest("'count' must be between 1 and 12")
-
-    for _ in range(5):
-        try:
-            obstacles = arena_module.random_layout(count)
-            return jsonify({"obstacles": [ob.to_dict() for ob in obstacles]})
-        except RuntimeError:
-            continue
-
-    raise BadRequest("Could not generate a legal layout of %d obstacles. Please try again." % count)
-
-
-# @app.route("/api/random")
-# def api_random():
-#     """A random legal layout. Guaranteed solvable -- see `arena.random_layout`."""
-#     try:
-#         count = int(request.args.get("count", cfg.NUM_OBSTACLES))
-#     except ValueError:
-#         raise BadRequest("'count' must be an integer")
-#     if not 1 <= count <= 12:
-#         raise BadRequest("'count' must be between 1 and 12")
-#     obstacles = arena_module.random_layout(count)
-#     return jsonify({"obstacles": [ob.to_dict() for ob in obstacles]})
+    obstacles = arena_module.random_layout(count)
+    return jsonify({"obstacles": [ob.to_dict() for ob in obstacles]})
 
 
 @app.route("/api/plan", methods=["POST"])
@@ -322,16 +326,14 @@ def api_navigate():
     data = payload.get("data", payload)
     layout = _read_layout(data)
 
+    # The robot is always pushed into the corner (config.START_*), so the start
+    # is that one setting -- the same one the simulator plans from. The tablet's
+    # robot cell is a hand-placed marker, not a measurement: log it and move on.
     start = arena_module.start_pose()
     robot = data.get("robot")
     if robot:
-        # The RPi speaks in grid cells like the tablet does; convert to the
-        # centre-of-robot centimetres the planner works in.
-        start = arena_module.bottom_left_to_centre(
-            arena_module.cell_to_cm(float(robot.get("x", 0))),
-            arena_module.cell_to_cm(float(robot.get("y", 0))),
-            arena_module.face_to_heading(str(robot.get("dir", robot.get("face", "N")))),
-        )
+        app.logger.info("navigate: ignoring robot %r from the RPi; planning from the "
+                        "configured start (%.2f, %.2f)", robot, start.x, start.y)
 
     began = time.time()
     route = planner.plan_route(layout, _read_strategy(data), start=start,

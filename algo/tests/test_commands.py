@@ -15,7 +15,8 @@ import commands
 import config as cfg
 import planner
 from arena import Arena, Obstacle, start_pose
-from motion import BACKWARD, FORWARD, LEFT, RIGHT, STRAIGHT, Pose, Segment, Trajectory
+from motion import (BACKWARD, FORWARD, LEFT, RIGHT, STRAIGHT, Pose, Segment, Trajectory,
+                    normalise_angle)
 
 
 class Formatting(unittest.TestCase):
@@ -91,10 +92,13 @@ class RoundTrip(unittest.TestCase):
             commands.trajectory_to_commands(trajectory), start)
 
     def test_a_handmade_path_survives_the_round_trip(self):
+        # Built at the robot's real radii: a command carries only an angle, so
+        # a path drawn at any other radius is not one the STM would reproduce.
+        right, left = cfg.TURNING_RADIUS_RIGHT, cfg.TURNING_RADIUS_LEFT
         start = Pose(30.0, 30.0, math.pi / 2)
-        first = Segment(FORWARD, STRAIGHT, 60.0, 25.0, start)
-        second = Segment(FORWARD, RIGHT, math.pi / 2 * 25.0, 25.0, first.end)
-        third = Segment(BACKWARD, LEFT, math.pi / 4 * 25.0, 25.0, second.end)
+        first = Segment(FORWARD, STRAIGHT, 60.0, 0.0, start)
+        second = Segment(FORWARD, RIGHT, math.pi / 2 * right, right, first.end)
+        third = Segment(BACKWARD, LEFT, math.pi / 4 * left, left, second.end)
         original = Trajectory([first, second, third])
 
         replayed = self.replay(original, start)
@@ -102,6 +106,24 @@ class RoundTrip(unittest.TestCase):
         self.assertAlmostEqual(got.x, want.x, delta=0.5)
         self.assertAlmostEqual(got.y, want.y, delta=0.5)
         self.assertAlmostEqual(got.theta, want.theta, delta=0.02)
+
+    def test_each_turn_is_replayed_on_its_own_sides_radius(self):
+        # The robot turns 20cm left and 36cm right about its centre. A quarter
+        # turn from the origin facing East must therefore land one left radius
+        # up-and-across for LF090, and one right radius down-and-across for
+        # RF090. Mixing the two up would put every turn in the wrong place.
+        origin = Pose(0.0, 0.0, 0.0)
+        left, right = cfg.TURNING_RADIUS_LEFT, cfg.TURNING_RADIUS_RIGHT
+        cases = [("LF090", left, left, math.pi / 2),
+                 ("RF090", right, -right, -math.pi / 2),
+                 ("LB090", -left, left, -math.pi / 2),
+                 ("RB090", -right, -right, math.pi / 2)]
+        for command, x, y, theta in cases:
+            end = commands.commands_to_trajectory([command], origin).end_pose()
+            with self.subTest(command=command):
+                self.assertAlmostEqual(end.x, x, places=6)
+                self.assertAlmostEqual(end.y, y, places=6)
+                self.assertAlmostEqual(end.theta, theta, places=6)
 
     def test_a_planned_route_survives_the_round_trip(self):
         # The real check: rounding to whole centimetres and whole degrees must
@@ -143,6 +165,39 @@ class RouteCommands(unittest.TestCase):
         text = commands.describe(self.commands)
         self.assertIn("photograph obstacle", text)
         self.assertTrue(text.endswith("finish"))
+
+
+class WholeDegrees(unittest.TestCase):
+    """The STM takes whole degrees and keeps an absolute heading."""
+
+    def test_rounding_the_running_total_stops_drift(self):
+        # Four 89.6 degree turns: rounding each alone sends 4 x 90 = 360 and the
+        # heading ends 1.6 degrees out. Rounding the running total never lets
+        # it get more than half a degree out.
+        heading = commands.HeadingTracker()
+        sent = [heading.take(89.6) for _ in range(4)]
+        self.assertEqual(sent, [90, 89, 90, 89])
+        self.assertLessEqual(abs(heading.planned - heading.sent), 0.5)
+
+    def test_a_turn_too_small_to_send_carries_into_the_next(self):
+        heading = commands.HeadingTracker()
+        self.assertEqual(heading.take(0.6), 0)
+        self.assertEqual(heading.take(90.0), 91)
+
+    def test_a_route_never_ends_a_leg_more_than_half_a_degree_out(self):
+        layout = [Obstacle(1, 60.0, 120.0, "S"), Obstacle(2, 140.0, 60.0, "W"),
+                  Obstacle(3, 150.0, 150.0, "S"), Obstacle(4, 60.0, 60.0, "E"),
+                  Obstacle(5, 100.0, 170.0, "S")]
+        route = planner.plan_route(Arena(layout), "exhaustive")
+        sent = []
+        for leg, leg_commands in zip(route.legs, commands.route_leg_commands(route)):
+            sent.extend(leg_commands)
+            # What the STM's absolute heading target is after this leg's commands.
+            target = commands.commands_to_trajectory(sent, start_pose()).end_pose().theta
+            planned = leg.trajectory.end_pose().theta
+            with self.subTest(obstacle=leg.obstacle_id):
+                self.assertLessEqual(abs(math.degrees(normalise_angle(target - planned))),
+                                     0.5 + 1e-9)
 
 
 if __name__ == "__main__":

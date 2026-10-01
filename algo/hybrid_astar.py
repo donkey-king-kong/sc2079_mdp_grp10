@@ -14,12 +14,13 @@ can actually drive.
 
 import heapq
 import math
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import config as cfg
 import dubins
-from arena import Arena
+from arena import Arena, nearby_cells
 from motion import (
     BACKWARD,
     FORWARD,
@@ -27,10 +28,13 @@ from motion import (
     RIGHT,
     STRAIGHT,
     Pose,
+    RadiusSpec,
     Segment,
     Trajectory,
+    footprint_centre,
     merge_segments,
     normalise_angle,
+    turning_radii,
 )
 
 # The six ways the robot can move for one primitive step.
@@ -72,7 +76,10 @@ class _DistanceField:
         self.n = int(math.ceil(cfg.ARENA_SIZE / resolution))
         self.cost: List[float] = [float("inf")] * (self.n * self.n)
 
-        gx, gy = self._index(goal.x), self._index(goal.y)
+        # The free cells are where the footprint's middle may be, so the field
+        # is seeded, and later read, at the footprint rather than the pose.
+        fx, fy = footprint_centre(goal)
+        gx, gy = self._index(fx), self._index(fy)
         if not (0 <= gx < self.n and 0 <= gy < self.n):
             return
 
@@ -95,17 +102,8 @@ class _DistanceField:
                         continue
                     neighbour = ny * self.n + nx
                     if not arena.is_point_free((nx + 0.5) * resolution,
-                                               (ny + 0.5) * resolution,
-                                               clearance=cfg.ROBOT_HALF_WIDTH + 1.0):
+                                               (ny + 0.5) * resolution):
                         continue
-
-                    # Prevent passing diagonally through touching obstacles
-                    if dx != 0 and dy != 0:
-                        ortho1_free = arena.is_point_free((cx + dx + 0.5) * resolution, (cy + 0.5) * resolution, clearance=cfg.ROBOT_CLEARANCE)
-                        ortho2_free = arena.is_point_free((cx + 0.5) * resolution, (cy + dy + 0.5) * resolution, clearance=cfg.ROBOT_CLEARANCE)
-                        if not (ortho1_free and ortho2_free):
-                            continue
-
                     step = diag if dx and dy else resolution
                     if dist + step < self.cost[neighbour]:
                         self.cost[neighbour] = dist + step
@@ -115,7 +113,20 @@ class _DistanceField:
         return int(value // self.resolution)
 
     def __call__(self, pose: Pose) -> float:
-        cx, cy = self._index(pose.x), self._index(pose.y)
+        fx, fy = footprint_centre(pose)
+        cx, cy = self._index(fx), self._index(fy)
+        cost = self._at(cx, cy)
+        if math.isinf(cost):
+            # The body's middle can legally be a little inside the inflated
+            # boxes this field is built on (the corner start, or beside a
+            # block's corner). Borrow the nearest cell that has a value.
+            for dist, nx, ny in nearby_cells(cx, cy):
+                near = self._at(nx, ny)
+                if not math.isinf(near):
+                    return near + dist * self.resolution
+        return cost
+
+    def _at(self, cx: int, cy: int) -> float:
         if not (0 <= cx < self.n and 0 <= cy < self.n):
             return float("inf")
         return self.cost[cy * self.n + cx]
@@ -132,7 +143,8 @@ def _distance_field(arena: Arena, goal: Pose) -> "_DistanceField":
     if cache is None:
         cache = {}
         setattr(arena, "_distance_fields", cache)
-    key = (int(goal.x // cfg.HA_XY_RESOLUTION), int(goal.y // cfg.HA_XY_RESOLUTION))
+    fx, fy = footprint_centre(goal)
+    key = (int(fx // cfg.HA_XY_RESOLUTION), int(fy // cfg.HA_XY_RESOLUTION))
     if key not in cache:
         cache[key] = _DistanceField(arena, goal)
     return cache[key]
@@ -154,6 +166,12 @@ def _at_goal(pose: Pose, goal: Pose) -> bool:
             and abs(normalise_angle(pose.theta - goal.theta)) <= cfg.HA_GOAL_THETA_TOLERANCE)
 
 
+def _reversed(trajectory: Trajectory) -> Trajectory:
+    """The same path driven the other way in reverse gear (as `planner._reversed`)."""
+    return Trajectory([Segment(BACKWARD, seg.steering, seg.length, seg.radius, seg.end)
+                       for seg in reversed(trajectory.segments)])
+
+
 def _reconstruct(node: _Node, tail: Optional[Trajectory] = None) -> Trajectory:
     segments: List[Segment] = []
     cursor: Optional[_Node] = node
@@ -166,25 +184,43 @@ def _reconstruct(node: _Node, tail: Optional[Trajectory] = None) -> Trajectory:
     return Trajectory(merge_segments(segments))
 
 
-def plan(
-    arena: Arena,
-    start: Pose,
-    goal: Pose,
-    radius: float = cfg.TURNING_RADIUS,
-    r_left: float = cfg.TURNING_RADIUS_LEFT,
-    r_right: float = cfg.TURNING_RADIUS_RIGHT,
-    max_expansions: int = cfg.HA_MAX_EXPANSIONS,
-) -> Optional[Trajectory]:
-    """Shortest drivable path from `start` to `goal` avoiding obstacles.
+def plan(arena: Arena, start: Pose, goal: Pose,
+         radius: RadiusSpec = None,
+         max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+         deadline: Optional[float] = None) -> Optional[Trajectory]:
+    """Shortest drivable path from `start` to `goal`; see `plan_any`."""
+    found = plan_any(arena, start, [goal], radius, max_expansions, deadline)
+    return found[1] if found is not None else None
+
+
+def plan_any(arena: Arena, start: Pose, goals: List[Pose],
+             radius: RadiusSpec = None,
+             max_expansions: int = cfg.HA_MAX_EXPANSIONS,
+             deadline: Optional[float] = None) -> Optional[Tuple[int, Trajectory]]:
+    """Shortest drivable path from `start` to whichever of `goals` it reaches first.
+
+    Returns `(index into goals, trajectory)`. One search aimed at every photo
+    pose of an obstacle costs about as much as a search for one of them, and
+    finds a way in when the best-looking pose is the one the car cannot fit
+    into -- e.g. straight-on under a wall -- while a slanted one is easy.
+
+    `radius` defaults to the robot's configured left/right radii; see
+    `motion.turning_radii` for the other forms it accepts.
 
     Returns None if no path is found within `max_expansions` -- a bound that
     exists so an unreachable capture pose costs a fraction of a second instead
     of hanging the demo. The planner just moves on to the next pose in the menu.
+    `deadline` (a `time.monotonic()` reading) is a second, wall-clock bound.
     """
-    if not arena.is_pose_free(start) or not arena.is_pose_free(goal):
+    goals = [g for g in goals if arena.is_pose_free(g)]
+    if not goals or not arena.is_pose_free(start):
         return None
+    radii = turning_radii(radius)
 
-    heuristic = _distance_field(arena, goal)
+    fields = [_distance_field(arena, g) for g in goals]
+
+    def heuristic(pose: Pose) -> float:
+        return min(field(pose) for field in fields)
     # The Dijkstra sweep only reaches cells connected to the goal. If the start
     # is not one of them the goal is walled off and no amount of searching will
     # help -- bail now rather than burning the whole expansion budget proving it.
@@ -203,41 +239,36 @@ def plan(
         if node.g > best_g.get(key, float("inf")) + 1e-9:
             continue
         expansions += 1
+        if deadline is not None and time.monotonic() > deadline:
+            return None
 
         # Analytic expansion. Every so often -- and always once we are close --
-        # try to close the remaining gap with a single exact Dubins path. When
-        # it works the robot lands on the goal pose *exactly* rather than
-        # within the lattice tolerance, which matters because the next leg
-        # starts from wherever this one ended.
-        if expansions % 8 == 0 or heuristic(node.pose) < 3.0 * max(r_left, r_right):
-            shot = dubins.plan(
-                node.pose,
-                goal,
-                r_left=r_left,
-                r_right=r_right,
-                is_pose_free=arena.is_pose_free,
-            )
+        # try to close the remaining gap with a single exact Dubins path, so
+        # the robot lands on the goal pose *exactly*. That is the only way this
+        # search may finish: the next leg starts from the exact goal pose, and
+        # the STM is never told about any gap in between, so a leg that stops
+        # "close enough" leaves every later command that far off course.
+        # Only the goal nearest this node is worth an analytic shot: shooting
+        # at every one of an obstacle's photo poses from every node near it
+        # costs several times the rest of the search put together.
+        estimates = [field(node.pose) for field in fields]
+        nearest = min(range(len(goals)), key=estimates.__getitem__)
+        if expansions % 8 == 0 or estimates[nearest] < 3.0 * radii.widest:
+            shot = dubins.plan(node.pose, goals[nearest], radii, arena.is_pose_free)
             if shot is not None:
-                return _reconstruct(node, shot[1])
+                return nearest, _reconstruct(node, shot[1])
+        for index, goal in enumerate(goals):
+            # Near the goal but no forward shot fits: try reversing onto it. If
+            # that is blocked too, keep searching from here rather than stopping.
+            if _at_goal(node.pose, goal):
+                shot = dubins.plan(goal, node.pose, radii, arena.is_pose_free)
+                if shot is not None:
+                    return index, _reconstruct(node, _reversed(shot[1]))
 
-        if _at_goal(node.pose, goal):
-            return _reconstruct(node)
-
-        # Apply specific turning radius based on steering direction
         for gear, steering in PRIMITIVES:
-            # Apply specific turning radius based on steering direction
-            if steering == LEFT:
-                r_step = getattr(cfg, "TURNING_RADIUS_LEFT", radius)
-            elif steering == RIGHT:
-                r_step = getattr(cfg, "TURNING_RADIUS_RIGHT", radius)
-            else:
-                r_step = radius
-
-            # Scale turn step length so each primitive rotates by at least 1 theta bin
-            bin_angle = (2.0 * math.pi) / cfg.HA_THETA_BINS
-            step_len = min(r_step * bin_angle, cfg.HA_STEP) if steering != STRAIGHT else cfg.HA_STEP
-
-            segment = Segment(gear, steering, step_len, r_step, node.pose)
+            # Each side turns at its own radius, so a left step swings the nose
+            # further than a right step of the same arc length.
+            segment = Segment(gear, steering, cfg.HA_STEP, radii.of(steering), node.pose)
             # Check the whole swept step, not just where it lands, or the robot
             # will happily clip a corner mid-primitive.
             if not all(arena.is_pose_free(p) for p in segment.iter_sample(cfg.COLLISION_SAMPLE_STEP)):
