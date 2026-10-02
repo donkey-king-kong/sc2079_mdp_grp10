@@ -1,5 +1,6 @@
 package com.example.sc2079;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -31,9 +32,18 @@ public class startTask extends Fragment {
     private Runnable timerRunnable;
 
 
+    public startTask() {}
+
     public startTask(GridMapClass gridMap){
         this.gridMap = gridMap;
+    }
 
+    @Override
+    public void onAttach(android.content.Context context) {
+        super.onAttach(context);
+        if (gridMap == null && context instanceof MainActivity) {
+            gridMap = ((MainActivity) context).gridMapObj;
+        }
     }
 
     @Nullable

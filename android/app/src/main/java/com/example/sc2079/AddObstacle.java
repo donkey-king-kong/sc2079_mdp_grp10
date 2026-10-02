@@ -38,8 +38,18 @@ public class AddObstacle extends Fragment{
 
     private GridMapClass gridMap;
 
+    public AddObstacle() {}
+
     public AddObstacle(GridMapClass gridMap){
         this.gridMap = gridMap;
+    }
+
+    @Override
+    public void onAttach(android.content.Context context) {
+        super.onAttach(context);
+        if (gridMap == null && context instanceof MainActivity) {
+            gridMap = ((MainActivity) context).gridMapObj;
+        }
     }
 
     @Nullable

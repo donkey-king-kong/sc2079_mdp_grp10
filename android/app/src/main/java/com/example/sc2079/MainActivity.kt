@@ -57,7 +57,7 @@ class MainActivity : AppCompatActivity() {
     private val sharedViewModel: SharedViewModel by viewModels()
 
     private var isConnected = false
-    private lateinit var gridMapObj: GridMapClass
+    internal lateinit var gridMapObj: GridMapClass
     private val messageLog = ArrayList<String>()
     private var messageListener: MessageListener? = null
 
@@ -364,6 +364,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Initialise grid (must happen before applyDrawables which calls gridMapObj.setDarkTheme)
+        val gridMapView = findViewById<LinearLayout>(R.id.gridMapView)
+        gridMapObj = GridMapClass(this)
+        gridMapObj.setGridColumns(20)
+        gridMapObj.setGridRows(20)
+        gridMapView.addView(gridMapObj)
+        setupGraphAxes(this, true)
+        updateGridSizeLabel()
+
         // Apply drawables immediately on startup for current mode
         applyDrawables(isDayMode)
 
@@ -379,15 +388,6 @@ class MainActivity : AppCompatActivity() {
             )
             recreate()
         }
-
-        // Initialise grid
-        val gridMapView = findViewById<LinearLayout>(R.id.gridMapView)
-        gridMapObj = GridMapClass(this)
-        gridMapObj.setGridColumns(20)
-        gridMapObj.setGridRows(20)
-        gridMapView.addView(gridMapObj)
-        setupGraphAxes(this, true)
-        updateGridSizeLabel()
 
         // D-pad click listeners (variables already declared above for theme toggle)
         dpadUp.setOnClickListener    { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true) }
