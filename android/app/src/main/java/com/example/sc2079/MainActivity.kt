@@ -282,27 +282,27 @@ class MainActivity : AppCompatActivity() {
         val tabs = findViewById<TabLayout>(R.id.tabs)
 
         fun applyTheme(day: Boolean) {
-            fun tint(color: String) = android.content.res.ColorStateList.valueOf(Color.parseColor(color))
-            fun col(color: String) = Color.parseColor(color)
+            fun col(id: Int) = ContextCompat.getColor(this, id)
+            gridMapObj.setDarkTheme(!day)
             if (day) {
                 btnThemeToggle.text = "🌙"
-                rootContainer.setBackgroundColor(col("#C8CDD4"))
-                headerRow.setBackgroundColor(col("#E8EAED"))
-                bottomRow.setBackgroundColor(col("#E8EAED"))
-                rightPanel.setBackgroundColor(col("#E8EAED"))
-                tabs.setBackgroundColor(col("#C8CDD4"))
-                tabs.setSelectedTabIndicatorColor(col("#1A3ECF"))
-                tabs.setTabTextColors(col("#606163"), col("#1A3ECF"))
+                rootContainer.setBackgroundColor(col(R.color.ds_bg_light))
+                headerRow.setBackgroundColor(col(R.color.ds_panel_light))
+                bottomRow.setBackgroundColor(col(R.color.ds_panel_light))
+                rightPanel.setBackgroundColor(col(R.color.ds_panel_light))
+                tabs.setBackgroundColor(col(R.color.ds_bg_light))
+                tabs.setSelectedTabIndicatorColor(col(R.color.ds_accent_light))
+                tabs.setTabTextColors(col(R.color.ds_text_muted_light), col(R.color.ds_accent_light))
                 updateAxisTextColor(false)
             } else {
                 btnThemeToggle.text = "☀"
-                rootContainer.setBackgroundColor(col("#0E1117"))
-                headerRow.setBackgroundColor(col("#151B27"))
-                bottomRow.setBackgroundColor(col("#151B27"))
-                rightPanel.setBackgroundColor(col("#151B27"))
-                tabs.setBackgroundColor(col("#0E1117"))
-                tabs.setSelectedTabIndicatorColor(col("#6C8EF5"))
-                tabs.setTabTextColors(col("#47E8EAF0"), col("#6C8EF5"))
+                rootContainer.setBackgroundColor(col(R.color.ds_bg_dark))
+                headerRow.setBackgroundColor(col(R.color.ds_panel_dark))
+                bottomRow.setBackgroundColor(col(R.color.ds_panel_dark))
+                rightPanel.setBackgroundColor(col(R.color.ds_panel_dark))
+                tabs.setBackgroundColor(col(R.color.ds_bg_dark))
+                tabs.setSelectedTabIndicatorColor(col(R.color.ds_accent_dark))
+                tabs.setTabTextColors(col(R.color.ds_text_dim_dark), col(R.color.ds_accent_dark))
                 updateAxisTextColor(true)
             }
         }

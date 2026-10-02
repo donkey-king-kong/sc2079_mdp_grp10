@@ -16,7 +16,7 @@
     <color name="status_connecting">#f79736</color>
     <color name="status_disconnected">#EF5252</color>
 
-    <!-- Design system tokens -->
+    <!-- Design system tokens — dark (default) -->
     <color name="ds_bg">#0E1117</color>
     <color name="ds_panel">#151B27</color>
     <color name="ds_surface">#1C2333</color>
@@ -33,4 +33,40 @@
     <color name="ds_pink_dim">#33D45A8E</color>
     <color name="ds_red_dim">#26E05252</color>
     <color name="ds_green_dim">#263DBA6E</color>
+
+    <!-- Design system tokens — dark suffix (explicit dark mode) -->
+    <color name="ds_bg_dark">#0E1117</color>
+    <color name="ds_panel_dark">#151B27</color>
+    <color name="ds_surface_dark">#1C2333</color>
+    <color name="ds_accent_dark">#6C8EF5</color>
+    <color name="ds_pink_dark">#D45A8E</color>
+    <color name="ds_green_dark">#3DBA6E</color>
+    <color name="ds_red_dark">#E05252</color>
+    <color name="ds_text_dark">#E8EAF0</color>
+    <color name="ds_text_muted_dark">#73E8EAF0</color>
+    <color name="ds_text_dim_dark">#47E8EAF0</color>
+    <color name="ds_border_dark">#14FFFFFF</color>
+    <color name="ds_border_strong_dark">#24FFFFFF</color>
+    <color name="ds_accent_dim_dark">#2E6C8EF5</color>
+    <color name="ds_pink_dim_dark">#33D45A8E</color>
+    <color name="ds_red_dim_dark">#26E05252</color>
+    <color name="ds_green_dim_dark">#263DBA6E</color>
+
+    <!-- Design system tokens — light suffix (light mode) -->
+    <color name="ds_bg_light">#C8CDD4</color>
+    <color name="ds_panel_light">#E8EAED</color>
+    <color name="ds_surface_light">#F2F4F7</color>
+    <color name="ds_accent_light">#1A3ECF</color>
+    <color name="ds_pink_light">#B03070</color>
+    <color name="ds_green_light">#1E7A44</color>
+    <color name="ds_red_light">#C03030</color>
+    <color name="ds_text_light">#1C2333</color>
+    <color name="ds_text_muted_light">#73333333</color>
+    <color name="ds_text_dim_light">#47333333</color>
+    <color name="ds_border_light">#28000000</color>
+    <color name="ds_border_strong_light">#48000000</color>
+    <color name="ds_accent_dim_light">#2E1A3ECF</color>
+    <color name="ds_pink_dim_light">#33B03070</color>
+    <color name="ds_red_dim_light">#26C03030</color>
+    <color name="ds_green_dim_light">#261E7A44</color>
 </resources>

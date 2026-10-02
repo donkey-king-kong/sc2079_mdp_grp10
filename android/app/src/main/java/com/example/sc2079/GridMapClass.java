@@ -78,6 +78,7 @@ public class GridMapClass extends View {
     int obstacleCount = 0;
     private ArrayList<ObstacleData> placedObstacles = new ArrayList<>();
     private boolean bound = false;
+    private boolean isDarkTheme = true;
 
     private BluetoothService btService;
     private utilities utilitiesClass = new utilities();
@@ -280,6 +281,11 @@ public class GridMapClass extends View {
         this.currentMode = mode;
     }
 
+    public void setDarkTheme(boolean dark) {
+        this.isDarkTheme = dark;
+        invalidate();
+    }
+
     public void setBluetoothService(BluetoothService service) {
         this.btService = service;
         Log.d("GridMapClass", "BluetoothService instance set.");
@@ -362,17 +368,27 @@ public class GridMapClass extends View {
 
     @Override
     protected void onDraw(Canvas canvas){
-        canvas.drawColor(Color.parseColor("#7CFC00"));
+        int bgColor     = isDarkTheme ? Color.parseColor("#0E1117") : Color.parseColor("#D8DDE4");
+        int gridColor   = isDarkTheme ? Color.parseColor("#24FFFFFF") : Color.parseColor("#48000000");
+        int obstColor   = isDarkTheme ? Color.parseColor("#E8EAF0")  : Color.parseColor("#1C2333");
+        textPaint.setColor(isDarkTheme ? Color.WHITE : Color.WHITE);
+        blackPaint.setColor(obstColor);
+
+        canvas.drawColor(bgColor);
         if (gridColumns == 0 || gridRows == 0) {
             return;
         }
 
+        Paint linePaint = new Paint();
+        linePaint.setColor(gridColor);
+        linePaint.setStrokeWidth(1f);
+
         // Draw grid first
         for (int i = 0; i <= gridColumns; i++) {
-            canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), blackPaint);
+            canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), linePaint);
         }
         for (int j = 0; j <= gridRows; j++) {
-            canvas.drawLine(0, j * cellHeight, getWidth(), j * cellHeight, blackPaint);
+            canvas.drawLine(0, j * cellHeight, getWidth(), j * cellHeight, linePaint);
         }
 
         for (int y = 0; y < gridRows; y++) {
@@ -494,9 +510,10 @@ public class GridMapClass extends View {
         float top = (gridRows - (y + 3)) * cellHeight;
 
         // 1. Draw Green Body
+        greenPaint.setColor(isDarkTheme ? Color.parseColor("#3DBA6E") : Color.parseColor("#2E9E58"));
         canvas.drawRect(left, top, right, bottom, greenPaint);
 
-        // 2. Draw Cyan Outline (neutral — direction shown by bar, not border color)
+        // 2. Draw Cyan Outline
         Paint outlinePaint = new Paint();
         outlinePaint.setStyle(Paint.Style.STROKE);
         outlinePaint.setStrokeWidth(6f);
