@@ -215,20 +215,15 @@
                     android:layout_marginEnd="6dp" />
 
                 <!-- − button (wired to showGridSizeDialog in code) -->
-                <com.google.android.material.button.MaterialButton
+                <Button
                     android:id="@+id/btn_grid_size"
-                    style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="28dp"
                     android:layout_height="28dp"
                     android:text="−"
                     android:textSize="16sp"
                     android:textColor="@color/ds_text"
                     android:padding="0dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:background="@drawable/rounded_status_background"
-                    android:backgroundTint="@color/ds_surface"
-                    app:iconPadding="0dp" />
+                    android:background="@drawable/btn_footer" />
 
                 <TextView
                     android:id="@+id/grid_size_label"
@@ -247,60 +242,45 @@
                     android:layout_weight="1" />
 
                 <!-- Reset -->
-                <com.google.android.material.button.MaterialButton
+                <Button
                     android:id="@+id/reset_map_button"
-                    style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="30dp"
                     android:text="Reset"
                     android:textSize="11sp"
                     android:textColor="@color/ds_text_muted"
                     android:fontFamily="@font/poppins_bold"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
-                    android:background="@drawable/rounded_status_background"
-                    android:backgroundTint="@color/ds_surface"
-                    android:layout_marginEnd="6dp"
-                    app:iconPadding="0dp" />
+                    android:background="@drawable/btn_footer"
+                    android:layout_marginEnd="6dp" />
 
                 <!-- Save -->
-                <com.google.android.material.button.MaterialButton
+                <Button
                     android:id="@+id/save_map_button"
-                    style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="30dp"
                     android:text="Save"
                     android:textSize="11sp"
                     android:textColor="@color/ds_text_muted"
                     android:fontFamily="@font/poppins_bold"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
-                    android:background="@drawable/rounded_status_background"
-                    android:backgroundTint="@color/ds_surface"
-                    android:layout_marginEnd="6dp"
-                    app:iconPadding="0dp" />
+                    android:background="@drawable/btn_footer"
+                    android:layout_marginEnd="6dp" />
 
                 <!-- Load -->
-                <com.google.android.material.button.MaterialButton
+                <Button
                     android:id="@+id/load_map_button"
-                    style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="30dp"
                     android:text="Load"
                     android:textSize="11sp"
                     android:textColor="@color/ds_text_muted"
                     android:fontFamily="@font/poppins_bold"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
-                    android:background="@drawable/rounded_status_background"
-                    android:backgroundTint="@color/ds_surface"
-                    app:iconPadding="0dp" />
+                    android:background="@drawable/btn_footer" />
 
             </LinearLayout>
 
@@ -331,8 +311,7 @@
                     android:text="▲"
                     android:textSize="16sp"
                     android:textColor="@color/ds_text"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:backgroundTint="@color/ds_panel"
+                    android:background="@drawable/btn_dpad"
                     android:padding="0dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
@@ -352,8 +331,7 @@
                         android:text="◀"
                         android:textSize="16sp"
                         android:textColor="@color/ds_text"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/ds_panel"
+                        android:background="@drawable/btn_dpad"
                         android:padding="0dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
@@ -363,8 +341,7 @@
                         android:id="@+id/dpadCenterSquare"
                         android:layout_width="44dp"
                         android:layout_height="44dp"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/ds_bg" />
+                        android:background="@drawable/btn_dpad" />
 
                     <Button
                         android:id="@+id/dpad_right"
@@ -373,8 +350,7 @@
                         android:text="▶"
                         android:textSize="16sp"
                         android:textColor="@color/ds_text"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/ds_panel"
+                        android:background="@drawable/btn_dpad"
                         android:padding="0dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
@@ -388,8 +364,7 @@
                     android:text="▼"
                     android:textSize="16sp"
                     android:textColor="@color/ds_text"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:backgroundTint="@color/ds_panel"
+                    android:background="@drawable/btn_dpad"
                     android:padding="0dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
@@ -408,8 +383,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:gravity="center"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/ds_panel"
+                        android:background="@drawable/btn_dpad"
                         android:paddingTop="5dp"
                         android:paddingBottom="5dp"
                         android:layout_marginEnd="4dp">
@@ -439,8 +413,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:gravity="center"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="@color/ds_panel"
+                        android:background="@drawable/btn_dpad"
                         android:paddingTop="5dp"
                         android:paddingBottom="5dp">
 

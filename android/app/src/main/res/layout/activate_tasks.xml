@@ -15,8 +15,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/ds_surface"
+            android:background="@drawable/btn_input_field"
             android:padding="10dp"
             android:layout_marginBottom="8dp">
 
@@ -39,7 +38,7 @@
                 android:backgroundTint="@color/ds_bg"
                 android:gravity="center"
                 android:text="00:00"
-                android:textColor="@color/ds_text"
+                android:textColor="@color/ds_accent"
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
@@ -51,10 +50,9 @@
                 android:textOff="TASK 1 START"
                 android:textOn="STOP"
                 android:textSize="11sp"
-                android:textColor="@color/white"
+                android:textColor="@color/ds_text"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/ds_accent" />
+                android:background="@drawable/btn_toggle_task" />
         </LinearLayout>
 
         <!-- Task 2 card -->
@@ -62,8 +60,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/ds_surface"
+            android:background="@drawable/btn_input_field"
             android:padding="10dp"
             android:layout_marginBottom="8dp">
 
@@ -86,7 +83,7 @@
                 android:backgroundTint="@color/ds_bg"
                 android:gravity="center"
                 android:text="00:00"
-                android:textColor="@color/ds_text"
+                android:textColor="@color/ds_accent"
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
@@ -98,10 +95,9 @@
                 android:textOff="TASK 2 START"
                 android:textOn="STOP"
                 android:textSize="11sp"
-                android:textColor="@color/white"
+                android:textColor="@color/ds_text"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/ds_accent" />
+                android:background="@drawable/btn_toggle_task" />
         </LinearLayout>
 
         <!-- Stitch card -->
@@ -109,8 +105,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/ds_surface"
+            android:background="@drawable/btn_input_field"
             android:padding="10dp">
 
             <TextView
@@ -131,10 +126,9 @@
                 android:textOff="STITCH START"
                 android:textOn="STOP"
                 android:textSize="11sp"
-                android:textColor="@color/white"
+                android:textColor="@color/ds_text"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/ds_pink" />
+                android:background="@drawable/btn_toggle_stitch" />
         </LinearLayout>
 
     </LinearLayout>

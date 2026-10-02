@@ -361,9 +361,9 @@ class MainActivity : AppCompatActivity() {
         subNavigationBar?.setOffscreenPageLimit(2)
         tabs.setupWithViewPager(subNavigationBar)
 
-        tabs.getTabAt(0)?.setIcon(R.drawable.plus_for_enter)
-        tabs.getTabAt(1)?.setIcon(R.drawable.send_message)
-        tabs.getTabAt(2)?.setIcon(R.drawable.ic_dashboard_black_24dp)
+        tabs.getTabAt(0)?.apply { setIcon(R.drawable.plus_for_enter); text = "Place" }
+        tabs.getTabAt(1)?.apply { setIcon(R.drawable.send_message); text = "Chat" }
+        tabs.getTabAt(2)?.apply { setIcon(R.drawable.ic_dashboard_black_24dp); text = "Panels" }
     }
 
     override fun onStart() {

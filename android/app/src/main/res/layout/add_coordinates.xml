@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/fragment_container_view_add_coordinates"
-    android:background="#0F1C3A">
+    android:background="@color/ds_panel">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -31,7 +31,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="X"
-                    android:textColor="#7AAFCB"
+                    android:textColor="@color/ds_accent"
                     android:textSize="9sp"
                     android:fontFamily="@font/poppins_bold"
                     android:layout_marginBottom="2dp"
@@ -41,11 +41,10 @@
                     android:id="@+id/addXCoords"
                     android:layout_width="match_parent"
                     android:layout_height="38dp"
-                    android:background="@drawable/rounded_status_background"
-                    android:backgroundTint="#1A2E50"
+                    android:background="@drawable/btn_input_field"
                     android:hint="0 – 19"
-                    android:textColorHint="#4A6A88"
-                    android:textColor="@color/white"
+                    android:textColorHint="@color/ds_text_dim"
+                    android:textColor="@color/ds_text"
                     android:fontFamily="@font/poppins_regular"
                     android:gravity="center"
                     android:textSize="13sp"
@@ -63,7 +62,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Y"
-                    android:textColor="#7AAFCB"
+                    android:textColor="@color/ds_accent"
                     android:textSize="9sp"
                     android:fontFamily="@font/poppins_bold"
                     android:layout_marginBottom="2dp"
@@ -73,11 +72,10 @@
                     android:id="@+id/addYCoords"
                     android:layout_width="match_parent"
                     android:layout_height="38dp"
-                    android:background="@drawable/rounded_status_background"
-                    android:backgroundTint="#1A2E50"
+                    android:background="@drawable/btn_input_field"
                     android:hint="0 – 19"
-                    android:textColorHint="#4A6A88"
-                    android:textColor="@color/white"
+                    android:textColorHint="@color/ds_text_dim"
+                    android:textColor="@color/ds_text"
                     android:fontFamily="@font/poppins_regular"
                     android:gravity="center"
                     android:textSize="13sp"
@@ -91,19 +89,20 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="MODE"
-            android:textColor="#4A6A88"
+            android:textColor="@color/ds_text_muted"
             android:textSize="8sp"
             android:fontFamily="@font/poppins_bold"
             android:letterSpacing="0.12"
             android:layout_marginBottom="4dp" />
 
-        <!-- Mode buttons — horizontal row -->
+        <!-- Mode buttons — horizontal row, plain Button with shape drawables -->
         <LinearLayout
             android:id="@+id/linearLayout_add_Toogle_Group_Options"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
+            <!-- Wrapping in a hidden MaterialButtonToggleGroup to preserve IDs and toggle logic -->
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/toggleGroup_Options"
                 android:layout_width="match_parent"
@@ -120,14 +119,15 @@
                     android:layout_marginEnd="4dp"
                     android:text="Vehicle"
                     android:textSize="9sp"
-                    android:textColor="@color/white"
+                    android:textColor="@color/ds_text"
                     app:icon="@drawable/vehicle_icon"
                     app:iconGravity="top"
                     app:iconPadding="2dp"
                     app:iconSize="20dp"
-                    app:iconTint="@android:color/white"
-                    app:strokeColor="#2A4A6B"
-                    app:strokeWidth="1dp" />
+                    app:iconTint="@color/ds_text"
+                    app:strokeColor="@color/ds_border_strong"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/ds_surface" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/add_obstacle_button"
@@ -138,14 +138,15 @@
                     android:layout_marginEnd="4dp"
                     android:text="Obstacle"
                     android:textSize="9sp"
-                    android:textColor="@color/white"
+                    android:textColor="@color/ds_text"
                     app:icon="@drawable/obstacle_icon"
                     app:iconGravity="top"
                     app:iconPadding="2dp"
                     app:iconSize="20dp"
-                    app:iconTint="@android:color/white"
-                    app:strokeColor="#2A4A6B"
-                    app:strokeWidth="1dp" />
+                    app:iconTint="@color/ds_text"
+                    app:strokeColor="@color/ds_border_strong"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/ds_surface" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/remove_obstacle_button"
@@ -155,14 +156,15 @@
                     android:layout_weight="1"
                     android:text="Remove"
                     android:textSize="9sp"
-                    android:textColor="@color/white"
+                    android:textColor="@color/ds_text"
                     app:icon="@drawable/outline_delete_24dp"
                     app:iconGravity="top"
                     app:iconPadding="2dp"
                     app:iconSize="20dp"
-                    app:iconTint="@android:color/white"
-                    app:strokeColor="#2A4A6B"
-                    app:strokeWidth="1dp" />
+                    app:iconTint="@color/ds_text"
+                    app:strokeColor="@color/ds_border_strong"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/ds_surface" />
 
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
@@ -173,7 +175,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Tap grid to place · tap placed item to cycle direction"
-            android:textColor="#3A5A78"
+            android:textColor="@color/ds_text_dim"
             android:textSize="8sp"
             android:fontFamily="@font/poppins_regular"
             android:gravity="center"
@@ -198,9 +200,8 @@
                 android:scaleType="fitCenter"
                 android:src="@drawable/cross_for_exit"
                 android:contentDescription="Cancel"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#3A1A1A"
-                app:tint="#EF5252" />
+                android:background="@drawable/btn_cancel"
+                app:tint="@color/ds_red" />
 
             <ImageButton
                 android:id="@+id/addObstacleButton"
@@ -211,9 +212,8 @@
                 android:scaleType="fitCenter"
                 android:src="@drawable/plus_for_enter"
                 android:contentDescription="Confirm"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#0D2E1A"
-                app:tint="#4CCB67" />
+                android:background="@drawable/btn_confirm"
+                app:tint="@color/ds_green" />
         </LinearLayout>
 
     </LinearLayout>

@@ -19,8 +19,7 @@
         android:textSize="11sp"
         android:textColor="@color/ds_text"
         android:fontFamily="@font/poppins_regular"
-        android:background="@drawable/rounded_status_background"
-        android:backgroundTint="@color/ds_bg"
+        android:background="@drawable/btn_input_field"
         android:isScrollContainer="true"
         android:layout_marginBottom="8dp" />
 
@@ -30,8 +29,7 @@
         android:layout_height="42dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@drawable/rounded_status_background"
-        android:backgroundTint="@color/ds_surface"
+        android:background="@drawable/btn_input_field"
         android:paddingStart="10dp"
         android:paddingEnd="4dp">
 
@@ -55,8 +53,7 @@
             android:padding="8dp"
             android:scaleType="fitCenter"
             android:src="@drawable/send_message"
-            android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/ds_accent"
+            android:background="@drawable/btn_mode_selected"
             app:tint="@color/white"
             android:contentDescription="Send" />
 
