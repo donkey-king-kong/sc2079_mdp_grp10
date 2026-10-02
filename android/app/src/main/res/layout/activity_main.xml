@@ -4,380 +4,423 @@
     android:id="@+id/container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:background="@color/dark_blue_700">
+    android:orientation="vertical"
+    android:background="@color/ds_bg">
 
-    <!-- LEFT: Grid area (square, weight-based) -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/constraintGridMapView"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:layout_margin="8dp">
-
-        <!-- Y-axis -->
-        <LinearLayout
-            android:id="@+id/y_axis_numbers"
-            android:layout_width="24dp"
-            android:layout_height="0dp"
-            android:gravity="center"
-            android:orientation="vertical"
-            app:layout_constraintBottom_toBottomOf="@id/gridMapView"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@id/gridMapView" />
-
-        <!-- X-axis -->
-        <LinearLayout
-            android:id="@+id/x_axis_numbers"
-            android:layout_width="0dp"
-            android:layout_height="24dp"
-            android:gravity="center"
-            android:orientation="horizontal"
-            app:layout_constraintTop_toBottomOf="@id/gridMapView"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="@id/gridMapView"
-            app:layout_constraintStart_toStartOf="@id/gridMapView" />
-
-        <!-- Grid (square ratio) -->
-        <LinearLayout
-            android:id="@+id/gridMapView"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:orientation="vertical"
-            app:layout_constraintVertical_chainStyle="packed"
-            app:layout_constraintHorizontal_bias="0"
-            app:layout_constraintBottom_toTopOf="@id/x_axis_numbers"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/y_axis_numbers"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintDimensionRatio="1:1" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <!-- RIGHT: Control panel (fixed weight) -->
+    <!-- HEADER BAR (full width) -->
     <LinearLayout
-        android:id="@+id/rightPanel"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:padding="6dp">
+        android:id="@+id/headerRow"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/ds_panel"
+        android:paddingStart="12dp"
+        android:paddingEnd="10dp">
 
-        <!-- Row 1: Header — info cards + action buttons -->
+        <!-- POSITION label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="POSITION"
+            android:textSize="9sp"
+            android:letterSpacing="0.12"
+            android:textColor="@color/ds_text_muted"
+            android:fontFamily="@font/poppins_bold"
+            android:layout_marginEnd="6dp" />
+
+        <!-- Position pill -->
         <LinearLayout
-            android:id="@+id/headerRow"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:id="@+id/coordCard"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_200"
+            android:backgroundTint="@color/ds_surface"
             android:paddingStart="10dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="0dp"
-            android:paddingBottom="0dp"
-            android:layout_marginBottom="6dp">
+            android:paddingEnd="10dp">
 
-            <!-- Coordinates pill card -->
-            <LinearLayout
-                android:id="@+id/coordCard"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:layout_marginEnd="5dp">
+            <TextView
+                android:id="@+id/give_vehicle_coord_now"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—, —"
+                android:textSize="12sp"
+                android:textColor="@color/ds_text"
+                android:fontFamily="@font/poppins_bold" />
 
-                <!-- Cyan accent dot -->
-                <View
-                    android:layout_width="5dp"
-                    android:layout_height="5dp"
-                    android:background="@drawable/circle_background"
-                    android:backgroundTint="@color/cyan"
-                    android:layout_marginEnd="6dp" />
+            <TextView
+                android:id="@+id/give_vehicle_direction_now"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="10sp"
+                android:textColor="@color/ds_text_muted"
+                android:fontFamily="@font/poppins_regular"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+        <!-- Divider -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="@color/ds_border_strong"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="POSITION"
-                        android:textSize="6sp"
-                        android:letterSpacing="0.10"
-                        android:textColor="#5A8AAA"
-                        android:fontFamily="@font/poppins_bold" />
+        <!-- Status dot -->
+        <View
+            android:layout_width="7dp"
+            android:layout_height="7dp"
+            android:background="@drawable/circle_background"
+            android:backgroundTint="@color/status_disconnected"
+            android:layout_marginEnd="6dp" />
 
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+        <!-- Status text -->
+        <TextView
+            android:id="@+id/give_vehicle_status_now"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Vehicle not placed"
+            android:textSize="11sp"
+            android:textColor="@color/ds_text_muted"
+            android:fontFamily="@font/poppins_regular"
+            android:singleLine="true" />
 
-                        <TextView
-                            android:id="@+id/give_vehicle_coord_now"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="—,—"
-                            android:textSize="12sp"
-                            android:textColor="@color/white"
-                            android:fontFamily="@font/poppins_bold" />
+        <!-- Theme toggle -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnThemeToggle"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:text="☀"
+            android:textSize="14sp"
+            android:textColor="@color/ds_text"
+            android:padding="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/rounded_status_background"
+            android:backgroundTint="@color/ds_surface"
+            app:iconPadding="0dp" />
 
-                        <TextView
-                            android:id="@+id/give_vehicle_direction_now"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text=" · —"
-                            android:textSize="9sp"
-                            android:textColor="#7AAFCB"
-                            android:fontFamily="@font/poppins_regular"
-                            android:layout_marginStart="3dp" />
-                    </LinearLayout>
-                </LinearLayout>
-            </LinearLayout>
+        <!-- Bluetooth button + status dot -->
+        <FrameLayout
+            android:layout_width="32dp"
+            android:layout_height="32dp">
 
-            <!-- Status pill card -->
-            <LinearLayout
-                android:id="@+id/statusCard"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:layout_marginEnd="8dp">
-
-                <!-- Amber accent dot -->
-                <View
-                    android:layout_width="5dp"
-                    android:layout_height="5dp"
-                    android:background="@drawable/circle_background"
-                    android:backgroundTint="#F5A623"
-                    android:layout_marginEnd="6dp" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="STATUS"
-                        android:textSize="6sp"
-                        android:letterSpacing="0.10"
-                        android:textColor="#5A8AAA"
-                        android:fontFamily="@font/poppins_bold" />
-
-                    <TextView
-                        android:id="@+id/give_vehicle_status_now"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Idle"
-                        android:textSize="11sp"
-                        android:textColor="@color/white"
-                        android:fontFamily="@font/poppins_regular" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Action buttons group: same 36dp height, same pill background, evenly spaced -->
             <ImageButton
-                android:id="@+id/btnAddCoordinate"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:id="@+id/btnBluetooth"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
-                android:contentDescription="Place obstacle or vehicle"
-                android:padding="8dp"
+                android:backgroundTint="@color/ds_surface"
+                android:contentDescription="Bluetooth"
+                android:padding="7dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/plus_for_enter"
-                android:layout_marginEnd="5dp"
-                app:tint="@color/cyan" />
+                android:src="@drawable/ic_bluetooth_24dp"
+                app:tint="@color/ds_text" />
 
-            <!-- Day/Night theme toggle -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnThemeToggle"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:text="☀"
-                android:textSize="14sp"
-                android:textColor="@color/cyan"
-                android:padding="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:layout_marginEnd="5dp"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
-                app:iconPadding="0dp" />
+            <ImageView
+                android:id="@+id/bluetoothStatus"
+                android:layout_width="9dp"
+                android:layout_height="9dp"
+                android:layout_gravity="end|bottom"
+                android:background="@drawable/circle_background"
+                android:backgroundTint="@color/status_disconnected"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_status_disconnected_24dp" />
+        </FrameLayout>
 
-            <!-- Bluetooth button + status dot -->
-            <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp">
+    </LinearLayout>
 
-                <ImageButton
-                    android:id="@+id/btnBluetooth"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+    <!-- BODY: two columns -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <!-- LEFT: Grid + footer -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <!-- Grid area -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/constraintGridMapView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:padding="8dp">
+
+                <LinearLayout
+                    android:id="@+id/y_axis_numbers"
+                    android:layout_width="20dp"
+                    android:layout_height="0dp"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    app:layout_constraintBottom_toBottomOf="@id/gridMapView"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="@id/gridMapView" />
+
+                <LinearLayout
+                    android:id="@+id/x_axis_numbers"
+                    android:layout_width="0dp"
+                    android:layout_height="20dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    app:layout_constraintTop_toBottomOf="@id/gridMapView"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="@id/gridMapView"
+                    app:layout_constraintStart_toStartOf="@id/gridMapView" />
+
+                <LinearLayout
+                    android:id="@+id/gridMapView"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:orientation="vertical"
+                    app:layout_constraintHorizontal_bias="0"
+                    app:layout_constraintBottom_toTopOf="@id/x_axis_numbers"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@id/y_axis_numbers"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintDimensionRatio="1:1" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- GRID FOOTER BAR -->
+            <LinearLayout
+                android:id="@+id/bottomRow"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@color/ds_panel"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp">
+
+                <!-- Grid size label -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Grid size"
+                    android:textSize="10sp"
+                    android:textColor="@color/ds_text_muted"
+                    android:fontFamily="@font/poppins_regular"
+                    android:layout_marginEnd="6dp" />
+
+                <!-- − button (wired to showGridSizeDialog in code) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_grid_size"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:text="−"
+                    android:textSize="16sp"
+                    android:textColor="@color/ds_text"
+                    android:padding="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:background="@drawable/rounded_status_background"
-                    android:backgroundTint="#1A3A5C"
-                    android:contentDescription="Bluetooth"
-                    android:padding="8dp"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_bluetooth_24dp"
-                    app:tint="@color/cyan" />
+                    android:backgroundTint="@color/ds_surface"
+                    app:iconPadding="0dp" />
 
-                <ImageView
-                    android:id="@+id/bluetoothStatus"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:layout_gravity="end|bottom"
-                    android:background="@drawable/circle_background"
-                    android:backgroundTint="@color/status_disconnected"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_status_disconnected_24dp" />
-            </FrameLayout>
+                <TextView
+                    android:id="@+id/grid_size_label"
+                    android:layout_width="32dp"
+                    android:layout_height="wrap_content"
+                    android:text="20"
+                    android:textSize="13sp"
+                    android:textColor="@color/ds_text"
+                    android:fontFamily="@font/poppins_bold"
+                    android:gravity="center" />
+
+                <!-- Spacer -->
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <!-- Reset -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/reset_map_button"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:text="Reset"
+                    android:textSize="11sp"
+                    android:textColor="@color/ds_text_muted"
+                    android:fontFamily="@font/poppins_bold"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:background="@drawable/rounded_status_background"
+                    android:backgroundTint="@color/ds_surface"
+                    android:layout_marginEnd="6dp"
+                    app:iconPadding="0dp" />
+
+                <!-- Save -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/save_map_button"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:text="Save"
+                    android:textSize="11sp"
+                    android:textColor="@color/ds_text_muted"
+                    android:fontFamily="@font/poppins_bold"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:background="@drawable/rounded_status_background"
+                    android:backgroundTint="@color/ds_surface"
+                    android:layout_marginEnd="6dp"
+                    app:iconPadding="0dp" />
+
+                <!-- Load -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/load_map_button"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:text="Load"
+                    android:textSize="11sp"
+                    android:textColor="@color/ds_text_muted"
+                    android:fontFamily="@font/poppins_bold"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:background="@drawable/rounded_status_background"
+                    android:backgroundTint="@color/ds_surface"
+                    app:iconPadding="0dp" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
-        <!-- Row 2: Joystick + Tabs -->
+        <!-- RIGHT PANEL -->
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:orientation="horizontal">
+            android:id="@+id/rightPanel"
+            android:layout_width="220dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:background="@color/ds_panel">
 
-            <!-- D-pad + reverse buttons -->
+            <!-- D-pad -->
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:gravity="top|center_horizontal"
-                android:layout_marginTop="8dp"
-                android:layout_marginEnd="6dp">
+                android:gravity="center_horizontal"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:background="@color/ds_surface">
 
-                <!-- D-pad cross -->
+                <Button
+                    android:id="@+id/dpad_up"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:text="▲"
+                    android:textSize="16sp"
+                    android:textColor="@color/ds_text"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:backgroundTint="@color/ds_panel"
+                    android:padding="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:layout_marginBottom="4dp" />
+
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center">
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="4dp">
 
-                    <!-- Up -->
                     <Button
-                        android:id="@+id/dpad_up"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:text="▲"
-                        android:textSize="18sp"
-                        android:textColor="#4AD8F0"
+                        android:id="@+id/dpad_left"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:text="◀"
+                        android:textSize="16sp"
+                        android:textColor="@color/ds_text"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1E4A65"
+                        android:backgroundTint="@color/ds_panel"
                         android:padding="0dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
-                        android:layout_marginBottom="3dp" />
+                        android:layout_marginEnd="4dp" />
 
-                    <!-- Middle row: Left + Center spacer + Right -->
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center"
-                        android:layout_marginBottom="3dp">
-
-                        <Button
-                            android:id="@+id/dpad_left"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:text="◀"
-                            android:textSize="18sp"
-                            android:textColor="#4AD8F0"
-                            android:background="@drawable/button_rounded_square_background"
-                            android:backgroundTint="#1E4A65"
-                            android:padding="0dp"
-                            android:insetTop="0dp"
-                            android:insetBottom="0dp"
-                            android:layout_marginEnd="3dp" />
-
-                        <!-- Center gap -->
-                        <View
-                            android:id="@+id/dpadCenterSquare"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:background="@drawable/button_rounded_square_background"
-                            android:backgroundTint="#2A4A6A" />
-
-                        <Button
-                            android:id="@+id/dpad_right"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:text="▶"
-                            android:textSize="18sp"
-                            android:textColor="#4AD8F0"
-                            android:background="@drawable/button_rounded_square_background"
-                            android:backgroundTint="#1E4A65"
-                            android:padding="0dp"
-                            android:insetTop="0dp"
-                            android:insetBottom="0dp"
-                            android:layout_marginStart="3dp" />
-                    </LinearLayout>
-
-                    <!-- Down -->
-                    <Button
-                        android:id="@+id/dpad_down"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:text="▼"
-                        android:textSize="18sp"
-                        android:textColor="#4AD8F0"
+                    <View
+                        android:id="@+id/dpadCenterSquare"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1E4A65"
+                        android:backgroundTint="@color/ds_bg" />
+
+                    <Button
+                        android:id="@+id/dpad_right"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:text="▶"
+                        android:textSize="16sp"
+                        android:textColor="@color/ds_text"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:backgroundTint="@color/ds_panel"
                         android:padding="0dp"
                         android:insetTop="0dp"
-                        android:insetBottom="0dp" />
+                        android:insetBottom="0dp"
+                        android:layout_marginStart="4dp" />
                 </LinearLayout>
 
-                <!-- Reverse buttons below d-pad -->
+                <Button
+                    android:id="@+id/dpad_down"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:text="▼"
+                    android:textSize="16sp"
+                    android:textColor="@color/ds_text"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:backgroundTint="@color/ds_panel"
+                    android:padding="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:layout_marginBottom="6dp" />
+
+                <!-- Rev buttons -->
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center"
-                    android:layout_marginTop="6dp">
+                    android:gravity="center">
 
-                    <!-- Reverse Left: icon + label -->
                     <LinearLayout
                         android:id="@+id/reverse_left_button"
-                        android:layout_width="52dp"
+                        android:layout_width="68dp"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:gravity="center"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1E4A65"
+                        android:backgroundTint="@color/ds_panel"
                         android:paddingTop="5dp"
-                        android:paddingBottom="4dp"
-                        android:layout_marginEnd="3dp">
+                        android:paddingBottom="5dp"
+                        android:layout_marginEnd="4dp">
 
                         <ImageView
                             android:id="@+id/revLeftIcon"
-                            android:layout_width="22dp"
-                            android:layout_height="16dp"
+                            android:layout_width="20dp"
+                            android:layout_height="14dp"
                             android:src="@drawable/reverse_left_button"
                             android:scaleType="fitCenter"
-                            app:tint="@color/cyan" />
+                            app:tint="@color/ds_text" />
 
                         <TextView
                             android:id="@+id/revLeftLabel"
@@ -385,30 +428,29 @@
                             android:layout_height="wrap_content"
                             android:text="Rev ◀"
                             android:textSize="7sp"
-                            android:textColor="#4AD8F0"
+                            android:textColor="@color/ds_text_muted"
                             android:fontFamily="@font/poppins_bold"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
 
-                    <!-- Reverse Right: icon + label -->
                     <LinearLayout
                         android:id="@+id/reverse_right_button"
-                        android:layout_width="52dp"
+                        android:layout_width="68dp"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:gravity="center"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1E4A65"
+                        android:backgroundTint="@color/ds_panel"
                         android:paddingTop="5dp"
-                        android:paddingBottom="4dp">
+                        android:paddingBottom="5dp">
 
                         <ImageView
                             android:id="@+id/revRightIcon"
-                            android:layout_width="22dp"
-                            android:layout_height="16dp"
+                            android:layout_width="20dp"
+                            android:layout_height="14dp"
                             android:src="@drawable/reverse_right_button"
                             android:scaleType="fitCenter"
-                            app:tint="@color/cyan" />
+                            app:tint="@color/ds_text" />
 
                         <TextView
                             android:id="@+id/revRightLabel"
@@ -416,183 +458,63 @@
                             android:layout_height="wrap_content"
                             android:text="Rev ▶"
                             android:textSize="7sp"
-                            android:textColor="#4AD8F0"
+                            android:textColor="@color/ds_text_muted"
                             android:fontFamily="@font/poppins_bold"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
+
                 </LinearLayout>
+
             </LinearLayout>
 
-            <!-- Tabs -->
+            <!-- Tab bar + pager -->
             <LinearLayout
                 android:id="@+id/sub_navigation_container"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
                 <com.google.android.material.tabs.TabLayout
                     android:id="@+id/tabs"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="36dp"
+                    android:background="@color/ds_bg"
                     app:tabMode="fixed"
                     app:tabGravity="fill"
                     app:tabMinWidth="0dp"
                     app:tabPaddingStart="0dp"
-                    app:tabPaddingEnd="0dp" />
+                    app:tabPaddingEnd="0dp"
+                    app:tabSelectedTextColor="@color/ds_accent"
+                    app:tabTextColor="@color/ds_text_dim"
+                    app:tabIndicatorColor="@color/ds_accent"
+                    app:tabIndicatorHeight="2dp" />
 
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/sub_navigation_bar"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:background="@color/ds_panel" />
+
             </LinearLayout>
 
-        </LinearLayout>
-
-        <!-- Row 3: Bottom buttons -->
-        <LinearLayout
-            android:id="@+id/bottomRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/rounded_status_background"
-            android:backgroundTint="#1E3A5F"
-            android:layout_marginTop="6dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp">
-
-            <!-- Manual + Auto grouped together -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/manual_update_button"
-                style="@style/Widget.Material3.Button.TextButton"
+            <!-- Hidden buttons kept for logic wiring -->
+            <ImageButton
+                android:id="@+id/btnAddCoordinate"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Manual"
-                android:textSize="10sp"
-                android:textColor="@color/cyan"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_bold"
-                app:iconPadding="0dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/auto_update_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Auto"
-                android:textSize="10sp"
-                android:textColor="@color/cyan"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_bold"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_grid_size"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Size"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/reset_map_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Reset"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/save_map_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Save"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/load_map_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Load"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:contentDescription="Place obstacle or vehicle"
+                android:src="@drawable/plus_for_enter" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clear_logs_button"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Clear"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:text="Clear" />
 
         </LinearLayout>
 

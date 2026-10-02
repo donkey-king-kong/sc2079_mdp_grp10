@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/ds_panel">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="8dp">
+        android:padding="10dp">
 
         <!-- Task 1 card -->
         <LinearLayout
@@ -16,15 +16,15 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_700"
+            android:backgroundTint="@color/ds_surface"
             android:padding="10dp"
             android:layout_marginBottom="8dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="TASK 1: Traverse Map"
-                android:textColor="#5A8AAA"
+                android:text="TASK 1: TRAVERSE MAP"
+                android:textColor="@color/ds_text_muted"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -34,12 +34,12 @@
                 android:id="@+id/calculateObstacleTimer"
                 android:layout_width="match_parent"
                 android:layout_height="40dp"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
+                android:backgroundTint="@color/ds_bg"
                 android:gravity="center"
                 android:text="00:00"
-                android:textColor="@color/white"
+                android:textColor="@color/ds_text"
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
@@ -54,7 +54,7 @@
                 android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#2563A8" />
+                android:backgroundTint="@color/ds_accent" />
         </LinearLayout>
 
         <!-- Task 2 card -->
@@ -63,15 +63,15 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_700"
+            android:backgroundTint="@color/ds_surface"
             android:padding="10dp"
             android:layout_marginBottom="8dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="TASK 2: Fastest Round"
-                android:textColor="#5A8AAA"
+                android:text="TASK 2: FASTEST ROUND"
+                android:textColor="@color/ds_text_muted"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -81,12 +81,12 @@
                 android:id="@+id/fastestTimeTimer"
                 android:layout_width="match_parent"
                 android:layout_height="40dp"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
+                android:backgroundTint="@color/ds_bg"
                 android:gravity="center"
                 android:text="00:00"
-                android:textColor="@color/white"
+                android:textColor="@color/ds_text"
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
@@ -101,7 +101,7 @@
                 android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#2563A8" />
+                android:backgroundTint="@color/ds_accent" />
         </LinearLayout>
 
         <!-- Stitch card -->
@@ -110,14 +110,14 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_700"
+            android:backgroundTint="@color/ds_surface"
             android:padding="10dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="RETRIEVE STITCHED IMAGES"
-                android:textColor="#5A8AAA"
+                android:textColor="@color/ds_text_muted"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -134,7 +134,7 @@
                 android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#5A2D8A" />
+                android:backgroundTint="@color/ds_pink" />
         </LinearLayout>
 
     </LinearLayout>

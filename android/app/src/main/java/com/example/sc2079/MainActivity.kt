@@ -43,8 +43,8 @@ import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment
 import com.example.sc2079.ui.coordinates.SharedViewModel
 
 class MainActivity : AppCompatActivity() {
-    private val base64Data = StringBuilder();
-    private var iterationHowMany: Int = -1;
+    private val base64Data = StringBuilder()
+    private var iterationHowMany: Int = -1
     private var bluetoothService: BluetoothService? = null
     private var isBound = false
     private lateinit var binding: ActivityMainBinding
@@ -65,11 +65,8 @@ class MainActivity : AppCompatActivity() {
         fun onNewMessage(message: String)
         fun onLogCleared()
     }
-    private lateinit var givevehicleDirectionNow: TextView
-    private lateinit var givevehicleCoordinatesNow: TextView
-    private lateinit var givevehicleStatusNow: TextView
+
     private val handler = Handler(Looper.getMainLooper())
-    // Polls AMD every 2s when Auto mode is ON, requesting arena + robot position update
     private val autoHandler = Handler(Looper.getMainLooper())
     private val autoRunnable = object : Runnable {
         override fun run() {
@@ -79,33 +76,24 @@ class MainActivity : AppCompatActivity() {
     }
     private val updateTask = object : Runnable {
         override fun run() {
-            val givevehicleDirectionNow = findViewById<TextView?>(R.id.give_vehicle_direction_now)
-            val givevehicleCoordinatesNow = findViewById<TextView?>(R.id.give_vehicle_coord_now)
-            val givevehicleStatusNow = findViewById<TextView?>(R.id.give_vehicle_status_now)
-            // Update your TextViews from gridMapObj
-            givevehicleDirectionNow.text = gridMapObj.getImmediateVehicleDirection()
-            givevehicleCoordinatesNow.text = gridMapObj.getImmediateVehicleCoord()
-            val getString = gridMapObj.getImmediateVehicleStatus()
-            givevehicleStatusNow.text = gridMapObj.getImmediateVehicleStatus()
-
-            // Schedule the next update after 500 ms (adjust as needed)
+            findViewById<TextView?>(R.id.give_vehicle_direction_now)?.text = gridMapObj.getImmediateVehicleDirection()
+            findViewById<TextView?>(R.id.give_vehicle_coord_now)?.text = gridMapObj.getImmediateVehicleCoord()
+            findViewById<TextView?>(R.id.give_vehicle_status_now)?.text = gridMapObj.getImmediateVehicleStatus()
             handler.postDelayed(this, 500)
         }
     }
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as BluetoothService.LocalBinder
             bluetoothService = binder.getService()
             isBound = true
             gridMapObj.setBluetoothService(bluetoothService)
-
-            // Start Bluetooth server to allow incoming connections (e.g., from Windows)
-            val service = bluetoothService
-            if (service != null && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                service.startServer()
+            val svc = bluetoothService
+            if (svc != null && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                svc.startServer()
             }
         }
-
         override fun onServiceDisconnected(name: ComponentName?) {
             isBound = false
             bluetoothService = null
@@ -116,31 +104,17 @@ class MainActivity : AppCompatActivity() {
     private val bluetoothEnableLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
-                // User enabled Bluetooth → show fragment
                 BluetoothFragment().show(supportFragmentManager, "BluetoothFragment")
             } else {
                 Toast.makeText(this, "Bluetooth is required to continue", Toast.LENGTH_SHORT).show()
             }
         }
 
-    fun getBluetoothService(): BluetoothService? {
-        // Check that the service is bound and the instance is not null
-        return if (isBound) bluetoothService else null
-    }
+    fun getBluetoothService(): BluetoothService? = if (isBound) bluetoothService else null
+    fun getIsConnected(): Boolean = isConnected
+    fun getMessageLog(): ArrayList<String> = messageLog
+    fun setMessageListener(listener: MessageListener?) { this.messageListener = listener }
 
-    fun getIsConnected(): Boolean {
-        return isConnected
-    }
-
-    fun getMessageLog(): ArrayList<String> {
-        return messageLog
-    }
-
-    fun setMessageListener(listener: MessageListener?) {
-        this.messageListener = listener
-    }
-
-    // This BroadcastReceiver will handle incoming data messages from the BluetoothService
     private val msgReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (BluetoothService.ACTION_MESSAGE != intent?.action) return
@@ -155,8 +129,6 @@ class MainActivity : AppCompatActivity() {
             }
             if (text == null) text = "(empty packet)"
 
-            // AMD bundles grid + robot location as two newline-separated JSONs in one BT packet.
-            // Split and re-dispatch each part so the individual message handlers each fire correctly.
             val parts = text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
             if (parts.size > 1) {
                 for (part in parts) {
@@ -168,190 +140,97 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
-            // Checklist requirements C.9 & C.10 (Plain text protocol)
             if (text.startsWith("TARGET,")) {
                 val subParts = text.split(",").map { it.trim() }
                 if (subParts.size >= 3) {
-                    try {
-                        gridMapObj.updateObstacleTarget(subParts[1].toInt(), subParts[2])
-                    } catch (e: Exception) {
-                        Log.e("MainActivity", "Error parsing TARGET: $text")
-                    }
+                    try { gridMapObj.updateObstacleTarget(subParts[1].toInt(), subParts[2]) }
+                    catch (e: Exception) { Log.e("MainActivity", "Error parsing TARGET: $text") }
                 }
             }
 
             if (text.startsWith("ROBOT,")) {
                 val subParts = text.split(",").map { it.trim() }
                 if (subParts.size >= 4) {
-                    try {
-                        gridMapObj.updateRobotPosition(subParts[1].toInt(), subParts[2].toInt(), subParts[3])
-                    } catch (e: Exception) {
-                        Log.e("MainActivity", "Error parsing ROBOT: $text")
-                    }
+                    try { gridMapObj.updateRobotPosition(subParts[1].toInt(), subParts[2].toInt(), subParts[3]) }
+                    catch (e: Exception) { Log.e("MainActivity", "Error parsing ROBOT: $text") }
                 }
             }
 
-            val line: String
-            /*
-            if (text.contains("stitch-image:")) {
-                // 1. Extract Base64 data (everything after "image-rec:")
-                val base64Data = text.substringAfter("stitch-image:").trim()
+            val line = "Robot: $text\n"
 
-                // 2. Launch the image display fragment (pop-up)
-                if (base64Data.isNotEmpty()) {
-                    // Check for isBound before showing fragment
-                    ImageDisplayFragment.newInstance(base64Data)
-                        .show(supportFragmentManager, "ImageDisplayFragment")
-                }
-
-                // 3. Log a simple placeholder message to the chat history
-                line = "Robot: [Image Received - Tap to view]\n"
-
-                // Still notify GridMap for obstacle verification
-                //gridMapObj.receiveVerifiedObstacleBluetooth(text);
-            */
-            //} else {
-            // Regular text message
-            line = "Robot: " + text + "\n"
-            //}
-
-            if(iterationHowMany == -1){
-                // Store the message in the persistent log
+            if (iterationHowMany == -1) {
                 messageLog.add(line)
-
-                // Notify the registered listener (if one exists)
                 messageListener?.onNewMessage(line)
             }
 
-            if(text.contains("stitch-image")) {
-                val status = gridMapObj.receiveStichImageMessageBluetooth(text);
+            if (text.contains("stitch-image")) {
+                val status = gridMapObj.receiveStichImageMessageBluetooth(text)
                 when (status) {
-                    "-1" -> {
-                        //Toast.makeText(context, "Unknown Error Occurred", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Unknown Error Occurred at stitch-image \n");
-                    }
-                    "2" -> {
-                        messageLog.add("Starting to Stitch \n");
-                        iterationHowMany = 0;
-                        base64Data.clear()
-                    }
-                    "3" -> {
+                    "-1" -> messageLog.add("Unknown Error Occurred at stitch-image \n")
+                    "2"  -> { messageLog.add("Starting to Stitch \n"); iterationHowMany = 0; base64Data.clear() }
+                    "3"  -> {
                         messageLog.add("Ending Stitch, displaying image \n")
                         messageLog.add("Robot: [Image Received - Tap to view]\n")
-                        val base64Data = base64Data.toString()
-                        Log.d("Image Message", "Final length: ${base64Data.length}")
-                        //val imageBytes = Base64.decode(base64Data.toString(), Base64.DEFAULT)
-                        ImageDisplayFragment.newInstance(base64Data).show(supportFragmentManager, "ImageDisplayFragment")
-                        iterationHowMany = -1;
+                        val data = base64Data.toString()
+                        Log.d("Image Message", "Final length: ${data.length}")
+                        ImageDisplayFragment.newInstance(data).show(supportFragmentManager, "ImageDisplayFragment")
+                        iterationHowMany = -1
                     }
                     else -> {
-                        base64Data.append(status)  // add chunk
-                        Log.d("Image Chunk", status)
+                        base64Data.append(status)
                         iterationHowMany += 1
                         messageLog.add("Running data compilation iteration $iterationHowMany \n")
                         Log.d("Image Chunk", "Added chunk length=${status.length}, total=${base64Data.length}")
-
                     }
                 }
             }
 
-
-            if(text.contains("image-rec")){
-                val status = gridMapObj.receiveVerifiedObstacleBluetooth(text);
-                when(status){
-                    -3->{
-                        //Toast.makeText(context, "Bullseye Detected!", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Bullseye Detected \n");
-                    }
-                    -2 ->{
-                        //Toast.makeText(context, "Unknown Error Occurred", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Unknown Error Occurred at image-rec \n");
-                    }
-                    -1 ->{
-                        //Toast.makeText(context, "No Image ID Detected", Toast.LENGTH_SHORT).show();
-                        messageLog.add("No Image ID Detected \n");
-                    }
-                    0 ->{
-                        //Toast.makeText(context, "Failed to verify Obstacle", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Failed to verify Obstacle \n");
-                    }
-                    1->{
-                        //Toast.makeText(context, "Successfully Verified Obstacle", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Successfully Verified Obstacle \n");
-                    }
-                    2->{
-                        //Toast.makeText(context, "Capturing Obstacle Image", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Capturing Obstacle Image \n");
-                    }
-
+            if (text.contains("image-rec")) {
+                when (gridMapObj.receiveVerifiedObstacleBluetooth(text)) {
+                    -3 -> messageLog.add("Bullseye Detected \n")
+                    -2 -> messageLog.add("Unknown Error Occurred at image-rec \n")
+                    -1 -> messageLog.add("No Image ID Detected \n")
+                    0  -> messageLog.add("Failed to verify Obstacle \n")
+                    1  -> messageLog.add("Successfully Verified Obstacle \n")
+                    2  -> messageLog.add("Capturing Obstacle Image \n")
                 }
             }
 
-            if(text.contains("location")) {
-                val status = gridMapObj.receiveLocationMessageBluetooth(text);
-                when (status) {
-                    -2 -> {
-                        //Toast.makeText(context, "Unknown Error Occurred", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Unknown Error Occurred at location \n");
-                    }
-                    0 -> {
-                        //Toast.makeText(context, "Failed to verify Location", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Failed to verify Location \n");
-                    }
-
-                    1 -> {
-                        //Toast.makeText(context, "Successfully Verified Location", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Successfully Verified Location \n");
-                    }
+            if (text.contains("location")) {
+                when (gridMapObj.receiveLocationMessageBluetooth(text)) {
+                    -2 -> messageLog.add("Unknown Error Occurred at location \n")
+                    0  -> messageLog.add("Failed to verify Location \n")
+                    1  -> messageLog.add("Successfully Verified Location \n")
                 }
             }
 
-
-            if(text.contains("health")){
-                val status = gridMapObj.receiveHealthMessageBluetooth(text);
-                when (status) {
-                    -2 -> {
-                        //Toast.makeText(context, "Unknown Error Occurred", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Unknown Error Occurred at health \n");
-                    }
-                    0 ->{
-                        //Toast.makeText(context, "Image Rec API is down", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Image Rec API is down \n");
-                    }
-                    1 ->{
-                        //Toast.makeText(context, "Algo API is down", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Algo API is down \n");
-                    }
+            if (text.contains("health")) {
+                when (gridMapObj.receiveHealthMessageBluetooth(text)) {
+                    -2 -> messageLog.add("Unknown Error Occurred at health \n")
+                    0  -> messageLog.add("Image Rec API is down \n")
+                    1  -> messageLog.add("Algo API is down \n")
                 }
             }
 
-
-            if(text.contains("status")){
-                activateJoyStickBool = false;
-                gridMapObj.receiveStatusMessageBluetooth(text, activateJoyStickBool);
+            if (text.contains("status")) {
+                activateJoyStickBool = false
+                gridMapObj.receiveStatusMessageBluetooth(text, activateJoyStickBool)
             }
 
-            if(text.contains("\"grid\"")){
-                gridMapObj.receiveGridHexBluetooth(text);
+            if (text.contains("\"grid\"")) {
+                gridMapObj.receiveGridHexBluetooth(text)
             }
-
-            // if(text.contains("Failed to convert raw Android message")){
-            // gridMapObj.sendAlertToSignalFailure();
-            // }
         }
     }
 
     private val requestBluetoothPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            val allGranted = permissions.entries.all { it.value }
-            if (allGranted) {
-                // Permissions granted, now we can ask to enable Bluetooth
+            if (permissions.entries.all { it.value }) {
                 checkBluetoothEnabled()
-                // Start the server now that permissions are granted
-                val service = bluetoothService
-                if (isBound && service != null && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                val svc = bluetoothService
+                if (isBound && svc != null && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
                     @Suppress("MissingPermission")
-                    service.startServer()
+                    svc.startServer()
                 }
             } else {
                 Toast.makeText(this, "Bluetooth permissions are required", Toast.LENGTH_SHORT).show()
@@ -361,14 +240,7 @@ class MainActivity : AppCompatActivity() {
     private val connStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val state = intent?.getStringExtra(BluetoothService.EXTRA_CONN_STATE)
-
-            if (state == "connected") {
-                isConnected = true
-            } else if (state == "disconnected" || state == "error") {
-                isConnected = false
-            }
-
-            // Update the UI with the new status
+            isConnected = state == "connected"
             updateBluetoothStatus()
         }
     }
@@ -378,208 +250,59 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        //val navView: BottomNavigationView = binding.navView
-        //val navController = findNavController(R.id.nav_host_fragment_activity_main)
 
-        //navView.setupWithNavController(navController)
         btnBluetooth = findViewById(R.id.btnBluetooth)
         bluetoothStatus = findViewById(R.id.bluetoothStatus)
-
         btnAddCoordinate = findViewById(R.id.btnAddCoordinate)
 
-        btnAddCoordinate.setOnClickListener {
-            showAddCoordinatesFragment()
-        }
+        btnAddCoordinate.setOnClickListener { showAddCoordinatesFragment() }
+        btnBluetooth.setOnClickListener { checkBluetoothPermissionsAndState() }
 
         updateBluetoothStatus()
-
-        btnBluetooth.setOnClickListener {
-            checkBluetoothPermissionsAndState()
-        }
 
         sharedViewModel.newCoordinate.observe(this) { coordinate ->
             gridMapObj.addNewObstacleToGrid(coordinate.first.toInt(), coordinate.second.toInt())
         }
-
         sharedViewModel.newObstacleRequest.observe(this) { request ->
             gridMapObj.addNewObstacleToGridWithDirection(request.x, request.y, request.direction)
             Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
         }
 
-        val btnLogClear: com.google.android.material.button.MaterialButton =
-            findViewById(R.id.clear_logs_button)
-        btnLogClear.setOnClickListener {
-            clearMessageLog()
-        }
-
-        val btnManual: com.google.android.material.button.MaterialButton = findViewById(R.id.manual_update_button)
-        val btnAuto: com.google.android.material.button.MaterialButton = findViewById(R.id.auto_update_button)
-
-        btnManual.setOnClickListener {
-            bluetoothService?.write("sendArena".toByteArray())
-            Toast.makeText(this, "Requested arena update", Toast.LENGTH_SHORT).show()
-        }
+        // Hidden clear logs button kept for logic wiring
+        findViewById<MaterialButton>(R.id.clear_logs_button).setOnClickListener { clearMessageLog() }
 
         var autoActive = false
-        val colorGreenFill = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#2E7D32"))
-        val colorTransparent = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
 
-        fun updateAutoVisual() {
-            if (autoActive) {
-                btnAuto.backgroundTintList = colorGreenFill
-                btnAuto.setTextColor(android.graphics.Color.WHITE)
-                btnAuto.strokeWidth = 0
-            } else {
-                btnAuto.backgroundTintList = colorTransparent
-                btnAuto.setTextColor(android.graphics.Color.parseColor("#26B5CB"))
-                btnAuto.strokeWidth = 0
-            }
-        }
-
-        btnAuto.setOnClickListener {
-            autoActive = !autoActive
-            updateAutoVisual()
-            if (autoActive) {
-                autoHandler.post(autoRunnable)
-            } else {
-                autoHandler.removeCallbacks(autoRunnable)
-            }
-        }
-
-        val customNavigatorBar: customNavigator = customNavigator(
-            supportFragmentManager,
-            FragmentPagerAdapter.BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT
-        )
-
-        // Day/Night theme toggle
-        val btnThemeToggle = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnThemeToggle)
-        val rootContainer = findViewById<android.widget.LinearLayout>(R.id.container)
-        val rightPanel = findViewById<android.widget.LinearLayout>(R.id.rightPanel)
-        val gridArea = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.constraintGridMapView)
-        val subNavContainer = findViewById<android.widget.LinearLayout>(R.id.sub_navigation_container)
-        val dpadCenter = findViewById<android.view.View>(R.id.dpadCenterSquare)
-
-        val headerRow = findViewById<android.widget.LinearLayout>(R.id.headerRow)
-        val bottomRow = findViewById<android.widget.LinearLayout>(R.id.bottomRow)
-        val coordCard = findViewById<android.widget.LinearLayout>(R.id.coordCard)
-        val statusCard = findViewById<android.widget.LinearLayout>(R.id.statusCard)
-        val btnAddCoordinate = findViewById<android.widget.ImageButton>(R.id.btnAddCoordinate)
-        val btnBluetooth = findViewById<android.widget.ImageButton>(R.id.btnBluetooth)
-        val dpadUp = findViewById<android.widget.Button>(R.id.dpad_up)
-        val dpadDown = findViewById<android.widget.Button>(R.id.dpad_down)
-        val dpadLeft = findViewById<android.widget.Button>(R.id.dpad_left)
-        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
-        val reverseLeft = findViewById<android.widget.LinearLayout>(R.id.reverse_left_button)
-        val reverseRight = findViewById<android.widget.LinearLayout>(R.id.reverse_right_button)
-        val revLeftIcon = findViewById<android.widget.ImageView>(R.id.revLeftIcon)
-        val revLeftLabel = findViewById<android.widget.TextView>(R.id.revLeftLabel)
-        val revRightIcon = findViewById<android.widget.ImageView>(R.id.revRightIcon)
-        val revRightLabel = findViewById<android.widget.TextView>(R.id.revRightLabel)
-        val coordText = findViewById<android.widget.TextView>(R.id.give_vehicle_coord_now)
-        val dirText = findViewById<android.widget.TextView>(R.id.give_vehicle_direction_now)
-        val statusText = findViewById<android.widget.TextView>(R.id.give_vehicle_status_now)
-
-        // Bottom bar buttons — declared here so applyTheme can reach them
-        val btnGridSize = findViewById<MaterialButton>(R.id.btn_grid_size)
-        val btnReset = findViewById<MaterialButton>(R.id.reset_map_button)
-        val saveGridMapButton = findViewById<MaterialButton>(R.id.save_map_button)
-        val loadGridMapButton = findViewById<MaterialButton>(R.id.load_map_button)
+        // Theme toggle — flips between design-system dark and light token sets
+        val btnThemeToggle = findViewById<MaterialButton>(R.id.btnThemeToggle)
+        val rootContainer = findViewById<LinearLayout>(R.id.container)
+        val headerRow = findViewById<LinearLayout>(R.id.headerRow)
+        val bottomRow = findViewById<LinearLayout>(R.id.bottomRow)
+        val rightPanel = findViewById<LinearLayout>(R.id.rightPanel)
         val tabs = findViewById<TabLayout>(R.id.tabs)
 
         fun applyTheme(day: Boolean) {
-            fun tint(color: String) = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(color))
-            fun col(color: String) = android.graphics.Color.parseColor(color)
+            fun tint(color: String) = android.content.res.ColorStateList.valueOf(Color.parseColor(color))
+            fun col(color: String) = Color.parseColor(color)
             if (day) {
                 btnThemeToggle.text = "🌙"
-                rootContainer.setBackgroundColor(col("#EDF1F7"))
-                rightPanel.setBackgroundColor(col("#EDF1F7"))
-                gridArea.setBackgroundColor(col("#EDF1F7"))
-                subNavContainer.setBackgroundColor(col("#EDF1F7"))
-                headerRow.backgroundTintList = tint("#D6DEF0")
-                bottomRow.backgroundTintList = tint("#D6DEF0")
-                coordCard.backgroundTintList = tint("#C2CEDF")
-                statusCard.backgroundTintList = tint("#C2CEDF")
-                btnAddCoordinate.backgroundTintList = tint("#C2CEDF")
-                btnThemeToggle.backgroundTintList = tint("#C2CEDF")
-                btnBluetooth.backgroundTintList = tint("#C2CEDF")
-                // D-pad: darker blue bg so the navy arrow text pops
-                dpadUp.backgroundTintList = tint("#7A9BBF")
-                dpadDown.backgroundTintList = tint("#7A9BBF")
-                dpadLeft.backgroundTintList = tint("#7A9BBF")
-                dpadRight.backgroundTintList = tint("#7A9BBF")
-                dpadUp.setTextColor(col("#FFFFFF"))
-                dpadDown.setTextColor(col("#FFFFFF"))
-                dpadLeft.setTextColor(col("#FFFFFF"))
-                dpadRight.setTextColor(col("#FFFFFF"))
-                reverseLeft.backgroundTintList = tint("#7A9BBF")
-                reverseRight.backgroundTintList = tint("#7A9BBF")
-                revLeftIcon.imageTintList = tint("#FFFFFF")
-                revLeftLabel.setTextColor(col("#FFFFFF"))
-                revRightIcon.imageTintList = tint("#FFFFFF")
-                revRightLabel.setTextColor(col("#FFFFFF"))
-                dpadCenter.backgroundTintList = tint("#C5D5E8")
-                coordText.setTextColor(col("#1A2A4A"))
-                dirText.setTextColor(col("#3A5A8A"))
-                statusText.setTextColor(col("#1A2A4A"))
-                // Bottom bar buttons: dark text on light bar
-                val darkNavy = col("#1A2A4A")
-                btnManual.setTextColor(darkNavy)
-                btnAuto.setTextColor(darkNavy)
-                btnGridSize.setTextColor(darkNavy)
-                btnReset.setTextColor(darkNavy)
-                saveGridMapButton.setTextColor(darkNavy)
-                loadGridMapButton.setTextColor(darkNavy)
-                btnLogClear.setTextColor(darkNavy)
-                // Tab bar: match panel background
-                tabs.setBackgroundColor(col("#EDF1F7"))
-                tabs.setSelectedTabIndicatorColor(col("#2563A8"))
-                tabs.setTabIconTint(android.content.res.ColorStateList.valueOf(col("#1A2A4A")))
+                rootContainer.setBackgroundColor(col("#C8CDD4"))
+                headerRow.setBackgroundColor(col("#E8EAED"))
+                bottomRow.setBackgroundColor(col("#E8EAED"))
+                rightPanel.setBackgroundColor(col("#E8EAED"))
+                tabs.setBackgroundColor(col("#C8CDD4"))
+                tabs.setSelectedTabIndicatorColor(col("#1A3ECF"))
+                tabs.setTabTextColors(col("#606163"), col("#1A3ECF"))
                 updateAxisTextColor(false)
             } else {
                 btnThemeToggle.text = "☀"
-                rootContainer.setBackgroundColor(col("#0F1C3A"))
-                rightPanel.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                gridArea.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                subNavContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                headerRow.backgroundTintList = tint("#182D4B")
-                bottomRow.backgroundTintList = tint("#1E3A5F")
-                coordCard.backgroundTintList = tint("#1A3A5C")
-                statusCard.backgroundTintList = tint("#1A3A5C")
-                btnAddCoordinate.backgroundTintList = tint("#1A3A5C")
-                btnThemeToggle.backgroundTintList = tint("#1A3A5C")
-                btnBluetooth.backgroundTintList = tint("#1A3A5C")
-                dpadUp.backgroundTintList = tint("#1E4A65")
-                dpadDown.backgroundTintList = tint("#1E4A65")
-                dpadLeft.backgroundTintList = tint("#1E4A65")
-                dpadRight.backgroundTintList = tint("#1E4A65")
-                dpadUp.setTextColor(col("#4AD8F0"))
-                dpadDown.setTextColor(col("#4AD8F0"))
-                dpadLeft.setTextColor(col("#4AD8F0"))
-                dpadRight.setTextColor(col("#4AD8F0"))
-                reverseLeft.backgroundTintList = tint("#1E4A65")
-                reverseRight.backgroundTintList = tint("#1E4A65")
-                revLeftIcon.imageTintList = tint("#26B5CB")
-                revLeftLabel.setTextColor(col("#4AD8F0"))
-                revRightIcon.imageTintList = tint("#26B5CB")
-                revRightLabel.setTextColor(col("#4AD8F0"))
-                dpadCenter.backgroundTintList = tint("#2A4A6A")
-                coordText.setTextColor(android.graphics.Color.WHITE)
-                dirText.setTextColor(col("#7AAFCB"))
-                statusText.setTextColor(android.graphics.Color.WHITE)
-                // Bottom bar buttons: restore original light-blue text
-                val cyanText = col("#26B5CB")
-                val paleText = col("#A8C8E8")
-                btnManual.setTextColor(cyanText)
-                btnAuto.setTextColor(cyanText)
-                btnGridSize.setTextColor(paleText)
-                btnReset.setTextColor(paleText)
-                saveGridMapButton.setTextColor(paleText)
-                loadGridMapButton.setTextColor(paleText)
-                btnLogClear.setTextColor(paleText)
-                // Tab bar: restore dark background
-                tabs.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                tabs.setSelectedTabIndicatorColor(col("#F137A5"))
-                tabs.setTabIconTint(android.content.res.ColorStateList.valueOf(col("#FFFFFF")))
+                rootContainer.setBackgroundColor(col("#0E1117"))
+                headerRow.setBackgroundColor(col("#151B27"))
+                bottomRow.setBackgroundColor(col("#151B27"))
+                rightPanel.setBackgroundColor(col("#151B27"))
+                tabs.setBackgroundColor(col("#0E1117"))
+                tabs.setSelectedTabIndicatorColor(col("#6C8EF5"))
+                tabs.setTabTextColors(col("#47E8EAF0"), col("#6C8EF5"))
                 updateAxisTextColor(true)
             }
         }
@@ -589,64 +312,50 @@ class MainActivity : AppCompatActivity() {
             applyTheme(isDayMode)
         }
 
-        // Initializes gridmap
+        // Initialise grid
         val gridMapView = findViewById<LinearLayout>(R.id.gridMapView)
         gridMapObj = GridMapClass(this)
         gridMapObj.setGridColumns(20)
         gridMapObj.setGridRows(20)
         gridMapView.addView(gridMapObj)
         setupGraphAxes(this, true)
+        updateGridSizeLabel()
 
-        // D-pad buttons
-        dpadUp.setOnClickListener {
-            activateJoyStickBool = true
-            gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true)
-        }
-        dpadDown.setOnClickListener {
-            activateJoyStickBool = true
-            gridMapObj.moveVehicleStraight(ObstacleData.Direction.SOUTH, true)
-        }
-        dpadLeft.setOnClickListener {
-            activateJoyStickBool = true
-            gridMapObj.moveVehicleStraight(ObstacleData.Direction.WEST, true)
-        }
-        dpadRight.setOnClickListener {
-            activateJoyStickBool = true
-            gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
-        }
+        // D-pad
+        val dpadUp    = findViewById<android.widget.Button>(R.id.dpad_up)
+        val dpadDown  = findViewById<android.widget.Button>(R.id.dpad_down)
+        val dpadLeft  = findViewById<android.widget.Button>(R.id.dpad_left)
+        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
+        val reverseLeft  = findViewById<LinearLayout>(R.id.reverse_left_button)
+        val reverseRight = findViewById<LinearLayout>(R.id.reverse_right_button)
 
-        reverseLeft.setOnClickListener {
-            Log.d("JoystickButtons", "Reverse Left clicked")
-            gridMapObj.reverseLeftVehicle(true)
-        }
+        dpadUp.setOnClickListener    { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true) }
+        dpadDown.setOnClickListener  { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.SOUTH, true) }
+        dpadLeft.setOnClickListener  { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.WEST, true) }
+        dpadRight.setOnClickListener { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true) }
+        reverseLeft.setOnClickListener  { Log.d("JoystickButtons", "Reverse Left clicked");  gridMapObj.reverseLeftVehicle(true) }
+        reverseRight.setOnClickListener { Log.d("JoystickButtons", "Reverse Right clicked"); gridMapObj.reverseRightVehicle(true) }
 
-        reverseRight.setOnClickListener {
-            Log.d("JoystickButtons", "Reverse Right clicked")
-            gridMapObj.reverseRightVehicle(true)
-        }
+        // Bottom bar
+        val btnGridSize       = findViewById<MaterialButton>(R.id.btn_grid_size)
+        val btnReset          = findViewById<MaterialButton>(R.id.reset_map_button)
+        val saveGridMapButton = findViewById<MaterialButton>(R.id.save_map_button)
+        val loadGridMapButton = findViewById<MaterialButton>(R.id.load_map_button)
 
-        saveGridMapButton.setOnClickListener {
-            saveGridMapData(gridMapObj.returnGridMap())
-        }
+        btnGridSize.setOnClickListener { showGridSizeDialog() }
+        btnReset.setOnClickListener    { gridMapObj.clearGridMap() }
+        saveGridMapButton.setOnClickListener { saveGridMapData(gridMapObj.returnGridMap()) }
+        loadGridMapButton.setOnClickListener { loadGridMapData() }
 
-        loadGridMapButton.setOnClickListener {
-            loadGridMapData()
-        }
-
-        btnGridSize.setOnClickListener {
-            showGridSizeDialog()
-        }
-
-        btnReset.setOnClickListener {
-            gridMapObj.clearGridMap()
-        }
-
-        // Initalize navigation tabz
+        // Tabs
+        val customNavigatorBar = customNavigator(
+            supportFragmentManager,
+            FragmentPagerAdapter.BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT
+        )
         customNavigatorBar.addFragment(AddObstacle(gridMapObj), "")
         customNavigatorBar.addFragment(commsToRobot(gridMapObj), "")
         customNavigatorBar.addFragment(startTask(gridMapObj), "")
 
-        // Initializes Navigation Bar
         val subNavigationBar = findViewById<ViewPager?>(R.id.sub_navigation_bar)
         subNavigationBar?.setAdapter(customNavigatorBar)
         subNavigationBar?.setOffscreenPageLimit(2)
@@ -659,67 +368,36 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        Intent(this, BluetoothService::class.java).also { intent ->
-            bindService(intent, connection, Context.BIND_AUTO_CREATE)
-        }
-
-        LocalBroadcastManager.getInstance(this).registerReceiver(
-            connStateReceiver,
-            IntentFilter(BluetoothService.ACTION_CONN_STATE)
-        )
-
-        LocalBroadcastManager.getInstance(this).registerReceiver(
-            msgReceiver,
-            IntentFilter(BluetoothService.ACTION_MESSAGE)
-        )
+        Intent(this, BluetoothService::class.java).also { bindService(it, connection, Context.BIND_AUTO_CREATE) }
+        LocalBroadcastManager.getInstance(this).registerReceiver(connStateReceiver, IntentFilter(BluetoothService.ACTION_CONN_STATE))
+        LocalBroadcastManager.getInstance(this).registerReceiver(msgReceiver, IntentFilter(BluetoothService.ACTION_MESSAGE))
     }
 
     override fun onStop() {
         super.onStop()
-        // Unbind from the service
-        if (isBound) {
-            unbindService(connection)
-            isBound = false
-        }
-
-        // Unregister broadcast receivers
+        if (isBound) { unbindService(connection); isBound = false }
         LocalBroadcastManager.getInstance(this).unregisterReceiver(connStateReceiver)
         LocalBroadcastManager.getInstance(this).unregisterReceiver(msgReceiver)
         autoHandler.removeCallbacks(autoRunnable)
     }
 
-    private fun checkBluetoothPermissionsAndState() {
-        val bluetoothScanPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-        val bluetoothConnectPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+    override fun onResume() { super.onResume(); handler.post(updateTask) }
+    override fun onPause()  { super.onPause();  handler.removeCallbacks(updateTask) }
 
-        if (bluetoothScanPermission && bluetoothConnectPermission) {
-            checkBluetoothEnabled()
-        } else {
-            requestBluetoothPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                )
-            )
-        }
+    private fun checkBluetoothPermissionsAndState() {
+        val scan    = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)    == PackageManager.PERMISSION_GRANTED
+        val connect = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        if (scan && connect) checkBluetoothEnabled()
+        else requestBluetoothPermissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT))
     }
 
     private fun checkBluetoothEnabled() {
-        if (isBound && bluetoothService?.isBluetoothEnabled() == true) {
-            showBluetoothFragment()
-        } else {
-            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-            bluetoothEnableLauncher.launch(enableBtIntent)
-        }
+        if (isBound && bluetoothService?.isBluetoothEnabled() == true) showBluetoothFragment()
+        else bluetoothEnableLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
     }
 
-    private fun showBluetoothFragment() {
-        BluetoothFragment().show(supportFragmentManager, "BluetoothFragment")
-    }
-
-    private fun showAddCoordinatesFragment() {
-        PlaceObstacleDialogFragment().show(supportFragmentManager, "PlaceObstacleDialog")
-    }
+    private fun showBluetoothFragment() = BluetoothFragment().show(supportFragmentManager, "BluetoothFragment")
+    private fun showAddCoordinatesFragment() = PlaceObstacleDialogFragment().show(supportFragmentManager, "PlaceObstacleDialog")
 
     private fun updateBluetoothStatus() {
         if (isConnected) {
@@ -730,20 +408,11 @@ class MainActivity : AppCompatActivity() {
             bluetoothStatus.backgroundTintList = ContextCompat.getColorStateList(this, R.color.status_disconnected)
         }
     }
+
     fun clearMessageLog() {
         messageLog.clear()
-        messageListener?.onLogCleared() // Notify listener to clear the displayed text
+        messageListener?.onLogCleared()
         Toast.makeText(this, "Bluetooth message log cleared", Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        handler.post(updateTask) // Start updating when activity is visible
-    }
-
-    override fun onPause() {
-        super.onPause()
-        handler.removeCallbacks(updateTask) // Stop updating when activity is hidden
     }
 
     fun setupGraphAxes(context: Context, isDark: Boolean) {
@@ -754,27 +423,22 @@ class MainActivity : AppCompatActivity() {
         val cols = gridMapObj.getGridColumns()
 
         for (i in (rows - 1) downTo 0) {
-            val textView = TextView(context)
-            textView.text = i.toString()
-            textView.setTextColor(axisColor)
-            textView.gravity = Gravity.CENTER
-            textView.layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0, 1f
-            )
-            yAxis.addView(textView)
+            val tv = TextView(context)
+            tv.text = i.toString()
+            tv.setTextColor(axisColor)
+            tv.textSize = 8f
+            tv.gravity = Gravity.CENTER
+            tv.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+            yAxis.addView(tv)
         }
-
         for (i in 0 until cols) {
-            val textView = TextView(context)
-            textView.text = i.toString()
-            textView.setTextColor(axisColor)
-            textView.gravity = Gravity.CENTER
-            textView.layoutParams = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.MATCH_PARENT, 1f
-            )
-            xAxis.addView(textView)
+            val tv = TextView(context)
+            tv.text = i.toString()
+            tv.setTextColor(axisColor)
+            tv.textSize = 8f
+            tv.gravity = Gravity.CENTER
+            tv.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            xAxis.addView(tv)
         }
     }
 
@@ -782,13 +446,14 @@ class MainActivity : AppCompatActivity() {
         val axisColor = if (isDark) Color.WHITE else Color.BLACK
         val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
         val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
-        for (i in 0 until yAxis.childCount) {
-            (yAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
-        }
-        for (i in 0 until xAxis.childCount) {
-            (xAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
-        }
+        for (i in 0 until yAxis.childCount) (yAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
+        for (i in 0 until xAxis.childCount) (xAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
     }
+
+    private fun updateGridSizeLabel() {
+        findViewById<TextView?>(R.id.grid_size_label)?.text = gridMapObj.getGridColumns().toString()
+    }
+
     private fun showGridSizeDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_grid_size, null)
         val colPicker = dialogView.findViewById<NumberPicker>(R.id.picker_cols)
@@ -798,9 +463,7 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Arena Size")
             .setView(dialogView)
-            .setPositiveButton("Apply") { _, _ ->
-                applyGridSize(colPicker.value, rowPicker.value)
-            }
+            .setPositiveButton("Apply") { _, _ -> applyGridSize(colPicker.value, rowPicker.value) }
             .setNegativeButton("Cancel", null)
             .show()
     }
@@ -810,8 +473,6 @@ class MainActivity : AppCompatActivity() {
         gridMapObj.setGridRows(rows)
         gridMapObj.clearGridMap()
 
-        // Keep the grid view filling the full area with the correct col:row ratio
-        // so cells are always as large as possible without overflowing.
         val gridView = findViewById<LinearLayout>(R.id.gridMapView)
         val params = gridView.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
         params.width = 0
@@ -825,35 +486,27 @@ class MainActivity : AppCompatActivity() {
         yAxis.removeAllViews()
         xAxis.removeAllViews()
         setupGraphAxes(this, !isDayMode)
+        updateGridSizeLabel()
     }
 
-    private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {
+    private fun saveGridMapData(gridMapData: ArrayList<ArrayList<ObstacleData>>) {
         val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
-
         val gson = Gson()
-        val json = gson.toJson(gridMapData) // convert to JSON string
-
-        editor.putString("gridMapData", json)
-        editor.apply()
+        sharedPreferences.edit().putString("gridMapData", gson.toJson(gridMapData)).apply()
         Toast.makeText(this, "Map was successfully saved!", Toast.LENGTH_SHORT).show()
     }
 
     private fun loadGridMapData() {
         val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
-        val gson = Gson()
         val json = sharedPreferences.getString("gridMapData", null)
-
         if (json != null) {
             val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
-            val loadedData: ArrayList<ArrayList<ObstacleData>> = gson.fromJson(json, type)
+            val loadedData: ArrayList<ArrayList<ObstacleData>> = Gson().fromJson(json, type)
             gridMapObj.clearGridMap()
             gridMapObj.addGridMapSaved(loadedData)
-        }else{
+            gridMapObj.sendArenaDataBluetooth()
+        } else {
             Toast.makeText(this, "No Map was saved!", Toast.LENGTH_SHORT).show()
-
         }
     }
-
-
 }

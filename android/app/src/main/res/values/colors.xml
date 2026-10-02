@@ -15,4 +15,22 @@
     <color name="status_connected">#4CCB67</color>
     <color name="status_connecting">#f79736</color>
     <color name="status_disconnected">#EF5252</color>
+
+    <!-- Design system tokens -->
+    <color name="ds_bg">#0E1117</color>
+    <color name="ds_panel">#151B27</color>
+    <color name="ds_surface">#1C2333</color>
+    <color name="ds_accent">#6C8EF5</color>
+    <color name="ds_pink">#D45A8E</color>
+    <color name="ds_green">#3DBA6E</color>
+    <color name="ds_red">#E05252</color>
+    <color name="ds_text">#E8EAF0</color>
+    <color name="ds_text_muted">#73E8EAF0</color>
+    <color name="ds_text_dim">#47E8EAF0</color>
+    <color name="ds_border">#14FFFFFF</color>
+    <color name="ds_border_strong">#24FFFFFF</color>
+    <color name="ds_accent_dim">#2E6C8EF5</color>
+    <color name="ds_pink_dim">#33D45A8E</color>
+    <color name="ds_red_dim">#26E05252</color>
+    <color name="ds_green_dim">#263DBA6E</color>
 </resources>
