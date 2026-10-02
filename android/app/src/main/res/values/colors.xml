@@ -16,7 +16,7 @@
     <color name="status_connecting">#f79736</color>
     <color name="status_disconnected">#EF5252</color>
 
-    <!-- Design system tokens — dark (default) -->
+    <!-- Design system tokens — dark (default/runtime) -->
     <color name="ds_bg">#0E1117</color>
     <color name="ds_panel">#151B27</color>
     <color name="ds_surface">#1C2333</color>
@@ -30,19 +30,15 @@
     <color name="ds_border">#14FFFFFF</color>
     <color name="ds_border_strong">#24FFFFFF</color>
     <color name="ds_accent_dim">#2E6C8EF5</color>
+    <color name="ds_accent_border">#596C8EF5</color>
     <color name="ds_pink_dim">#33D45A8E</color>
     <color name="ds_red_dim">#26E05252</color>
     <color name="ds_green_dim">#263DBA6E</color>
 
-    <!-- Design system tokens — dark suffix (explicit dark mode) -->
+    <!-- Design system tokens — explicit dark suffix -->
     <color name="ds_bg_dark">#0E1117</color>
     <color name="ds_panel_dark">#151B27</color>
     <color name="ds_surface_dark">#1C2333</color>
-    <!-- grid sage colors: light=#c8d4c8 checker=#b8c8b8, dark=#111a11 checker=#192019 -->
-    <color name="ds_grid_base_light">#C8D4C8</color>
-    <color name="ds_grid_check_light">#B8C8B8</color>
-    <color name="ds_grid_base_dark">#111A11</color>
-    <color name="ds_grid_check_dark">#192019</color>
     <color name="ds_accent_dark">#6C8EF5</color>
     <color name="ds_pink_dark">#D45A8E</color>
     <color name="ds_green_dark">#3DBA6E</color>
@@ -53,40 +49,50 @@
     <color name="ds_border_dark">#14FFFFFF</color>
     <color name="ds_border_strong_dark">#24FFFFFF</color>
     <color name="ds_accent_dim_dark">#2E6C8EF5</color>
+    <color name="ds_accent_border_dark">#596C8EF5</color>
     <color name="ds_pink_dim_dark">#33D45A8E</color>
     <color name="ds_red_dim_dark">#26E05252</color>
     <color name="ds_green_dim_dark">#263DBA6E</color>
 
-    <!-- Design system tokens — light suffix (light mode) — values from vehicle_ui_light_v4.html -->
+    <!-- Grid colors -->
+    <color name="ds_grid_base_light">#C8D4C8</color>
+    <color name="ds_grid_check_light">#B8C8B8</color>
+    <color name="ds_grid_base_dark">#111A11</color>
+    <color name="ds_grid_check_dark">#192019</color>
+
+    <!-- Design system tokens — explicit light suffix -->
+    <!-- bg_primary #c8cdd4, bg_panel #e8eaed, bg_surface #dde0e4, bg_surface2 #ffffff -->
     <color name="ds_bg_light">#C8CDD4</color>
     <color name="ds_panel_light">#E8EAED</color>
     <color name="ds_surface_light">#DDE0E4</color>
+    <color name="ds_surface2_light">#FFFFFF</color>
     <color name="ds_accent_light">#1A3ECF</color>
     <color name="ds_pink_light">#9E0F44</color>
     <color name="ds_green_light">#155E32</color>
     <color name="ds_red_light">#9E1515</color>
     <color name="ds_text_light">#0C0E11</color>
+    <!-- text_muted: rgba(12,14,17,0.55) = 0x8C -->
     <color name="ds_text_muted_light">#8C0C0E11</color>
+    <!-- text_dim: rgba(12,14,17,0.38) = 0x61 -->
     <color name="ds_text_dim_light">#610C0E11</color>
-    <!-- border: rgba(0,0,0,0.18)=0x2E, border-strong: rgba(0,0,0,0.28)=0x47 -->
+    <!-- border: rgba(0,0,0,0.18) = 0x2E -->
     <color name="ds_border_light">#2E000000</color>
+    <!-- border_strong: rgba(0,0,0,0.28) = 0x47 -->
     <color name="ds_border_strong_light">#47000000</color>
-    <!-- accent-dim: rgba(26,62,207,0.1)=0x1A -->
+    <!-- accent_dim: rgba(26,62,207,0.10) = 0x1A -->
     <color name="ds_accent_dim_light">#1A1A3ECF</color>
-    <!-- pink-dim: rgba(158,15,68,0.1)=0x1A -->
-    <color name="ds_pink_dim_light">#1A9E0F44</color>
-    <!-- red-dim: rgba(158,21,21,0.1)=0x1A -->
-    <color name="ds_red_dim_light">#1A9E1515</color>
-    <!-- green-dim: rgba(21,94,50,0.1)=0x1A -->
-    <color name="ds_green_dim_light">#1A155E32</color>
-    <!-- Button bg in light mode is white -->
-    <color name="ds_btn_bg_light">#FFFFFF</color>
-    <!-- accent-border: rgba(26,62,207,0.45)=0x73 -->
+    <!-- accent_border: rgba(26,62,207,0.45) = 0x73 -->
     <color name="ds_accent_border_light">#731A3ECF</color>
-    <!-- pink-border: rgba(158,15,68,0.4)=0x66 -->
+    <!-- pink_dim: rgba(158,15,68,0.10) = 0x1A -->
+    <color name="ds_pink_dim_light">#1A9E0F44</color>
+    <!-- pink_border: rgba(158,15,68,0.40) = 0x66 -->
     <color name="ds_pink_border_light">#669E0F44</color>
-    <!-- red-border: rgba(158,21,21,0.4)=0x66 -->
-    <color name="ds_red_border_light">#669E1515</color>
-    <!-- green-border: rgba(21,94,50,0.4)=0x66 -->
+    <!-- green_dim: rgba(21,94,50,0.10) = 0x1A -->
+    <color name="ds_green_dim_light">#1A155E32</color>
+    <!-- green_border: rgba(21,94,50,0.40) = 0x66 -->
     <color name="ds_green_border_light">#66155E32</color>
+    <!-- red_dim: rgba(158,21,21,0.10) = 0x1A -->
+    <color name="ds_red_dim_light">#1A9E1515</color>
+    <!-- red_border: rgba(158,21,21,0.40) = 0x66 -->
+    <color name="ds_red_border_light">#669E1515</color>
 </resources>

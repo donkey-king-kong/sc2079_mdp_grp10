@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Light-mode ghost button: white bg, 2dp dark-28% border, 6dp radius -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="#FFFFFF" />
     <corners android:radius="6dp" />
     <stroke android:width="2dp" android:color="#47000000" />

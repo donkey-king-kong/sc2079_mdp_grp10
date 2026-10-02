@@ -286,6 +286,36 @@ public class GridMapClass extends View {
         invalidate();
     }
 
+    private void applyLightPaints() {
+        // Obstacle cell: rgba(26,62,207,0.14) fill, #1a3ecf stroke
+        blackPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        blackPaint.setColor(Color.argb(36, 26, 62, 207));
+        // Text label: #1a3ecf
+        textPaint.setColor(Color.parseColor("#1A3ECF"));
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setAntiAlias(true);
+        // Obstacle direction arrow: #1a3ecf 1.5dp
+        redPaint.setStyle(Paint.Style.STROKE);
+        redPaint.setColor(Color.parseColor("#1A3ECF"));
+        redPaint.setStrokeWidth(4f);
+        redPaint.setAntiAlias(true);
+    }
+
+    private void applyDarkPaints() {
+        // Obstacle cell: rgba(108,142,245,0.18) fill, #6c8ef5 stroke
+        blackPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        blackPaint.setColor(Color.argb(46, 108, 142, 245));
+        // Text label: #6c8ef5
+        textPaint.setColor(Color.parseColor("#6C8EF5"));
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setAntiAlias(true);
+        // Obstacle direction arrow: #6c8ef5
+        redPaint.setStyle(Paint.Style.STROKE);
+        redPaint.setColor(Color.parseColor("#6C8EF5"));
+        redPaint.setStrokeWidth(4f);
+        redPaint.setAntiAlias(true);
+    }
+
     public void setBluetoothService(BluetoothService service) {
         this.btService = service;
         Log.d("GridMapClass", "BluetoothService instance set.");
@@ -368,13 +398,16 @@ public class GridMapClass extends View {
 
     @Override
     protected void onDraw(Canvas canvas){
-        // Grid sage palette — from vehicle_ui_light_v4.html
-        int bgColor      = isDarkTheme ? Color.parseColor("#111A11") : Color.parseColor("#C8D4C8");
-        int checkColor   = isDarkTheme ? Color.parseColor("#192019") : Color.parseColor("#B8C8B8");
-        int gridColor    = isDarkTheme ? Color.parseColor("#66466446") : Color.parseColor("#66466446");
-        int obstColor    = isDarkTheme ? Color.parseColor("#E8EAF0")  : Color.parseColor("#1C2333");
-        textPaint.setColor(isDarkTheme ? Color.WHITE : Color.WHITE);
-        blackPaint.setColor(obstColor);
+        if (isDarkTheme) {
+            applyDarkPaints();
+        } else {
+            applyLightPaints();
+        }
+
+        int bgColor    = isDarkTheme ? Color.parseColor("#111A11") : Color.parseColor("#C8D4C8");
+        int checkColor = isDarkTheme
+                ? Color.argb(46, 60, 120, 60)
+                : Color.parseColor("#B8C8B8");
 
         canvas.drawColor(bgColor);
         if (gridColumns == 0 || gridRows == 0) {
@@ -394,7 +427,9 @@ public class GridMapClass extends View {
         }
 
         Paint linePaint = new Paint();
-        linePaint.setColor(isDarkTheme ? Color.parseColor("#4D466446") : Color.parseColor("#4D466446"));
+        linePaint.setColor(isDarkTheme
+                ? Color.argb(77, 50, 100, 50)
+                : Color.argb(102, 70, 100, 70));
         linePaint.setStrokeWidth(0.5f);
 
         // Draw grid lines
@@ -523,15 +558,17 @@ public class GridMapClass extends View {
         float right = (x + 3) * cellWidth;
         float top = (gridRows - (y + 3)) * cellHeight;
 
-        // 1. Draw body — pink from HTML: #9e0f44 (light), #D45A8E (dark) at 18% alpha fill
-        greenPaint.setColor(isDarkTheme ? Color.parseColor("#2ED45A8E") : Color.parseColor("#2E9E0F44"));
+        // 1. Draw body — vehicle fill from spec: rgba(158,15,68,0.18) light / rgba(212,90,142,0.25) dark
+        greenPaint.setColor(isDarkTheme
+                ? Color.argb(64, 212, 90, 142)
+                : Color.argb(46, 158, 15, 68));
         canvas.drawRect(left, top, right, bottom, greenPaint);
 
-        // 2. Draw outline — accent color
+        // 2. Draw outline — vehicle stroke: #9e0f44 light (2dp) / #d45a8e dark (2dp)
         Paint outlinePaint = new Paint();
         outlinePaint.setStyle(Paint.Style.STROKE);
         outlinePaint.setStrokeWidth(6f);
-        outlinePaint.setColor(isDarkTheme ? Color.parseColor("#6C8EF5") : Color.parseColor("#1A3ECF"));
+        outlinePaint.setColor(isDarkTheme ? Color.parseColor("#D45A8E") : Color.parseColor("#9E0F44"));
         outlinePaint.setAntiAlias(true);
         canvas.drawRect(left, top, right, bottom, outlinePaint);
 

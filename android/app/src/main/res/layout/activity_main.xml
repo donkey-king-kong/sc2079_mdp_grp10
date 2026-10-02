@@ -90,21 +90,19 @@
             android:singleLine="true" />
 
         <!-- Theme toggle -->
-        <com.google.android.material.button.MaterialButton
+        <Button
             android:id="@+id/btnThemeToggle"
-            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:text="☀"
             android:textSize="14sp"
-            android:textColor="@color/ds_text"
+            android:textColor="#990C0E11"
             android:padding="0dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:layout_marginEnd="6dp"
-            android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/ds_surface"
-            app:iconPadding="0dp" />
+            android:background="@drawable/btn_header_icon"
+            android:stateListAnimator="@null" />
 
         <!-- Bluetooth button + status dot -->
         <FrameLayout
@@ -115,13 +113,12 @@
                 android:id="@+id/btnBluetooth"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/ds_surface"
+                android:background="@drawable/btn_header_icon"
                 android:contentDescription="Bluetooth"
                 android:padding="7dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_bluetooth_24dp"
-                app:tint="@color/ds_text" />
+                app:tint="#990C0E11" />
 
             <ImageView
                 android:id="@+id/bluetoothStatus"
@@ -221,8 +218,11 @@
                     android:layout_height="28dp"
                     android:text="−"
                     android:textSize="16sp"
+                    android:textStyle="bold"
                     android:textColor="#0C0E11"
                     android:padding="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:background="@drawable/btn_footer"
                     android:stateListAnimator="@null" />
 
@@ -249,10 +249,13 @@
                     android:layout_height="30dp"
                     android:text="Reset"
                     android:textSize="11sp"
-                    android:textColor="#990C0E11"
+                    android:textStyle="bold"
+                    android:textColor="#8C0C0E11"
                     android:fontFamily="@font/poppins_bold"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:background="@drawable/btn_footer"
                     android:stateListAnimator="@null"
                     android:layout_marginEnd="6dp" />
@@ -264,10 +267,13 @@
                     android:layout_height="30dp"
                     android:text="Save"
                     android:textSize="11sp"
-                    android:textColor="#990C0E11"
+                    android:textStyle="bold"
+                    android:textColor="#8C0C0E11"
                     android:fontFamily="@font/poppins_bold"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:background="@drawable/btn_footer"
                     android:stateListAnimator="@null"
                     android:layout_marginEnd="6dp" />
@@ -279,10 +285,13 @@
                     android:layout_height="30dp"
                     android:text="Load"
                     android:textSize="11sp"
-                    android:textColor="#990C0E11"
+                    android:textStyle="bold"
+                    android:textColor="#8C0C0E11"
                     android:fontFamily="@font/poppins_bold"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:background="@drawable/btn_footer"
                     android:stateListAnimator="@null" />
 
@@ -391,7 +400,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:gravity="center"
-                        android:background="@drawable/btn_dpad"
+                        android:background="@drawable/btn_dpad_rev"
                         android:paddingTop="5dp"
                         android:paddingBottom="5dp"
                         android:layout_marginEnd="4dp">
@@ -402,15 +411,16 @@
                             android:layout_height="14dp"
                             android:src="@drawable/reverse_left_button"
                             android:scaleType="fitCenter"
-                            app:tint="@color/ds_text" />
+                            app:tint="#0C0E11" />
 
                         <TextView
                             android:id="@+id/revLeftLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Rev ◀"
-                            android:textSize="7sp"
-                            android:textColor="@color/ds_text_muted"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:textColor="#0C0E11"
                             android:fontFamily="@font/poppins_bold"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
@@ -421,7 +431,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:gravity="center"
-                        android:background="@drawable/btn_dpad"
+                        android:background="@drawable/btn_dpad_rev"
                         android:paddingTop="5dp"
                         android:paddingBottom="5dp">
 
@@ -431,15 +441,16 @@
                             android:layout_height="14dp"
                             android:src="@drawable/reverse_right_button"
                             android:scaleType="fitCenter"
-                            app:tint="@color/ds_text" />
+                            app:tint="#0C0E11" />
 
                         <TextView
                             android:id="@+id/revRightLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Rev ▶"
-                            android:textSize="7sp"
-                            android:textColor="@color/ds_text_muted"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:textColor="#0C0E11"
                             android:fontFamily="@font/poppins_bold"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>

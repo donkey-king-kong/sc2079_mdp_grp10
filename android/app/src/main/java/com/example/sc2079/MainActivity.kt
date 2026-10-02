@@ -274,7 +274,7 @@ class MainActivity : AppCompatActivity() {
         var autoActive = false
 
         // Theme toggle — flips between design-system dark and light token sets
-        val btnThemeToggle = findViewById<MaterialButton>(R.id.btnThemeToggle)
+        val btnThemeToggle = findViewById<android.widget.Button>(R.id.btnThemeToggle)
         val rootContainer = findViewById<LinearLayout>(R.id.container)
         val headerRow = findViewById<LinearLayout>(R.id.headerRow)
         val bottomRow = findViewById<LinearLayout>(R.id.bottomRow)
@@ -293,6 +293,9 @@ class MainActivity : AppCompatActivity() {
         val btnLoad        = findViewById<android.widget.Button>(R.id.load_map_button)
         val revLeftLabel   = findViewById<android.widget.TextView>(R.id.revLeftLabel)
         val revRightLabel  = findViewById<android.widget.TextView>(R.id.revRightLabel)
+        val revLeftIcon    = findViewById<android.widget.ImageView>(R.id.revLeftIcon)
+        val revRightIcon   = findViewById<android.widget.ImageView>(R.id.revRightIcon)
+        val btBtn          = btnBluetooth  // already lateinit above
 
         fun applyTheme(day: Boolean) {
             fun col(id: Int) = ContextCompat.getColor(this, id)
@@ -300,6 +303,10 @@ class MainActivity : AppCompatActivity() {
             gridMapObj.setDarkTheme(!day)
             if (day) {
                 btnThemeToggle.text = "🌙"
+                btnThemeToggle.setTextColor(android.graphics.Color.parseColor("#990C0E11"))
+                btnThemeToggle.background = drw(R.drawable.btn_header_icon)
+                btBtn.background = drw(R.drawable.btn_header_icon)
+                btBtn.setColorFilter(android.graphics.Color.parseColor("#990C0E11"))
                 rootContainer.setBackgroundColor(col(R.color.ds_bg_light))
                 headerRow.setBackgroundColor(col(R.color.ds_panel_light))
                 bottomRow.setBackgroundColor(col(R.color.ds_panel_light))
@@ -308,26 +315,34 @@ class MainActivity : AppCompatActivity() {
                 tabs.setSelectedTabIndicatorColor(col(R.color.ds_accent_light))
                 tabs.setTabTextColors(col(R.color.ds_text_muted_light), col(R.color.ds_accent_light))
                 updateAxisTextColor(false)
-                // d-pad: white bg + dark border
+                // d-pad arrows: white, 2dp rgba(0,0,0,0.30) border, text #0c0e11
                 val dpadBg = drw(R.drawable.btn_dpad)
                 val dpadTextColor = android.graphics.Color.parseColor("#0C0E11")
                 listOf(dpadUp, dpadDown, dpadLeft, dpadRight).forEach { btn ->
                     btn.background = dpadBg
                     btn.setTextColor(dpadTextColor)
                 }
-                revLeft.background = drw(R.drawable.btn_dpad)
-                revRight.background = drw(R.drawable.btn_dpad)
-                revLeftLabel.setTextColor(android.graphics.Color.parseColor("#880C0E11"))
-                revRightLabel.setTextColor(android.graphics.Color.parseColor("#880C0E11"))
-                // footer buttons: white bg + dark border
+                // Rev buttons: white, 2dp border, text #0c0e11 10sp bold
+                revLeft.background = drw(R.drawable.btn_dpad_rev)
+                revRight.background = drw(R.drawable.btn_dpad_rev)
+                revLeftLabel.setTextColor(dpadTextColor)
+                revRightLabel.setTextColor(dpadTextColor)
+                revLeftIcon.setColorFilter(dpadTextColor)
+                revRightIcon.setColorFilter(dpadTextColor)
+                // Footer/grid-size buttons: white, text rgba(12,14,17,0.55)
                 val footerBg = drw(R.drawable.btn_footer)
-                val footerTextColor = android.graphics.Color.parseColor("#990C0E11")
+                val footerTextColor = android.graphics.Color.parseColor("#8C0C0E11")
                 listOf(btnGridSize, btnReset, btnSave, btnLoad).forEach { btn ->
                     btn.background = footerBg
                     btn.setTextColor(footerTextColor)
                 }
+                btnGridSize.setTextColor(android.graphics.Color.parseColor("#0C0E11"))
             } else {
                 btnThemeToggle.text = "☀"
+                btnThemeToggle.setTextColor(col(R.color.ds_text_dark))
+                btnThemeToggle.background = drw(R.drawable.btn_header_icon_dark)
+                btBtn.background = drw(R.drawable.btn_header_icon_dark)
+                btBtn.setColorFilter(col(R.color.ds_text_dark))
                 rootContainer.setBackgroundColor(col(R.color.ds_bg_dark))
                 headerRow.setBackgroundColor(col(R.color.ds_panel_dark))
                 bottomRow.setBackgroundColor(col(R.color.ds_panel_dark))
@@ -336,24 +351,28 @@ class MainActivity : AppCompatActivity() {
                 tabs.setSelectedTabIndicatorColor(col(R.color.ds_accent_dark))
                 tabs.setTabTextColors(col(R.color.ds_text_dim_dark), col(R.color.ds_accent_dark))
                 updateAxisTextColor(true)
-                // d-pad: dark panel bg + white border
+                // d-pad: accent@18% fill, accent@35% border, text accent
                 val dpadBg = drw(R.drawable.btn_dpad_dark)
-                val dpadTextColor = col(R.color.ds_text_dark)
+                val dpadTextColor = col(R.color.ds_accent_dark)
                 listOf(dpadUp, dpadDown, dpadLeft, dpadRight).forEach { btn ->
                     btn.background = dpadBg
                     btn.setTextColor(dpadTextColor)
                 }
-                revLeft.background = drw(R.drawable.btn_dpad_dark)
-                revRight.background = drw(R.drawable.btn_dpad_dark)
-                revLeftLabel.setTextColor(col(R.color.ds_text_muted_dark))
-                revRightLabel.setTextColor(col(R.color.ds_text_muted_dark))
-                // footer buttons: dark surface bg + white border
+                // Rev buttons: same fill/stroke as dpad, text accent
+                revLeft.background = drw(R.drawable.btn_dpad_rev_dark)
+                revRight.background = drw(R.drawable.btn_dpad_rev_dark)
+                revLeftLabel.setTextColor(dpadTextColor)
+                revRightLabel.setTextColor(dpadTextColor)
+                revLeftIcon.setColorFilter(dpadTextColor)
+                revRightIcon.setColorFilter(dpadTextColor)
+                // Footer: #1c2333, 1.5dp #24ffffff, text text_muted
                 val footerBg = drw(R.drawable.btn_footer_dark)
                 val footerTextColor = col(R.color.ds_text_muted_dark)
                 listOf(btnGridSize, btnReset, btnSave, btnLoad).forEach { btn ->
                     btn.background = footerBg
                     btn.setTextColor(footerTextColor)
                 }
+                btnGridSize.setTextColor(col(R.color.ds_text_dark))
             }
         }
 

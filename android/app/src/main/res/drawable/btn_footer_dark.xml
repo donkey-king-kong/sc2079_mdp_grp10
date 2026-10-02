@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark-mode footer button: ds_surface fill, white-24% border, 6dp radius -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="#1C2333" />
     <corners android:radius="6dp" />
-    <stroke android:width="1dp" android:color="#3DFFFFFF" />
+    <stroke android:width="1.5dp" android:color="#24FFFFFF" />
 </shape>
