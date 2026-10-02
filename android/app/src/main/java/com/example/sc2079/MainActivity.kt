@@ -412,39 +412,7 @@ class MainActivity : AppCompatActivity() {
             clearMessageLog()
         }
 
-        val btnManual: com.google.android.material.button.MaterialButton = findViewById(R.id.manual_update_button)
-        val btnAuto: com.google.android.material.button.MaterialButton = findViewById(R.id.auto_update_button)
-
-        btnManual.setOnClickListener {
-            bluetoothService?.write("sendArena".toByteArray())
-            Toast.makeText(this, "Requested arena update", Toast.LENGTH_SHORT).show()
-        }
-
         var autoActive = false
-        val colorGreenFill = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#2E7D32"))
-        val colorTransparent = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
-
-        fun updateAutoVisual() {
-            if (autoActive) {
-                btnAuto.backgroundTintList = colorGreenFill
-                btnAuto.setTextColor(android.graphics.Color.WHITE)
-                btnAuto.strokeWidth = 0
-            } else {
-                btnAuto.backgroundTintList = colorTransparent
-                btnAuto.setTextColor(android.graphics.Color.parseColor("#26B5CB"))
-                btnAuto.strokeWidth = 0
-            }
-        }
-
-        btnAuto.setOnClickListener {
-            autoActive = !autoActive
-            updateAutoVisual()
-            if (autoActive) {
-                autoHandler.post(autoRunnable)
-            } else {
-                autoHandler.removeCallbacks(autoRunnable)
-            }
-        }
 
         val customNavigatorBar: customNavigator = customNavigator(
             supportFragmentManager,
@@ -523,8 +491,6 @@ class MainActivity : AppCompatActivity() {
                 statusText.setTextColor(col("#1A2A4A"))
                 // Bottom bar buttons: dark text on light bar
                 val darkNavy = col("#1A2A4A")
-                btnManual.setTextColor(darkNavy)
-                btnAuto.setTextColor(darkNavy)
                 btnGridSize.setTextColor(darkNavy)
                 btnReset.setTextColor(darkNavy)
                 saveGridMapButton.setTextColor(darkNavy)
@@ -569,8 +535,6 @@ class MainActivity : AppCompatActivity() {
                 // Bottom bar buttons: restore original light-blue text
                 val cyanText = col("#26B5CB")
                 val paleText = col("#A8C8E8")
-                btnManual.setTextColor(cyanText)
-                btnAuto.setTextColor(cyanText)
                 btnGridSize.setTextColor(paleText)
                 btnReset.setTextColor(paleText)
                 saveGridMapButton.setTextColor(paleText)
