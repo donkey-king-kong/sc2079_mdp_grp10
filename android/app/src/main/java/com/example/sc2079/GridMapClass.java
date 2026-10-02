@@ -78,7 +78,6 @@ public class GridMapClass extends View {
     int obstacleCount = 0;
     private ArrayList<ObstacleData> placedObstacles = new ArrayList<>();
     private boolean bound = false;
-    private boolean isDarkTheme = true;
 
     private BluetoothService btService;
     private utilities utilitiesClass = new utilities();
@@ -281,41 +280,6 @@ public class GridMapClass extends View {
         this.currentMode = mode;
     }
 
-    public void setDarkTheme(boolean dark) {
-        this.isDarkTheme = dark;
-        invalidate();
-    }
-
-    private void applyLightPaints() {
-        // Obstacle cell: rgba(26,62,207,0.14) fill, #1a3ecf stroke
-        blackPaint.setStyle(Paint.Style.FILL_AND_STROKE);
-        blackPaint.setColor(Color.argb(36, 26, 62, 207));
-        // Text label: #1a3ecf
-        textPaint.setColor(Color.parseColor("#1A3ECF"));
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setAntiAlias(true);
-        // Obstacle direction arrow: #1a3ecf 1.5dp
-        redPaint.setStyle(Paint.Style.STROKE);
-        redPaint.setColor(Color.parseColor("#1A3ECF"));
-        redPaint.setStrokeWidth(4f);
-        redPaint.setAntiAlias(true);
-    }
-
-    private void applyDarkPaints() {
-        // Obstacle cell: rgba(108,142,245,0.18) fill, #6c8ef5 stroke
-        blackPaint.setStyle(Paint.Style.FILL_AND_STROKE);
-        blackPaint.setColor(Color.argb(46, 108, 142, 245));
-        // Text label: #6c8ef5
-        textPaint.setColor(Color.parseColor("#6C8EF5"));
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setAntiAlias(true);
-        // Obstacle direction arrow: #6c8ef5
-        redPaint.setStyle(Paint.Style.STROKE);
-        redPaint.setColor(Color.parseColor("#6C8EF5"));
-        redPaint.setStrokeWidth(4f);
-        redPaint.setAntiAlias(true);
-    }
-
     public void setBluetoothService(BluetoothService service) {
         this.btService = service;
         Log.d("GridMapClass", "BluetoothService instance set.");
@@ -398,46 +362,17 @@ public class GridMapClass extends View {
 
     @Override
     protected void onDraw(Canvas canvas){
-        if (isDarkTheme) {
-            applyDarkPaints();
-        } else {
-            applyLightPaints();
-        }
-
-        int bgColor    = isDarkTheme ? Color.parseColor("#111A11") : Color.parseColor("#C8D4C8");
-        int checkColor = isDarkTheme
-                ? Color.argb(46, 60, 120, 60)
-                : Color.parseColor("#B8C8B8");
-
-        canvas.drawColor(bgColor);
+        canvas.drawColor(Color.parseColor("#7CFC00"));
         if (gridColumns == 0 || gridRows == 0) {
             return;
         }
 
-        // Checkerboard
-        Paint checkPaint = new Paint();
-        checkPaint.setColor(checkColor);
-        for (int r = 0; r < gridRows; r++) {
-            for (int c = 0; c < gridColumns; c++) {
-                if ((r + c) % 2 == 0) {
-                    canvas.drawRect(c * cellWidth, r * cellHeight,
-                            (c + 1) * cellWidth, (r + 1) * cellHeight, checkPaint);
-                }
-            }
-        }
-
-        Paint linePaint = new Paint();
-        linePaint.setColor(isDarkTheme
-                ? Color.argb(77, 50, 100, 50)
-                : Color.argb(102, 70, 100, 70));
-        linePaint.setStrokeWidth(0.5f);
-
-        // Draw grid lines
+        // Draw grid first
         for (int i = 0; i <= gridColumns; i++) {
-            canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), linePaint);
+            canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), blackPaint);
         }
         for (int j = 0; j <= gridRows; j++) {
-            canvas.drawLine(0, j * cellHeight, getWidth(), j * cellHeight, linePaint);
+            canvas.drawLine(0, j * cellHeight, getWidth(), j * cellHeight, blackPaint);
         }
 
         for (int y = 0; y < gridRows; y++) {
@@ -558,17 +493,14 @@ public class GridMapClass extends View {
         float right = (x + 3) * cellWidth;
         float top = (gridRows - (y + 3)) * cellHeight;
 
-        // 1. Draw body — vehicle fill from spec: rgba(158,15,68,0.18) light / rgba(212,90,142,0.25) dark
-        greenPaint.setColor(isDarkTheme
-                ? Color.argb(64, 212, 90, 142)
-                : Color.argb(46, 158, 15, 68));
+        // 1. Draw Green Body
         canvas.drawRect(left, top, right, bottom, greenPaint);
 
-        // 2. Draw outline — vehicle stroke: #9e0f44 light (2dp) / #d45a8e dark (2dp)
+        // 2. Draw Cyan Outline (neutral — direction shown by bar, not border color)
         Paint outlinePaint = new Paint();
         outlinePaint.setStyle(Paint.Style.STROKE);
         outlinePaint.setStrokeWidth(6f);
-        outlinePaint.setColor(isDarkTheme ? Color.parseColor("#D45A8E") : Color.parseColor("#9E0F44"));
+        outlinePaint.setColor(Color.parseColor("#26B5CB"));
         outlinePaint.setAntiAlias(true);
         canvas.drawRect(left, top, right, bottom, outlinePaint);
 
@@ -2028,7 +1960,9 @@ public class GridMapClass extends View {
 
             int robotX, robotY, robotDir;
             if(bottomLeftVehicleData[1] == -2 && bottomLeftVehicleData[0] == -2){
-                robotX = 0; robotY = 0; robotDir = 0;
+                robotX = 0;
+                robotY = 0;
+                robotDir = 0;
             } else {
                 ObstacleData bottomLeftVehicle = gridMapData.get(bottomLeftVehicleData[1]).get(bottomLeftVehicleData[0]);
                 robotX = bottomLeftVehicle.getXCoord();
