@@ -1958,18 +1958,25 @@ public class GridMapClass extends View {
             StringBuilder stringBuilder = new StringBuilder();
             int[] bottomLeftVehicleData = findVehicleBottomLeftObstacle();
 
+            int robotX, robotY, robotDir;
             if(bottomLeftVehicleData[1] == -2 && bottomLeftVehicleData[0] == -2){
-                stringBuilder.append("\"NO MAP DATA\"");
-                utilitiesClass.arenaData = stringBuilder.toString();
-                btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
-                return;
+                robotX = 0;
+                robotY = 0;
+                robotDir = 0;
+            } else {
+                ObstacleData bottomLeftVehicle = gridMapData.get(bottomLeftVehicleData[1]).get(bottomLeftVehicleData[0]);
+                robotX = bottomLeftVehicle.getXCoord();
+                robotY = bottomLeftVehicle.getYCoord();
+                robotDir = bottomLeftVehicle.getDirection().getIntFromDirection();
             }
-            ObstacleData bottomLeftVehicle = gridMapData.get(bottomLeftVehicleData[1]).get(bottomLeftVehicleData[0]);
             stringBuilder.append("{\"obstacles\":");
             stringBuilder.append("[");
 
             if(placedObstacles.size() == 0){
-                stringBuilder.append("]");
+                stringBuilder.append("],");
+                stringBuilder.append("\"robot_x\": "+robotX+",");
+                stringBuilder.append("\"robot_y\": "+robotY+",");
+                stringBuilder.append("\"robot_direction\": "+robotDir+"}");
                 utilitiesClass.arenaData = stringBuilder.toString();
                 btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
                 return;
@@ -1986,9 +1993,9 @@ public class GridMapClass extends View {
                 }
             }
             stringBuilder.append("],");
-            stringBuilder.append("\"robot_x\": "+bottomLeftVehicle.getXCoord()+",");
-            stringBuilder.append("\"robot_y\": "+bottomLeftVehicle.getYCoord()+",");
-            stringBuilder.append("\"robot_direction\": "+bottomLeftVehicle.getDirection().getIntFromDirection()+"}");
+            stringBuilder.append("\"robot_x\": "+robotX+",");
+            stringBuilder.append("\"robot_y\": "+robotY+",");
+            stringBuilder.append("\"robot_direction\": "+robotDir+"}");
 
             utilitiesClass.arenaData = stringBuilder.toString();
             btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));

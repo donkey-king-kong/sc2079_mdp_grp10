@@ -849,6 +849,7 @@ class MainActivity : AppCompatActivity() {
             val loadedData: ArrayList<ArrayList<ObstacleData>> = gson.fromJson(json, type)
             gridMapObj.clearGridMap()
             gridMapObj.addGridMapSaved(loadedData)
+            gridMapObj.sendArenaDataBluetooth()
         }else{
             Toast.makeText(this, "No Map was saved!", Toast.LENGTH_SHORT).show()
 
