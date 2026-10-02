@@ -11,7 +11,8 @@
         <item name="colorOnSecondary">@color/black</item>
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
-        <!-- Customize your theme here. -->
+        <!-- Disable automatic forced dark mode — we handle it via AppCompatDelegate -->
+        <item name="android:forceDarkAllowed">false</item>
     </style>
     <style name="MyButton" parent="Widget.MaterialComponents.Button">
         <item name="android:fontFamily">@font/poppins_bold</item>

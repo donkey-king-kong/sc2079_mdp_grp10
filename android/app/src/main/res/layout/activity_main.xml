@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/ds_bg">
+    android:background="@color/bg_primary">
 
     <!-- HEADER BAR (full width) -->
     <LinearLayout
@@ -14,7 +14,7 @@
         android:layout_height="48dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@color/ds_panel"
+        android:background="@color/bg_panel"
         android:paddingStart="12dp"
         android:paddingEnd="10dp">
 
@@ -197,7 +197,7 @@
                 android:layout_height="44dp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:background="@color/ds_panel"
+                android:background="@color/bg_panel"
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp">
 
@@ -207,7 +207,7 @@
                     android:layout_height="wrap_content"
                     android:text="Grid size"
                     android:textSize="10sp"
-                    android:textColor="@color/ds_text_muted"
+                    android:textColor="@color/text_muted"
                     android:fontFamily="@font/poppins_regular"
                     android:layout_marginEnd="6dp" />
 
@@ -305,17 +305,56 @@
             android:layout_width="220dp"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:background="@color/ds_panel">
+            android:background="@color/bg_panel">
 
-            <!-- D-pad -->
+            <!-- Tab bar + pager — flex height, fills between header and d-pad -->
             <LinearLayout
+                android:id="@+id/sub_navigation_container"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <com.google.android.material.tabs.TabLayout
+                    android:id="@+id/tabs"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:background="@color/bg_surface"
+                    app:tabMode="fixed"
+                    app:tabGravity="fill"
+                    app:tabMinWidth="0dp"
+                    app:tabPaddingStart="0dp"
+                    app:tabPaddingEnd="0dp"
+                    app:tabSelectedTextColor="@color/accent"
+                    app:tabTextColor="@color/text_dim"
+                    app:tabIndicatorColor="@color/accent"
+                    app:tabIndicatorHeight="2dp" />
+
+                <androidx.viewpager.widget.ViewPager
+                    android:id="@+id/sub_navigation_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:background="@color/bg_panel" />
+
+            </LinearLayout>
+
+            <!-- D-pad section — fixed at bottom of right panel -->
+            <LinearLayout
+                android:id="@+id/dpadSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-                android:background="@color/ds_surface">
+                android:padding="12dp"
+                android:background="@color/bg_panel">
+
+                <!-- 1dp top border -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/border_strong"
+                    android:layout_marginBottom="10dp" />
 
                 <Button
                     android:id="@+id/dpad_up"
@@ -323,7 +362,7 @@
                     android:layout_height="44dp"
                     android:text="▲"
                     android:textSize="16sp"
-                    android:textColor="#0C0E11"
+                    android:textColor="@color/text_primary"
                     android:background="@drawable/btn_dpad"
                     android:padding="0dp"
                     android:insetTop="0dp"
@@ -344,7 +383,7 @@
                         android:layout_height="44dp"
                         android:text="◀"
                         android:textSize="16sp"
-                        android:textColor="#0C0E11"
+                        android:textColor="@color/text_primary"
                         android:background="@drawable/btn_dpad"
                         android:padding="0dp"
                         android:insetTop="0dp"
@@ -364,7 +403,7 @@
                         android:layout_height="44dp"
                         android:text="▶"
                         android:textSize="16sp"
-                        android:textColor="#0C0E11"
+                        android:textColor="@color/text_primary"
                         android:background="@drawable/btn_dpad"
                         android:padding="0dp"
                         android:insetTop="0dp"
@@ -379,7 +418,7 @@
                     android:layout_height="44dp"
                     android:text="▼"
                     android:textSize="16sp"
-                    android:textColor="#0C0E11"
+                    android:textColor="@color/text_primary"
                     android:background="@drawable/btn_dpad"
                     android:padding="0dp"
                     android:insetTop="0dp"
@@ -411,7 +450,7 @@
                             android:layout_height="14dp"
                             android:src="@drawable/reverse_left_button"
                             android:scaleType="fitCenter"
-                            app:tint="#0C0E11" />
+                            app:tint="@color/text_primary" />
 
                         <TextView
                             android:id="@+id/revLeftLabel"
@@ -420,7 +459,7 @@
                             android:text="Rev ◀"
                             android:textSize="10sp"
                             android:textStyle="bold"
-                            android:textColor="#0C0E11"
+                            android:textColor="@color/text_primary"
                             android:fontFamily="@font/poppins_bold"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
@@ -441,7 +480,7 @@
                             android:layout_height="14dp"
                             android:src="@drawable/reverse_right_button"
                             android:scaleType="fitCenter"
-                            app:tint="#0C0E11" />
+                            app:tint="@color/text_primary" />
 
                         <TextView
                             android:id="@+id/revRightLabel"
@@ -450,44 +489,12 @@
                             android:text="Rev ▶"
                             android:textSize="10sp"
                             android:textStyle="bold"
-                            android:textColor="#0C0E11"
+                            android:textColor="@color/text_primary"
                             android:fontFamily="@font/poppins_bold"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
 
                 </LinearLayout>
-
-            </LinearLayout>
-
-            <!-- Tab bar + pager -->
-            <LinearLayout
-                android:id="@+id/sub_navigation_container"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <com.google.android.material.tabs.TabLayout
-                    android:id="@+id/tabs"
-                    android:layout_width="match_parent"
-                    android:layout_height="36dp"
-                    android:background="@color/ds_bg"
-                    app:tabMode="fixed"
-                    app:tabGravity="fill"
-                    app:tabMinWidth="0dp"
-                    app:tabPaddingStart="0dp"
-                    app:tabPaddingEnd="0dp"
-                    app:tabSelectedTextColor="@color/ds_accent"
-                    app:tabTextColor="@color/ds_text_dim"
-                    app:tabIndicatorColor="@color/ds_accent"
-                    app:tabIndicatorHeight="2dp" />
-
-                <androidx.viewpager.widget.ViewPager
-                    android:id="@+id/sub_navigation_bar"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:background="@color/ds_panel" />
 
             </LinearLayout>
 
