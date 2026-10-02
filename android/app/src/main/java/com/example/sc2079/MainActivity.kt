@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -221,19 +222,6 @@ class MainActivity : AppCompatActivity() {
             }
             if (text == null) text = "(empty packet)"
 
-            // AMD bundles grid + robot location as two newline-separated JSONs in one BT packet.
-            // Split and re-dispatch each part so the individual message handlers each fire correctly.
-            val parts = text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-            if (parts.size > 1) {
-                for (part in parts) {
-                    val subIntent = Intent(BluetoothService.ACTION_MESSAGE).apply {
-                        putExtra(BluetoothService.EXTRA_TEXT, part)
-                    }
-                    onReceive(context, subIntent)
-                }
-                return
-            }
-
             // Checklist requirements C.9 & C.10 (Plain text protocol)
             if (text.startsWith("TARGET,")) {
                 val subParts = text.split(",").map { it.trim() }
@@ -293,8 +281,9 @@ class MainActivity : AppCompatActivity() {
                 val status = gridMapObj.receiveStichImageMessageBluetooth(text);
                 when (status) {
                     "-1" -> {
-                        //Toast.makeText(context, "Unknown Error Occurred", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Unknown Error Occurred at stitch-image \n");
+                        base64Data.clear()
+                        iterationHowMany = -1
+                        messageLog.add("Invalid stitched image message received \n");
                     }
                     "2" -> {
                         messageLog.add("Starting to Stitch \n");
@@ -302,9 +291,27 @@ class MainActivity : AppCompatActivity() {
                         base64Data.clear()
                     }
                     "3" -> {
+                        if (iterationHowMany < 0 || base64Data.isEmpty()) {
+                            base64Data.clear()
+                            iterationHowMany = -1
+                            Toast.makeText(this@MainActivity, "Incomplete stitched image received", Toast.LENGTH_SHORT).show()
+                            return
+                        }
+                        val stitchedImageBase64 = base64Data.toString()
+                        base64Data.clear()
+                        iterationHowMany = -1
+                        try {
+                            val imageBytes = Base64.decode(stitchedImageBase64, Base64.DEFAULT)
+                            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
+                            require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Invalid image data" }
+                        } catch (e: Exception) {
+                            Log.e("Image Message", "Invalid stitched image", e)
+                            Toast.makeText(this@MainActivity, "Invalid stitched image received", Toast.LENGTH_SHORT).show()
+                            return
+                        }
                         messageLog.add("Ending Stitch, displaying image \n")
                         messageLog.add("Robot: [Image Received - Tap to view]\n")
-                        val stitchedImageBase64 = base64Data.toString()
                         Log.d("Image Message", "Final length: ${stitchedImageBase64.length}")
                         try {
                             val savedUri = saveStitchedImageToGallery(stitchedImageBase64)
@@ -329,14 +336,15 @@ class MainActivity : AppCompatActivity() {
                         iterationHowMany = -1;
                     }
                     else -> {
+                        if (iterationHowMany < 0) return // Wait for a start marker.
                         base64Data.append(status)  // add chunk
-                        Log.d("Image Chunk", status)
                         iterationHowMany += 1
                         messageLog.add("Running data compilation iteration $iterationHowMany \n")
                         Log.d("Image Chunk", "Added chunk length=${status.length}, total=${base64Data.length}")
 
                     }
                 }
+                return
             }
 
 
@@ -450,6 +458,8 @@ class MainActivity : AppCompatActivity() {
                 isConnected = true
             } else if (state == "disconnected" || state == "error") {
                 isConnected = false
+                base64Data.clear()
+                iterationHowMany = -1
             }
 
             // Update the UI with the new status
