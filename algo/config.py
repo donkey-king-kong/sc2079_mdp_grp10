@@ -114,7 +114,7 @@ CAPTURE_STANDOFF = 30.0
 # camera sits 15cm ahead of the centre, so a 35cm standoff puts it there. Both
 # 30 and 35 are comfortably inside checklist A.2's "20-50cm from the midpoint
 # of the robot", which is the real acceptance criterion.
-CAPTURE_STANDOFF_OPTIONS = (20.0, 30.0, 35.0, 25.0, 40.0, 45.0)
+CAPTURE_STANDOFF_OPTIONS = (20.0, 35.0, 25.0)
 
 # "The center of the robot does not have to be aligned exactly with the center
 # of the image/obstacle" (slide 8), and slide 4 notes the camera has a conical
@@ -125,7 +125,7 @@ CAPTURE_STANDOFF_OPTIONS = (20.0, 30.0, 35.0, 25.0, 40.0, 45.0)
 # menu shares a heading if you only vary the standoff, and whether a Dubins path
 # exists depends almost entirely on the APPROACH HEADING. Offering the planner
 # a fan of approach angles is what turns "no path found" into a path.
-CAPTURE_ANGLE_OPTIONS = (0.0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0, 60.0, -60.0)
+CAPTURE_ANGLE_OPTIONS = (0.0, 30.0, -30.0, 60.0, -60.0)
 
 # How a compromise pose is scored against the ideal, for menu ordering.
 # An oblique view is harder for the camera than an unusual standoff, so
@@ -144,7 +144,7 @@ CAPTURE_MAX_DISTANCE = 50.0
 # drives into the block it just photographed. Before planning the next leg we
 # therefore back straight out by one of these distances and plan the Dubins
 # path from there. 0.0 is tried first so the start pose costs nothing extra.
-DEPARTURE_BACKOFF_OPTIONS = (0.0, 2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0)
+DEPARTURE_BACKOFF_OPTIONS = (0.0, 2.0, 5.0, 10.0, 20.0)
 
 # --------------------------------------------------------------------------
 # Hybrid A* fallback (used only when every Dubins candidate is blocked)
