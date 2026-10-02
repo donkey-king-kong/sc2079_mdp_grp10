@@ -38,6 +38,11 @@
     <color name="ds_bg_dark">#0E1117</color>
     <color name="ds_panel_dark">#151B27</color>
     <color name="ds_surface_dark">#1C2333</color>
+    <!-- grid sage colors: light=#c8d4c8 checker=#b8c8b8, dark=#111a11 checker=#192019 -->
+    <color name="ds_grid_base_light">#C8D4C8</color>
+    <color name="ds_grid_check_light">#B8C8B8</color>
+    <color name="ds_grid_base_dark">#111A11</color>
+    <color name="ds_grid_check_dark">#192019</color>
     <color name="ds_accent_dark">#6C8EF5</color>
     <color name="ds_pink_dark">#D45A8E</color>
     <color name="ds_green_dark">#3DBA6E</color>
@@ -52,21 +57,36 @@
     <color name="ds_red_dim_dark">#26E05252</color>
     <color name="ds_green_dim_dark">#263DBA6E</color>
 
-    <!-- Design system tokens — light suffix (light mode) -->
+    <!-- Design system tokens — light suffix (light mode) — values from vehicle_ui_light_v4.html -->
     <color name="ds_bg_light">#C8CDD4</color>
     <color name="ds_panel_light">#E8EAED</color>
-    <color name="ds_surface_light">#F2F4F7</color>
+    <color name="ds_surface_light">#DDE0E4</color>
     <color name="ds_accent_light">#1A3ECF</color>
-    <color name="ds_pink_light">#B03070</color>
-    <color name="ds_green_light">#1E7A44</color>
-    <color name="ds_red_light">#C03030</color>
-    <color name="ds_text_light">#1C2333</color>
-    <color name="ds_text_muted_light">#73333333</color>
-    <color name="ds_text_dim_light">#47333333</color>
-    <color name="ds_border_light">#28000000</color>
-    <color name="ds_border_strong_light">#48000000</color>
-    <color name="ds_accent_dim_light">#2E1A3ECF</color>
-    <color name="ds_pink_dim_light">#33B03070</color>
-    <color name="ds_red_dim_light">#26C03030</color>
-    <color name="ds_green_dim_light">#261E7A44</color>
+    <color name="ds_pink_light">#9E0F44</color>
+    <color name="ds_green_light">#155E32</color>
+    <color name="ds_red_light">#9E1515</color>
+    <color name="ds_text_light">#0C0E11</color>
+    <color name="ds_text_muted_light">#8C0C0E11</color>
+    <color name="ds_text_dim_light">#610C0E11</color>
+    <!-- border: rgba(0,0,0,0.18)=0x2E, border-strong: rgba(0,0,0,0.28)=0x47 -->
+    <color name="ds_border_light">#2E000000</color>
+    <color name="ds_border_strong_light">#47000000</color>
+    <!-- accent-dim: rgba(26,62,207,0.1)=0x1A -->
+    <color name="ds_accent_dim_light">#1A1A3ECF</color>
+    <!-- pink-dim: rgba(158,15,68,0.1)=0x1A -->
+    <color name="ds_pink_dim_light">#1A9E0F44</color>
+    <!-- red-dim: rgba(158,21,21,0.1)=0x1A -->
+    <color name="ds_red_dim_light">#1A9E1515</color>
+    <!-- green-dim: rgba(21,94,50,0.1)=0x1A -->
+    <color name="ds_green_dim_light">#1A155E32</color>
+    <!-- Button bg in light mode is white -->
+    <color name="ds_btn_bg_light">#FFFFFF</color>
+    <!-- accent-border: rgba(26,62,207,0.45)=0x73 -->
+    <color name="ds_accent_border_light">#731A3ECF</color>
+    <!-- pink-border: rgba(158,15,68,0.4)=0x66 -->
+    <color name="ds_pink_border_light">#669E0F44</color>
+    <!-- red-border: rgba(158,21,21,0.4)=0x66 -->
+    <color name="ds_red_border_light">#669E1515</color>
+    <!-- green-border: rgba(21,94,50,0.4)=0x66 -->
+    <color name="ds_green_border_light">#66155E32</color>
 </resources>

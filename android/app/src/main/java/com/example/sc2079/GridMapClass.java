@@ -368,9 +368,11 @@ public class GridMapClass extends View {
 
     @Override
     protected void onDraw(Canvas canvas){
-        int bgColor     = isDarkTheme ? Color.parseColor("#0E1117") : Color.parseColor("#D8DDE4");
-        int gridColor   = isDarkTheme ? Color.parseColor("#24FFFFFF") : Color.parseColor("#48000000");
-        int obstColor   = isDarkTheme ? Color.parseColor("#E8EAF0")  : Color.parseColor("#1C2333");
+        // Grid sage palette — from vehicle_ui_light_v4.html
+        int bgColor      = isDarkTheme ? Color.parseColor("#111A11") : Color.parseColor("#C8D4C8");
+        int checkColor   = isDarkTheme ? Color.parseColor("#192019") : Color.parseColor("#B8C8B8");
+        int gridColor    = isDarkTheme ? Color.parseColor("#66466446") : Color.parseColor("#66466446");
+        int obstColor    = isDarkTheme ? Color.parseColor("#E8EAF0")  : Color.parseColor("#1C2333");
         textPaint.setColor(isDarkTheme ? Color.WHITE : Color.WHITE);
         blackPaint.setColor(obstColor);
 
@@ -379,11 +381,23 @@ public class GridMapClass extends View {
             return;
         }
 
-        Paint linePaint = new Paint();
-        linePaint.setColor(gridColor);
-        linePaint.setStrokeWidth(1f);
+        // Checkerboard
+        Paint checkPaint = new Paint();
+        checkPaint.setColor(checkColor);
+        for (int r = 0; r < gridRows; r++) {
+            for (int c = 0; c < gridColumns; c++) {
+                if ((r + c) % 2 == 0) {
+                    canvas.drawRect(c * cellWidth, r * cellHeight,
+                            (c + 1) * cellWidth, (r + 1) * cellHeight, checkPaint);
+                }
+            }
+        }
 
-        // Draw grid first
+        Paint linePaint = new Paint();
+        linePaint.setColor(isDarkTheme ? Color.parseColor("#4D466446") : Color.parseColor("#4D466446"));
+        linePaint.setStrokeWidth(0.5f);
+
+        // Draw grid lines
         for (int i = 0; i <= gridColumns; i++) {
             canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), linePaint);
         }
@@ -509,15 +523,15 @@ public class GridMapClass extends View {
         float right = (x + 3) * cellWidth;
         float top = (gridRows - (y + 3)) * cellHeight;
 
-        // 1. Draw Green Body
-        greenPaint.setColor(isDarkTheme ? Color.parseColor("#3DBA6E") : Color.parseColor("#2E9E58"));
+        // 1. Draw body — pink from HTML: #9e0f44 (light), #D45A8E (dark) at 18% alpha fill
+        greenPaint.setColor(isDarkTheme ? Color.parseColor("#2ED45A8E") : Color.parseColor("#2E9E0F44"));
         canvas.drawRect(left, top, right, bottom, greenPaint);
 
-        // 2. Draw Cyan Outline
+        // 2. Draw outline — accent color
         Paint outlinePaint = new Paint();
         outlinePaint.setStyle(Paint.Style.STROKE);
         outlinePaint.setStrokeWidth(6f);
-        outlinePaint.setColor(Color.parseColor("#26B5CB"));
+        outlinePaint.setColor(isDarkTheme ? Color.parseColor("#6C8EF5") : Color.parseColor("#1A3ECF"));
         outlinePaint.setAntiAlias(true);
         canvas.drawRect(left, top, right, bottom, outlinePaint);
 

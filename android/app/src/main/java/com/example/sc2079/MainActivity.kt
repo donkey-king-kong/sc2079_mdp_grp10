@@ -281,8 +281,22 @@ class MainActivity : AppCompatActivity() {
         val rightPanel = findViewById<LinearLayout>(R.id.rightPanel)
         val tabs = findViewById<TabLayout>(R.id.tabs)
 
+        val dpadUp    = findViewById<android.widget.Button>(R.id.dpad_up)
+        val dpadDown  = findViewById<android.widget.Button>(R.id.dpad_down)
+        val dpadLeft  = findViewById<android.widget.Button>(R.id.dpad_left)
+        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
+        val revLeft   = findViewById<LinearLayout>(R.id.reverse_left_button)
+        val revRight  = findViewById<LinearLayout>(R.id.reverse_right_button)
+        val btnGridSize    = findViewById<android.widget.Button>(R.id.btn_grid_size)
+        val btnReset       = findViewById<android.widget.Button>(R.id.reset_map_button)
+        val btnSave        = findViewById<android.widget.Button>(R.id.save_map_button)
+        val btnLoad        = findViewById<android.widget.Button>(R.id.load_map_button)
+        val revLeftLabel   = findViewById<android.widget.TextView>(R.id.revLeftLabel)
+        val revRightLabel  = findViewById<android.widget.TextView>(R.id.revRightLabel)
+
         fun applyTheme(day: Boolean) {
             fun col(id: Int) = ContextCompat.getColor(this, id)
+            fun drw(id: Int) = ContextCompat.getDrawable(this, id)
             gridMapObj.setDarkTheme(!day)
             if (day) {
                 btnThemeToggle.text = "🌙"
@@ -294,6 +308,24 @@ class MainActivity : AppCompatActivity() {
                 tabs.setSelectedTabIndicatorColor(col(R.color.ds_accent_light))
                 tabs.setTabTextColors(col(R.color.ds_text_muted_light), col(R.color.ds_accent_light))
                 updateAxisTextColor(false)
+                // d-pad: white bg + dark border
+                val dpadBg = drw(R.drawable.btn_dpad)
+                val dpadTextColor = android.graphics.Color.parseColor("#0C0E11")
+                listOf(dpadUp, dpadDown, dpadLeft, dpadRight).forEach { btn ->
+                    btn.background = dpadBg
+                    btn.setTextColor(dpadTextColor)
+                }
+                revLeft.background = drw(R.drawable.btn_dpad)
+                revRight.background = drw(R.drawable.btn_dpad)
+                revLeftLabel.setTextColor(android.graphics.Color.parseColor("#880C0E11"))
+                revRightLabel.setTextColor(android.graphics.Color.parseColor("#880C0E11"))
+                // footer buttons: white bg + dark border
+                val footerBg = drw(R.drawable.btn_footer)
+                val footerTextColor = android.graphics.Color.parseColor("#990C0E11")
+                listOf(btnGridSize, btnReset, btnSave, btnLoad).forEach { btn ->
+                    btn.background = footerBg
+                    btn.setTextColor(footerTextColor)
+                }
             } else {
                 btnThemeToggle.text = "☀"
                 rootContainer.setBackgroundColor(col(R.color.ds_bg_dark))
@@ -304,6 +336,24 @@ class MainActivity : AppCompatActivity() {
                 tabs.setSelectedTabIndicatorColor(col(R.color.ds_accent_dark))
                 tabs.setTabTextColors(col(R.color.ds_text_dim_dark), col(R.color.ds_accent_dark))
                 updateAxisTextColor(true)
+                // d-pad: dark panel bg + white border
+                val dpadBg = drw(R.drawable.btn_dpad_dark)
+                val dpadTextColor = col(R.color.ds_text_dark)
+                listOf(dpadUp, dpadDown, dpadLeft, dpadRight).forEach { btn ->
+                    btn.background = dpadBg
+                    btn.setTextColor(dpadTextColor)
+                }
+                revLeft.background = drw(R.drawable.btn_dpad_dark)
+                revRight.background = drw(R.drawable.btn_dpad_dark)
+                revLeftLabel.setTextColor(col(R.color.ds_text_muted_dark))
+                revRightLabel.setTextColor(col(R.color.ds_text_muted_dark))
+                // footer buttons: dark surface bg + white border
+                val footerBg = drw(R.drawable.btn_footer_dark)
+                val footerTextColor = col(R.color.ds_text_muted_dark)
+                listOf(btnGridSize, btnReset, btnSave, btnLoad).forEach { btn ->
+                    btn.background = footerBg
+                    btn.setTextColor(footerTextColor)
+                }
             }
         }
 
@@ -321,31 +371,19 @@ class MainActivity : AppCompatActivity() {
         setupGraphAxes(this, true)
         updateGridSizeLabel()
 
-        // D-pad
-        val dpadUp    = findViewById<android.widget.Button>(R.id.dpad_up)
-        val dpadDown  = findViewById<android.widget.Button>(R.id.dpad_down)
-        val dpadLeft  = findViewById<android.widget.Button>(R.id.dpad_left)
-        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
-        val reverseLeft  = findViewById<LinearLayout>(R.id.reverse_left_button)
-        val reverseRight = findViewById<LinearLayout>(R.id.reverse_right_button)
-
+        // D-pad click listeners (variables already declared above for theme toggle)
         dpadUp.setOnClickListener    { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true) }
         dpadDown.setOnClickListener  { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.SOUTH, true) }
         dpadLeft.setOnClickListener  { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.WEST, true) }
         dpadRight.setOnClickListener { activateJoyStickBool = true; gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true) }
-        reverseLeft.setOnClickListener  { Log.d("JoystickButtons", "Reverse Left clicked");  gridMapObj.reverseLeftVehicle(true) }
-        reverseRight.setOnClickListener { Log.d("JoystickButtons", "Reverse Right clicked"); gridMapObj.reverseRightVehicle(true) }
+        revLeft.setOnClickListener  { Log.d("JoystickButtons", "Reverse Left clicked");  gridMapObj.reverseLeftVehicle(true) }
+        revRight.setOnClickListener { Log.d("JoystickButtons", "Reverse Right clicked"); gridMapObj.reverseRightVehicle(true) }
 
-        // Bottom bar
-        val btnGridSize       = findViewById<MaterialButton>(R.id.btn_grid_size)
-        val btnReset          = findViewById<MaterialButton>(R.id.reset_map_button)
-        val saveGridMapButton = findViewById<MaterialButton>(R.id.save_map_button)
-        val loadGridMapButton = findViewById<MaterialButton>(R.id.load_map_button)
-
+        // Bottom bar click listeners (variables already declared above for theme toggle)
         btnGridSize.setOnClickListener { showGridSizeDialog() }
         btnReset.setOnClickListener    { gridMapObj.clearGridMap() }
-        saveGridMapButton.setOnClickListener { saveGridMapData(gridMapObj.returnGridMap()) }
-        loadGridMapButton.setOnClickListener { loadGridMapData() }
+        btnSave.setOnClickListener     { saveGridMapData(gridMapObj.returnGridMap()) }
+        btnLoad.setOnClickListener     { loadGridMapData() }
 
         // Tabs
         val customNavigatorBar = customNavigator(

@@ -215,15 +215,35 @@ public class AddObstacle extends Fragment{
     }
 
     private void updateButtonState(){
-        addStartingPointButton.setActivated(addStartingPointButton.getId() == currentSelectedButtonId);
-        addObstacleToggle.setActivated(addObstacleToggle.getId() == currentSelectedButtonId);
-        removeButton.setActivated(removeButton.getId() == currentSelectedButtonId);
+        boolean vehicleActive   = addStartingPointButton.getId() == currentSelectedButtonId;
+        boolean obstacleActive  = addObstacleToggle.getId()      == currentSelectedButtonId;
+        boolean removeActive    = removeButton.getId()            == currentSelectedButtonId;
 
-        if (currentSelectedButtonId == addStartingPointButton.getId()) {
+        // Swap background drawables so active state is visually distinct
+        addStartingPointButton.setBackground(
+            androidx.core.content.ContextCompat.getDrawable(requireContext(),
+                vehicleActive ? R.drawable.btn_mode_vehicle_on : R.drawable.btn_mode_vehicle_off));
+        addObstacleToggle.setBackground(
+            androidx.core.content.ContextCompat.getDrawable(requireContext(),
+                obstacleActive ? R.drawable.btn_mode_obstacle_on : R.drawable.btn_mode_obstacle_off));
+        removeButton.setBackground(
+            androidx.core.content.ContextCompat.getDrawable(requireContext(),
+                removeActive ? R.drawable.btn_mode_remove_on : R.drawable.btn_mode_remove_off));
+
+        // Text color for active vs inactive
+        int activeVehicleColor  = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.ds_accent);
+        int activePinkColor     = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.ds_pink);
+        int activeRedColor      = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.ds_red);
+        int inactiveColor       = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.ds_text_muted);
+        addStartingPointButton.setTextColor(vehicleActive  ? activeVehicleColor : inactiveColor);
+        addObstacleToggle.setTextColor     (obstacleActive ? activePinkColor    : inactiveColor);
+        removeButton.setTextColor          (removeActive   ? activeRedColor     : inactiveColor);
+
+        if (vehicleActive) {
             gridMap.setGridMode(GridMapClass.GridMode.ADD_VEHICLE);
-        } else if (currentSelectedButtonId == addObstacleToggle.getId()) {
+        } else if (obstacleActive) {
             gridMap.setGridMode(GridMapClass.GridMode.ADD_OBSTACLE);
-        } else if (currentSelectedButtonId == removeButton.getId()) {
+        } else if (removeActive) {
             gridMap.setGridMode(GridMapClass.GridMode.REMOVE);
         } else {
             gridMap.setGridMode(GridMapClass.GridMode.NONE);

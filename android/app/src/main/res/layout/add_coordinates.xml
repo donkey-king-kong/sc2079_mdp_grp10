@@ -95,14 +95,14 @@
             android:letterSpacing="0.12"
             android:layout_marginBottom="4dp" />
 
-        <!-- Mode buttons — horizontal row, plain Button with shape drawables -->
+        <!-- Mode buttons — plain LinearLayout keeps toggle IDs but uses state-aware drawables -->
         <LinearLayout
             android:id="@+id/linearLayout_add_Toogle_Group_Options"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
-            <!-- Wrapping in a hidden MaterialButtonToggleGroup to preserve IDs and toggle logic -->
+            <!-- Wrapping in MaterialButtonToggleGroup preserves existing click-wiring in AddObstacle.java -->
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/toggleGroup_Options"
                 android:layout_width="match_parent"
@@ -120,13 +120,14 @@
                     android:text="Vehicle"
                     android:textSize="9sp"
                     android:textColor="@color/ds_text"
+                    android:stateListAnimator="@null"
                     app:icon="@drawable/vehicle_icon"
                     app:iconGravity="top"
                     app:iconPadding="2dp"
                     app:iconSize="20dp"
                     app:iconTint="@color/ds_text"
                     app:strokeColor="@color/ds_border_strong"
-                    app:strokeWidth="1dp"
+                    app:strokeWidth="2dp"
                     app:backgroundTint="@color/ds_surface" />
 
                 <com.google.android.material.button.MaterialButton
@@ -139,13 +140,14 @@
                     android:text="Obstacle"
                     android:textSize="9sp"
                     android:textColor="@color/ds_text"
+                    android:stateListAnimator="@null"
                     app:icon="@drawable/obstacle_icon"
                     app:iconGravity="top"
                     app:iconPadding="2dp"
                     app:iconSize="20dp"
                     app:iconTint="@color/ds_text"
                     app:strokeColor="@color/ds_border_strong"
-                    app:strokeWidth="1dp"
+                    app:strokeWidth="2dp"
                     app:backgroundTint="@color/ds_surface" />
 
                 <com.google.android.material.button.MaterialButton
@@ -157,13 +159,14 @@
                     android:text="Remove"
                     android:textSize="9sp"
                     android:textColor="@color/ds_text"
+                    android:stateListAnimator="@null"
                     app:icon="@drawable/outline_delete_24dp"
                     app:iconGravity="top"
                     app:iconPadding="2dp"
                     app:iconSize="20dp"
                     app:iconTint="@color/ds_text"
                     app:strokeColor="@color/ds_border_strong"
-                    app:strokeWidth="1dp"
+                    app:strokeWidth="2dp"
                     app:backgroundTint="@color/ds_surface" />
 
             </com.google.android.material.button.MaterialButtonToggleGroup>
