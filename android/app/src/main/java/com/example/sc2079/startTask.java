@@ -2,6 +2,8 @@ package com.example.sc2079;
 
 import android.content.ContentUris;
 import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -17,7 +19,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 import java.util.ArrayList;
-import java.lang.Thread;
 import java.util.Locale;
 
 import androidx.annotation.Nullable;
@@ -55,6 +56,12 @@ public class startTask extends Fragment {
         startExplorationButton = addStartTaskView.findViewById(R.id.beginExplorationButton);
         startFastestButton = addStartTaskView.findViewById(R.id.beginFastestButton);
         startStichButton = addStartTaskView.findViewById(R.id.beginStichButton);
+        setTaskButtonColors(startExplorationButton, "#2563A8");
+        setTaskButtonColors(startFastestButton, "#2563A8");
+        setTaskButtonColors(startStichButton, "#5A2D8A");
+        startExplorationButton.setChecked(startTraverseMap);
+        startFastestButton.setChecked(startFastestRound);
+        startStichButton.setChecked(startSendStich);
         viewSavedImagesButton = addStartTaskView.findViewById(R.id.viewSavedImagesButton);
         calculateObstacleTimerView = addStartTaskView.findViewById(R.id.calculateObstacleTimer);
         fastestTimeTimerView = addStartTaskView.findViewById(R.id.fastestTimeTimer);
@@ -77,19 +84,23 @@ public class startTask extends Fragment {
                     fastestTimeTimerView.setText(time);
                 }
                 if(gridMap.checkFINStatus()){
-                    if(startTraverseMap) {
-                        startTraverseMap = false;
-                    }else if(startFastestRound){
-                        startFastestRound = false;
-                    }
+                    startTraverseMap = false;
+                    startFastestRound = false;
+                    startExplorationButton.setChecked(false);
+                    startFastestButton.setChecked(false);
                     timerReflectOnText = 0;
                     gridMap.updateFINStatus(false);
                     timerHandler.removeCallbacks(timerRunnable);
                 }
 
 
-                // Re-post with delay for repeating
-                timerHandler.postDelayed(this, 1000);
+                if (startSendStich && "Stitched Images Completed".equals(gridMap.getImmediateVehicleStatus())) {
+                    startSendStich = false;
+                    startStichButton.setChecked(false);
+                }
+                if (startTraverseMap || startFastestRound || startSendStich) {
+                    timerHandler.postDelayed(this, 1000);
+                }
             }
         };
         startExplorationButton.setOnClickListener(new View.OnClickListener()
@@ -98,18 +109,16 @@ public class startTask extends Fragment {
             public void onClick(View view) {
                 if (!startTraverseMap) {
                     gridMap.sendArenaDataBluetooth();
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
                     // gridMap.sendBeginExplorationBluetooth();
                     startTraverseMap = true;
+                    gridMap.updateFINStatus(false);
+                    showTaskStatus("Task 1 in Progress...");
                     timerHandler.removeCallbacks(timerRunnable);
                     timerReflectOnText = 0;
                     timerHandler.postDelayed(timerRunnable, 1000);
                 } else {
                     startTraverseMap = false;
+                    showTaskStatus("Task 1 Stopped");
                     timerReflectOnText = 0;
                     timerHandler.removeCallbacks(timerRunnable);
                     gridMap.updateFINStatus(false);
@@ -123,18 +132,16 @@ public class startTask extends Fragment {
             public void onClick(View view){
                 if (!startFastestRound) {
                     gridMap.sendArenaDataBluetooth();
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
                     // gridMap.sendBeginExplorationBluetooth();
                     startFastestRound = true;
+                    gridMap.updateFINStatus(false);
+                    showTaskStatus("Task 2 in Progress...");
                     timerHandler.removeCallbacks(timerRunnable);
                     timerReflectOnText = 0;
                     timerHandler.postDelayed(timerRunnable, 1000);
                 } else{
                     startFastestRound = false;
+                    showTaskStatus("Task 2 Stopped");
                     timerReflectOnText = 0;
                     timerHandler.removeCallbacks(timerRunnable);
                     gridMap.updateFINStatus(false);
@@ -149,15 +156,15 @@ public class startTask extends Fragment {
             public void onClick(View view){
             if (!startSendStich) {
                 gridMap.sendStichSignalBluetooth();
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
                 // gridMap.sendBeginExplorationBluetooth();
                 startSendStich = true;
+                showTaskStatus("Stitched Images in Progress...");
+                timerHandler.removeCallbacks(timerRunnable);
+                timerHandler.postDelayed(timerRunnable, 1000);
             }else{
                 startSendStich = false;
+                showTaskStatus("Stitched Images Stopped");
+                if (!startTraverseMap && !startFastestRound) timerHandler.removeCallbacks(timerRunnable);
             }
         }
         });
@@ -171,6 +178,18 @@ public class startTask extends Fragment {
         });
 
             return addStartTaskView;
+    }
+
+    private void setTaskButtonColors(ToggleButton button, String startColor) {
+        button.setBackgroundTintList(new ColorStateList(
+                new int[][] {new int[] {android.R.attr.state_checked}, new int[] {}},
+                new int[] {Color.parseColor("#C62828"), Color.parseColor(startColor)}));
+    }
+
+    private void showTaskStatus(String status) {
+        gridMap.setTaskStatus(status);
+        TextView statusView = requireActivity().findViewById(R.id.give_vehicle_status_now);
+        statusView.setText(status);
     }
 
     private void showSavedImagesDialog() {

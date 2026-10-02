@@ -41,6 +41,11 @@ import com.google.android.material.tabs.TabLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import android.util.Base64
+import android.widget.EditText
+import android.widget.ScrollView
+import android.text.InputFilter
+import android.text.InputType
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import android.widget.NumberPicker
 import androidx.appcompat.app.AlertDialog
 import com.example.sc2079.ui.coordinates.AddCoordinateFragment
@@ -456,6 +461,7 @@ class MainActivity : AppCompatActivity() {
 
             if (state == "connected") {
                 isConnected = true
+                gridMapObj.syncArenaDataBluetooth()
             } else if (state == "disconnected" || state == "error") {
                 isConnected = false
                 base64Data.clear()
@@ -885,34 +891,215 @@ class MainActivity : AppCompatActivity() {
         setupGraphAxes(this, !isDayMode)
     }
 
-    private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {
-        val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
-
-        val gson = Gson()
-        val json = gson.toJson(gridMapData) // convert to JSON string
-
-        editor.putString("gridMapData", json)
-        editor.apply()
-        Toast.makeText(this, "Map was successfully saved!", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun loadGridMapData() {
-        val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
-        val gson = Gson()
-        val json = sharedPreferences.getString("gridMapData", null)
-
-        if (json != null) {
-            val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
-            val loadedData: ArrayList<ArrayList<ObstacleData>> = gson.fromJson(json, type)
-            gridMapObj.clearGridMap()
-            gridMapObj.addGridMapSaved(loadedData)
-            gridMapObj.sendArenaDataBluetooth()
-        }else{
-            Toast.makeText(this, "No Map was saved!", Toast.LENGTH_SHORT).show()
-
+    private fun readMapPresets(): List<MapPreset>? {
+        val preferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
+        return try {
+            val json = preferences.getString("mapPresets", null)
+            val presets = MapPresets.decode(json, preferences.getString("gridMapData", null))
+            if (json == null && presets.isNotEmpty()) writeMapPresets(presets)
+            presets
+        } catch (e: Exception) {
+            Log.e("MapPresets", "Unable to read saved maps", e)
+            Toast.makeText(this, "Unable to read saved maps", Toast.LENGTH_SHORT).show()
+            null
         }
     }
 
+    private fun writeMapPresets(presets: List<MapPreset>) {
+        getSharedPreferences("grid_map_prefs", MODE_PRIVATE).edit()
+            .putString("mapPresets", Gson().toJson(presets)).apply()
+    }
 
+    private fun saveGridMapData(gridMapData: ArrayList<ArrayList<ObstacleData>>) {
+        val presets = readMapPresets() ?: return
+        // Capture a snapshot, so editing or loading the grid cannot alter a saved preset.
+        val gridJson = Gson().toJson(gridMapData)
+        val columns = gridMapObj.getGridColumns()
+        val rows = gridMapObj.getGridRows()
+        val nameInput = EditText(this).apply {
+            hint = "Map name"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setSingleLine(true)
+            filters = arrayOf(InputFilter.LengthFilter(MapPresets.MAX_NAME_LENGTH))
+        }
+        val container = LinearLayout(this).apply {
+            setPadding(mapPickerDp(24), mapPickerDp(8), mapPickerDp(24), 0)
+            addView(nameInput, LinearLayout.LayoutParams(-1, -2))
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Save map as")
+            .setMessage("${presets.size}/${MapPresets.LIMIT} presets saved")
+            .setView(container)
+            .setPositiveButton("Save", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val name = nameInput.text.toString().trim()
+                if (name.isEmpty()) {
+                    nameInput.error = "Enter a map name"
+                    return@setOnClickListener
+                }
+                val current = readMapPresets() ?: return@setOnClickListener
+                val existing = current.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                if (existing == null && current.size >= MapPresets.LIMIT) {
+                    nameInput.error = "All 10 slots are full. Use an existing name to replace a map, or delete one from Load."
+                    return@setOnClickListener
+                }
+                val save = {
+                    val latest = readMapPresets()
+                    if (latest != null) {
+                        val updated = MapPresets.save(latest, MapPreset(name, columns, rows, gridJson))
+                        writeMapPresets(updated)
+                        Toast.makeText(this, "Saved as \"$name\"", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                    }
+                }
+                if (existing != null) {
+                    AlertDialog.Builder(this)
+                        .setTitle("Replace \"${existing.name}\"?")
+                        .setMessage("Replace this preset with the current map?")
+                        .setPositiveButton("Replace") { _, _ -> save() }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                } else save()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun loadGridMapData() {
+        val presets = readMapPresets() ?: return
+        val sheet = BottomSheetDialog(this)
+        val textColor = if (isDayMode) Color.parseColor("#102A43") else Color.WHITE
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(mapPickerDp(20), mapPickerDp(16), mapPickerDp(20), mapPickerDp(20))
+            setBackgroundColor(if (isDayMode) Color.WHITE else Color.parseColor("#102A43"))
+        }
+        content.addView(TextView(this).apply {
+            text = "Load map (${presets.size}/${MapPresets.LIMIT})"
+            textSize = 20f
+            setTextColor(textColor)
+            setPadding(0, 0, 0, mapPickerDp(12))
+        })
+        if (presets.isEmpty()) {
+            content.addView(TextView(this).apply {
+                text = "No saved maps yet. Use Save to create a preset."
+                setTextColor(textColor)
+                setPadding(0, mapPickerDp(16), 0, mapPickerDp(16))
+            })
+        } else {
+            val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            presets.forEach { preset ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                val loadButton = MaterialButton(this).apply {
+                    text = "${preset.name}  ·  ${preset.columns} × ${preset.rows}"
+                    isAllCaps = false
+                    maxLines = 2
+                    contentDescription = "Load ${preset.name}"
+                    setOnClickListener {
+                        try {
+                            val data = MapPresets.restoreGrid(preset)
+                            applyGridSize(preset.columns, preset.rows)
+                            gridMapObj.addGridMapSaved(data)
+                            gridMapObj.invalidate()
+                            Toast.makeText(this@MainActivity, "Loaded \"${preset.name}\"", Toast.LENGTH_SHORT).show()
+                            sheet.dismiss()
+                        } catch (e: Exception) {
+                            Log.e("MapPresets", "Unable to load ${preset.name}", e)
+                            Toast.makeText(this@MainActivity, "Unable to load this map", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                row.addView(loadButton, LinearLayout.LayoutParams(0, -2, 1f))
+                row.addView(MaterialButton(this, null, com.google.android.material.R.attr.borderlessButtonStyle).apply {
+                    text = "Delete"
+                    isAllCaps = false
+                    setTextColor(if (isDayMode) Color.parseColor("#B71C1C") else Color.parseColor("#FF8A80"))
+                    contentDescription = "Delete ${preset.name}"
+                    setOnClickListener {
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Delete \"${preset.name}\"?")
+                            .setMessage("This removes the saved preset. Your current map stays on screen.")
+                            .setPositiveButton("Delete") { _, _ ->
+                                val current = readMapPresets()
+                                if (current != null) {
+                                    writeMapPresets(current.filterNot { it.name == preset.name })
+                                    sheet.dismiss()
+                                    loadGridMapData()
+                                }
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                }, LinearLayout.LayoutParams(-2, -2))
+                list.addView(row)
+            }
+            val scroll = ScrollView(this).apply { addView(list); isFillViewport = true }
+            val listHeight = minOf(mapPickerDp(presets.size * 64), (resources.displayMetrics.heightPixels * 0.55).toInt())
+            content.addView(scroll, LinearLayout.LayoutParams(-1, listHeight))
+        }
+        content.addView(MaterialButton(this).apply {
+            text = "Close"
+            setOnClickListener { sheet.dismiss() }
+        }, LinearLayout.LayoutParams(-1, -2))
+        sheet.setContentView(content)
+        sheet.show()
+    }
+
+    private fun mapPickerDp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+}
+
+
+internal data class MapPreset(val name: String, val columns: Int, val rows: Int, val gridJson: String)
+
+/** Named snapshots stored in the existing grid_map_prefs preferences. */
+internal object MapPresets {
+    const val LIMIT = 10
+    const val MAX_NAME_LENGTH = 40
+
+    fun decode(json: String?, legacyGridJson: String?): List<MapPreset> {
+        val presets: List<MapPreset> = if (json != null) {
+            Gson().fromJson(json, object : TypeToken<List<MapPreset>>() {}.type)
+                ?: throw IllegalArgumentException("Invalid presets")
+        } else if (legacyGridJson != null) {
+            listOf(MapPreset("Saved Map", 20, 20, legacyGridJson))
+        } else emptyList()
+        require(presets.size <= LIMIT)
+        require(presets.all { it.name.isNotBlank() && it.name.length <= MAX_NAME_LENGTH &&
+            it.columns in 5..20 && it.rows in 5..20 && it.gridJson.isNotBlank() })
+        require(presets.map { it.name.lowercase(java.util.Locale.ROOT) }.distinct().size == presets.size)
+        return presets
+    }
+
+    fun restoreGrid(preset: MapPreset): ArrayList<ArrayList<ObstacleData>> {
+        val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
+        val saved: ArrayList<ArrayList<ObstacleData>> = Gson().fromJson(preset.gridJson, type)
+            ?: throw IllegalArgumentException("Saved map is empty")
+        require(saved.all { row -> row.size == 20 && row.all {
+            it.direction != null && it.obstacleType != null
+        } }) { "Saved map contains invalid cells" }
+        // Older GridMapClass constructors initialized twice. The second set of
+        // 20 rows was never displayed or edited; preserve the first 20 rows.
+        val legacyDoubleGrid = saved.size == 40 && saved.drop(20).all { row ->
+            row.all { !it.occupied && it.obstacleType == ObstacleData.OBSTACLETYPE.EMPTY }
+        }
+        require(saved.size == 20 || legacyDoubleGrid) { "Saved map has an unsupported layout" }
+        return ArrayList(saved.take(20))
+    }
+
+    fun save(presets: List<MapPreset>, preset: MapPreset): List<MapPreset> {
+        val normalized = preset.copy(name = preset.name.trim())
+        require(normalized.name.isNotEmpty() && normalized.name.length <= MAX_NAME_LENGTH)
+        val index = presets.indexOfFirst { it.name.equals(normalized.name, ignoreCase = true) }
+        require(index >= 0 || presets.size < LIMIT) { "All 10 preset slots are full" }
+        return presets.toMutableList().apply {
+            if (index >= 0) this[index] = normalized else add(normalized)
+        }
+    }
 }

@@ -3,6 +3,10 @@ package com.example.sc2079;
 import android.util.Log;
 import android.widget.EditText;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import java.util.ArrayList;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -30,6 +34,50 @@ public class utilities {
 
     public String getJsonCraftVehicleMovement() {
         return "{\"cat\": \"stm\", \"value\": \"" + this.vehiclePoint + "\"}";
+    }
+
+    // Both map synchronization and task start use this same complete snapshot.
+    public static String arenaMessage(String category, ArrayList<ArrayList<ObstacleData>> grid, int columns, int rows) {
+        JsonArray obstacles = new JsonArray();
+        int robotX = 0, robotY = 0, robotDirection = 0;
+        boolean foundRobot = false;
+        for (int y = 0; y < rows; y++) {
+            for (int x = 0; x < columns; x++) {
+                ObstacleData cell = grid.get(y).get(x);
+                if (!cell.getOccupied()) continue;
+                if (cell.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle) {
+                    JsonObject obstacle = new JsonObject();
+                    obstacle.addProperty("x", x);
+                    obstacle.addProperty("y", y);
+                    obstacle.addProperty("d", arenaDirection(cell.getDirection()));
+                    obstacle.addProperty("id", cell.getObstacleNumber());
+                    obstacles.add(obstacle);
+                } else if (!foundRobot && cell.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle) {
+                    foundRobot = true;
+                    robotX = x;
+                    robotY = y;
+                    robotDirection = arenaDirection(cell.getDirection());
+                }
+            }
+        }
+        JsonObject arena = new JsonObject();
+        arena.add("obstacles", obstacles);
+        arena.addProperty("robot_x", robotX);
+        arena.addProperty("robot_y", robotY);
+        arena.addProperty("robot_direction", robotDirection);
+        JsonObject message = new JsonObject();
+        message.addProperty("cat", category);
+        message.add("value", arena);
+        return message.toString() + "\n";
+    }
+
+    private static int arenaDirection(ObstacleData.Direction direction) {
+        switch (direction) {
+            case EAST: return 1;
+            case SOUTH: return 2;
+            case WEST: return 3;
+            default: return 0;
+        }
     }
 
     public String getJsonCraftSendArena(){

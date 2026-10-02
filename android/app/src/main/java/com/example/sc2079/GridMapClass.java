@@ -10,6 +10,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -82,11 +84,22 @@ public class GridMapClass extends View {
     private BluetoothService btService;
     private utilities utilitiesClass = new utilities();
     private String vehicleText = "Vehicle not placed";
+    private String taskStatus = null;
+    private final Handler arenaSyncHandler = new Handler(Looper.getMainLooper());
+    private final Runnable arenaSync = () -> {
+        // Dragging temporarily clears the source cell. Send only the committed map.
+        if (!isDragging) sendArenaMessage("arena-update");
+    };
+
+    public void syncArenaDataBluetooth() {
+        arenaSyncHandler.removeCallbacks(arenaSync);
+        arenaSyncHandler.postDelayed(arenaSync, 100);
+    }
+
     private boolean firstTimeInitalize = false;
     // Constructors
     public GridMapClass(Context context) {
-        this(context, null);
-        initializeGrid();
+        this(context, null); // The delegated constructor initializes the grid once.
     }
 
     public GridMapClass(Context context, @Nullable AttributeSet attrs) {
@@ -282,6 +295,7 @@ public class GridMapClass extends View {
 
     public void setBluetoothService(BluetoothService service) {
         this.btService = service;
+        if (service != null) syncArenaDataBluetooth();
         Log.d("GridMapClass", "BluetoothService instance set.");
         Log.d("Lolol", utilities.convertBooleanToString(this.btService == null));
     }
@@ -293,11 +307,13 @@ public class GridMapClass extends View {
             }
         }
         // 2. THE FIX: Reset the counting logic
+        taskStatus = null;
         vehicleText = "Vehicle not placed"; // This "unlocks" the car for the next run
         placedObstacles.clear(); // Empty the list so findVehicleDataType/placedObstacles is fresh
         obstacleCount = 0;       // Reset the counter back to zero
         firstTimeInitalize = false; // Reset the vehicle status text too
         Log.d("GridMapClass,java", "Grid Map Cleared");
+        syncArenaDataBluetooth();
         return true;
     }
 
@@ -318,6 +334,11 @@ public class GridMapClass extends View {
                 }
             }
         }
+        // Keep IDs unique when adding another obstacle after loading a preset.
+        placedObstacles.sort((left, right) -> Integer.compare(left.getObstacleNumber(), right.getObstacleNumber()));
+        obstacleCount = placedObstacles.isEmpty() ? 0 : placedObstacles.get(placedObstacles.size() - 1).getObstacleNumber();
+        syncArenaDataBluetooth();
+        invalidate();
         return true;
     }
 
@@ -573,8 +594,8 @@ public class GridMapClass extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         gestureDetector.onTouchEvent(event);
-        int currentXCoordRef = (int) (event.getX() / cellWidth);
-        int currentYCoordRef = gridRows - 1 - (int) (event.getY() / cellHeight);
+        int currentXCoordRef = (int) Math.floor(event.getX() / cellWidth);
+        int currentYCoordRef = gridRows - 1 - (int) Math.floor(event.getY() / cellHeight);
         switch (event.getAction()) {
             // New Coordinate about to be placed down
             case MotionEvent.ACTION_UP:
@@ -642,9 +663,24 @@ public class GridMapClass extends View {
                     draggedObstacleSnapshot = null;
                     ghostX = -1;
                     ghostY = -1;
-                    reformatObstacleDataArray();
+                    rebuildPlacedObstacles();
+                    syncArenaDataBluetooth();
                     invalidate();
                 }
+                break;
+            case MotionEvent.ACTION_CANCEL:
+                if (isDragging && draggedObstacleSnapshot != null &&
+                        draggedObstacleSnapshot.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle) {
+                    changeObstacleData(oldXCoordDrag, oldYCoordDrag, true,
+                            draggedObstacleSnapshot.getDirection(), draggedObstacleSnapshot.getObstacleType(),
+                            draggedObstacleSnapshot.getVerified(), draggedObstacleSnapshot.getObstacleNumber());
+                }
+                isDragging = false;
+                draggedObstacleSnapshot = null;
+                ghostX = ghostY = -1;
+                rebuildPlacedObstacles();
+                syncArenaDataBluetooth();
+                invalidate();
                 break;
             // Old Coordinate about to be dragged
             case MotionEvent.ACTION_DOWN:
@@ -658,6 +694,7 @@ public class GridMapClass extends View {
                 Log.d("GridMapClass.java", "Action Down Motion Event Detected");
                 oldXCoordDrag = (int) (event.getX() / cellWidth);
                 oldYCoordDrag = gridRows - 1 - (int) (event.getY() / cellHeight);
+                if (!checkValidObstacle(oldXCoordDrag, oldYCoordDrag)) return false;
                 // FIX: Create a NEW object so it doesn't get wiped by removeFromGrid
                 ObstacleData original = gridMapData.get(oldYCoordDrag).get(oldXCoordDrag);
 
@@ -826,6 +863,20 @@ public class GridMapClass extends View {
         }
     }
 
+    private void rebuildPlacedObstacles() {
+        placedObstacles.clear();
+        for (int y = 0; y < gridRows; y++) {
+            for (int x = 0; x < gridColumns; x++) {
+                ObstacleData cell = gridMapData.get(y).get(x);
+                if (cell.getOccupied() && cell.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle) {
+                    placedObstacles.add(cell);
+                }
+            }
+        }
+        reformatObstacleDataArray();
+        obstacleCount = placedObstacles.isEmpty() ? 0 : placedObstacles.get(placedObstacles.size() - 1).getObstacleNumber();
+    }
+
     public void reformatObstacleDataArray(){
         placedObstacles.sort(Comparator.comparingInt(ObstacleData::getObstacleNumber));
     }
@@ -874,6 +925,7 @@ public class GridMapClass extends View {
                 }
             }
         }
+        syncArenaDataBluetooth();
         return 1;
     }
 
@@ -1658,7 +1710,12 @@ public class GridMapClass extends View {
             return "("+bottomVehicleData[0]+","+bottomVehicleData[1]+")";
         }
     }
+    public void setTaskStatus(String status) {
+        taskStatus = status;
+    }
+
     public String getImmediateVehicleStatus(){
+        if (taskStatus != null) return taskStatus;
         int[] bottomVehicleData = findVehicleBottomLeftObstacle();
 
         if(bottomVehicleData[0] != -2 && !firstTimeInitalize) {
@@ -1834,10 +1891,12 @@ public class GridMapClass extends View {
         }
         if(stichValue.equals("starting stitch")){
             vehicleText = "starting stitch";
+            taskStatus = "Stitched Images in Progress...";
             FINDetected = true;
             return "2";
         }else if(stichValue.equals("ending stitch")){
             vehicleText = "ending stitch";
+            taskStatus = "Stitched Images Completed";
             return "3";
         }else{
 
@@ -1952,56 +2011,17 @@ public class GridMapClass extends View {
         }
     }
 
-    public void sendArenaDataBluetooth(){
-        if (btService != null) {
-            Log.d("Sending Message", "Sending Message");
-            StringBuilder stringBuilder = new StringBuilder();
-            int[] bottomLeftVehicleData = findVehicleBottomLeftObstacle();
+    public void sendArenaDataBluetooth() {
+        arenaSyncHandler.removeCallbacks(arenaSync);
+        sendArenaMessage("sendArena");
+    }
 
-            int robotX, robotY, robotDir;
-            if(bottomLeftVehicleData[1] == -2 && bottomLeftVehicleData[0] == -2){
-                robotX = 0;
-                robotY = 0;
-                robotDir = 0;
-            } else {
-                ObstacleData bottomLeftVehicle = gridMapData.get(bottomLeftVehicleData[1]).get(bottomLeftVehicleData[0]);
-                robotX = bottomLeftVehicle.getXCoord();
-                robotY = bottomLeftVehicle.getYCoord();
-                robotDir = bottomLeftVehicle.getDirection().getIntFromDirection();
-            }
-            stringBuilder.append("{\"obstacles\":");
-            stringBuilder.append("[");
-
-            if(placedObstacles.size() == 0){
-                stringBuilder.append("],");
-                stringBuilder.append("\"robot_x\": "+robotX+",");
-                stringBuilder.append("\"robot_y\": "+robotY+",");
-                stringBuilder.append("\"robot_direction\": "+robotDir+"}");
-                utilitiesClass.arenaData = stringBuilder.toString();
-                btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
-                return;
-            }
-            reformatObstacleDataArray();
-            for(int i=0; i< placedObstacles.size(); i++){
-                stringBuilder.append("{\"x\": "+placedObstacles.get(i).getXCoord()+",");
-                stringBuilder.append("\"y\": "+placedObstacles.get(i).getYCoord()+",");
-                stringBuilder.append("\"d\": "+placedObstacles.get(i).getDirection().getIntFromDirection()+",");
-                stringBuilder.append("\"id\": "+placedObstacles.get(i).getObstacleNumber()+"}");
-
-                if(i < placedObstacles.size()-1){
-                    stringBuilder.append(",");
-                }
-            }
-            stringBuilder.append("],");
-            stringBuilder.append("\"robot_x\": "+robotX+",");
-            stringBuilder.append("\"robot_y\": "+robotY+",");
-            stringBuilder.append("\"robot_direction\": "+robotDir+"}");
-
-            utilitiesClass.arenaData = stringBuilder.toString();
-            btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
-        } else {
-            Log.d("Sending Message", "Unable to send Message to send Arena Data to Bluetooth!");
-        }
+    private boolean sendArenaMessage(String category) {
+        if (btService == null) return false;
+        String message = utilities.arenaMessage(category, gridMapData, gridColumns, gridRows);
+        boolean sent = btService.write(message.getBytes(StandardCharsets.UTF_8));
+        Log.d("ArenaSync", sent ? "Sent " + category : "Not connected; map will sync on reconnect");
+        return sent;
     }
 
     public void sendStichSignalBluetooth(){
@@ -2164,6 +2184,7 @@ public class GridMapClass extends View {
     }
 
     public void sendTabletUpdateToAMD(String type, int x, int y, ObstacleData.Direction direction) {
+        syncArenaDataBluetooth();
         if (btService != null) {
             int degrees = 0;
             switch (direction) {
