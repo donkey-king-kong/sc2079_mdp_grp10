@@ -1955,53 +1955,50 @@ public class GridMapClass extends View {
     public void sendArenaDataBluetooth(){
         if (btService != null) {
             Log.d("Sending Message", "Sending Message");
-            StringBuilder stringBuilder = new StringBuilder();
             int[] bottomLeftVehicleData = findVehicleBottomLeftObstacle();
-
-            int robotX, robotY, robotDir;
+            ObstacleData bottomLeftVehicle = null;
             if(bottomLeftVehicleData[1] == -2 && bottomLeftVehicleData[0] == -2){
-                robotX = 0;
-                robotY = 0;
-                robotDir = 0;
+                bottomLeftVehicle = null;
             } else {
-                ObstacleData bottomLeftVehicle = gridMapData.get(bottomLeftVehicleData[1]).get(bottomLeftVehicleData[0]);
-                robotX = bottomLeftVehicle.getXCoord();
-                robotY = bottomLeftVehicle.getYCoord();
-                robotDir = bottomLeftVehicle.getDirection().getIntFromDirection();
-            }
-            stringBuilder.append("{\"obstacles\":");
-            stringBuilder.append("[");
-
-            if(placedObstacles.size() == 0){
-                stringBuilder.append("],");
-                stringBuilder.append("\"robot_x\": "+robotX+",");
-                stringBuilder.append("\"robot_y\": "+robotY+",");
-                stringBuilder.append("\"robot_direction\": "+robotDir+"}");
-                utilitiesClass.arenaData = stringBuilder.toString();
-                btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
-                return;
+                bottomLeftVehicle = gridMapData.get(bottomLeftVehicleData[1]).get(bottomLeftVehicleData[0]);
             }
             reformatObstacleDataArray();
-            for(int i=0; i< placedObstacles.size(); i++){
-                stringBuilder.append("{\"x\": "+placedObstacles.get(i).getXCoord()+",");
-                stringBuilder.append("\"y\": "+placedObstacles.get(i).getYCoord()+",");
-                stringBuilder.append("\"d\": "+placedObstacles.get(i).getDirection().getIntFromDirection()+",");
-                stringBuilder.append("\"id\": "+placedObstacles.get(i).getObstacleNumber()+"}");
-
-                if(i < placedObstacles.size()-1){
-                    stringBuilder.append(",");
-                }
-            }
-            stringBuilder.append("],");
-            stringBuilder.append("\"robot_x\": "+robotX+",");
-            stringBuilder.append("\"robot_y\": "+robotY+",");
-            stringBuilder.append("\"robot_direction\": "+robotDir+"}");
-
-            utilitiesClass.arenaData = stringBuilder.toString();
+            utilitiesClass.arenaData = buildArenaDataPayload(placedObstacles, bottomLeftVehicle);
             btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
         } else {
             Log.d("Sending Message", "Unable to send Message to send Arena Data to Bluetooth!");
         }
+    }
+
+    static String buildArenaDataPayload(ArrayList<ObstacleData> obstacles, @Nullable ObstacleData bottomLeftVehicle) {
+        int robotX = 0;
+        int robotY = 0;
+        int robotDir = 0;
+        if (bottomLeftVehicle != null) {
+            robotX = bottomLeftVehicle.getXCoord();
+            robotY = bottomLeftVehicle.getYCoord();
+            robotDir = bottomLeftVehicle.getDirection().getIntFromDirection();
+        }
+
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("{\"obstacles\":");
+        stringBuilder.append("[");
+        for(int i=0; i< obstacles.size(); i++){
+            stringBuilder.append("{\"x\": "+obstacles.get(i).getXCoord()+",");
+            stringBuilder.append("\"y\": "+obstacles.get(i).getYCoord()+",");
+            stringBuilder.append("\"d\": "+obstacles.get(i).getDirection().getIntFromDirection()+",");
+            stringBuilder.append("\"id\": "+obstacles.get(i).getObstacleNumber()+"}");
+
+            if(i < obstacles.size()-1){
+                stringBuilder.append(",");
+            }
+        }
+        stringBuilder.append("],");
+        stringBuilder.append("\"robot_x\": "+robotX+",");
+        stringBuilder.append("\"robot_y\": "+robotY+",");
+        stringBuilder.append("\"robot_direction\": "+robotDir+"}");
+
+        return stringBuilder.toString();
     }
 
     public void sendStichSignalBluetooth(){
