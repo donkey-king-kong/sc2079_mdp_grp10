@@ -72,6 +72,9 @@ class MainActivity : AppCompatActivity() {
     private val messageLog = ArrayList<String>()
     private var messageListener: MessageListener? = null
 
+    fun currentGridMapOrNull(): GridMapClass? =
+        if (::gridMapObj.isInitialized) gridMapObj else null
+
     interface MessageListener {
         fun onNewMessage(message: String)
         fun onLogCleared()

@@ -52,7 +52,7 @@ public class startTask extends Fragment {
     public void onAttach(android.content.Context context) {
         super.onAttach(context);
         if (gridMap == null && context instanceof MainActivity) {
-            gridMap = ((MainActivity) context).gridMapObj;
+            gridMap = ((MainActivity) context).currentGridMapOrNull();
         }
     }
 
