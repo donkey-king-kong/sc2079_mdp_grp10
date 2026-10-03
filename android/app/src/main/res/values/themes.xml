@@ -14,6 +14,12 @@
         <!-- Disable automatic forced dark mode — we handle it via AppCompatDelegate -->
         <item name="android:forceDarkAllowed">false</item>
     </style>
+    <style name="Theme.Sc2079.Splash" parent="Theme.Sc2079">
+        <item name="android:windowBackground">#0D4A3A</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:statusBarColor">#0D4A3A</item>
+    </style>
     <style name="MyButton" parent="Widget.MaterialComponents.Button">
         <item name="android:fontFamily">@font/poppins_bold</item>
         <item name="fontFamily">@font/poppins_bold</item>
