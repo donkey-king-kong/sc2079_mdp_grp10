@@ -252,6 +252,9 @@ public class AddObstacle extends Fragment implements ThemeAware {
             }
         });
 
+        currentSelectedButtonId = View.NO_ID;
+        updateButtonState();
+
         // Apply current theme
         if (getActivity() instanceof MainActivity) {
             applyTheme(((MainActivity) getActivity()).currentPalette());
@@ -388,14 +391,20 @@ public class AddObstacle extends Fragment implements ThemeAware {
             revLeft.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f));
             android.widget.ImageView revLeftIcon = addCoordsView.findViewById(R.id.revLeftIcon);
             android.widget.TextView revLeftLabel = addCoordsView.findViewById(R.id.revLeftLabel);
-            if (revLeftIcon != null) revLeftIcon.setColorFilter(p.getText());
+            if (revLeftIcon != null) {
+                revLeftIcon.setImageTintList(android.content.res.ColorStateList.valueOf(p.getText()));
+                revLeftIcon.setColorFilter(p.getText(), android.graphics.PorterDuff.Mode.SRC_IN);
+            }
             if (revLeftLabel != null) revLeftLabel.setTextColor(p.getText());
         }
         if (revRight != null) {
             revRight.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f));
             android.widget.ImageView revRightIcon = addCoordsView.findViewById(R.id.revRightIcon);
             android.widget.TextView revRightLabel = addCoordsView.findViewById(R.id.revRightLabel);
-            if (revRightIcon != null) revRightIcon.setColorFilter(p.getText());
+            if (revRightIcon != null) {
+                revRightIcon.setImageTintList(android.content.res.ColorStateList.valueOf(p.getText()));
+                revRightIcon.setColorFilter(p.getText(), android.graphics.PorterDuff.Mode.SRC_IN);
+            }
             if (revRightLabel != null) revRightLabel.setTextColor(p.getText());
         }
 
