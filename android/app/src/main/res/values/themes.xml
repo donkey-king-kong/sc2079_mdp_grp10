@@ -30,4 +30,8 @@
         <item name="fontFamily">@font/poppins_bold</item>
         <item name="android:radius">30dp</item>
     </style>
+    <style name="TabTextNoCaps" parent="@style/TextAppearance.Design.Tab">
+        <item name="android:textAllCaps">false</item>
+        <item name="textAllCaps">false</item>
+    </style>
 </resources>
