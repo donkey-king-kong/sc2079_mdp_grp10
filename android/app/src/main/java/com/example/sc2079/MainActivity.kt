@@ -260,6 +260,21 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Show full-screen splash overlay with large icon + title text for 1.5s
+        if (savedInstanceState == null) {
+            val overlay = layoutInflater.inflate(R.layout.activity_splash_overlay, null)
+            val decorView = window.decorView as android.view.ViewGroup
+            decorView.addView(overlay, android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+            overlay.postDelayed({
+                overlay.animate().alpha(0f).setDuration(300).withEndAction {
+                    decorView.removeView(overlay)
+                }.start()
+            }, 1500)
+        }
+
         btnBluetooth = findViewById(R.id.btnBluetooth)
         bluetoothStatus = findViewById(R.id.bluetoothStatus)
         btnAddCoordinate = findViewById(R.id.btnAddCoordinate)
