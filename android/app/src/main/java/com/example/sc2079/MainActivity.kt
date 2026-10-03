@@ -1,5 +1,6 @@
 package com.example.sc2079
 
+import androidx.core.view.WindowCompat
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.content.ContentValues
@@ -565,6 +566,7 @@ class MainActivity : AppCompatActivity() {
 
         fun applyTheme(day: Boolean) {
             val p = if (day) DAY else NIGHT
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = day
             btnThemeToggle.text = if (day) "🌙" else "☀"
             // Container backgrounds
             rootContainer.setBackgroundColor(p.panel)
