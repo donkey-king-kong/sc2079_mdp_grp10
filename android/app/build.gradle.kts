@@ -56,6 +56,7 @@ dependencies {
     implementation("com.github.controlwear:virtual-joystick-android:fda1c91")
     implementation("com.github.SebastianLiando:maze-mdp:v1.3.2")
     implementation("androidx.core:core-ktx:1.3.2")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.github.chrisbanes:PhotoView:2.3.0")

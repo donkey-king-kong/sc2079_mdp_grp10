@@ -14,6 +14,11 @@
         <!-- Disable automatic forced dark mode — we handle it via AppCompatDelegate -->
         <item name="android:forceDarkAllowed">false</item>
     </style>
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#064E3B</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Sc2079</item>
+    </style>
     <style name="Theme.Sc2079.Splash" parent="Theme.Sc2079">
         <item name="android:windowBackground">#0D4A3A</item>
         <item name="android:windowNoTitle">true</item>
