@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentPagerAdapter
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.viewpager.widget.ViewPager
@@ -254,7 +255,7 @@ class MainActivity : AppCompatActivity() {
             else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
         )
         super.onCreate(savedInstanceState)
-        androidx.core.splashscreen.SplashScreen.installSplashScreen(this)
+        installSplashScreen()
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
