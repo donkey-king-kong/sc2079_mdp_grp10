@@ -66,9 +66,6 @@
     <color name="text_dim">#610C0E11</color>
     <color name="accent">#1A3ECF</color>
 
-    <!-- Adaptive icon background -->
-    <color name="ic_launcher_background">#064E3B</color>
-
     <!-- Grid colors -->
     <color name="ds_grid_base_light">#C8D4C8</color>
     <color name="ds_grid_check_light">#B8C8B8</color>
