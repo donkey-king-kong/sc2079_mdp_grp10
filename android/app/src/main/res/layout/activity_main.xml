@@ -4,430 +4,384 @@
     android:id="@+id/container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:background="@color/dark_blue_700">
 
-    <!-- LEFT: Grid area (square, weight-based) -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/constraintGridMapView"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:layout_margin="8dp">
-
-        <!-- Y-axis -->
-        <LinearLayout
-            android:id="@+id/y_axis_numbers"
-            android:layout_width="24dp"
-            android:layout_height="0dp"
-            android:gravity="center"
-            android:orientation="vertical"
-            app:layout_constraintBottom_toBottomOf="@id/gridMapView"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@id/gridMapView" />
-
-        <!-- X-axis -->
-        <LinearLayout
-            android:id="@+id/x_axis_numbers"
-            android:layout_width="0dp"
-            android:layout_height="24dp"
-            android:gravity="center"
-            android:orientation="horizontal"
-            app:layout_constraintTop_toBottomOf="@id/gridMapView"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="@id/gridMapView"
-            app:layout_constraintStart_toStartOf="@id/gridMapView" />
-
-        <!-- Grid (square ratio) -->
-        <LinearLayout
-            android:id="@+id/gridMapView"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:orientation="vertical"
-            app:layout_constraintVertical_chainStyle="packed"
-            app:layout_constraintHorizontal_bias="0"
-            app:layout_constraintBottom_toTopOf="@id/x_axis_numbers"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/y_axis_numbers"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintDimensionRatio="1:1" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <!-- RIGHT: Control panel (fixed weight) -->
+    <!-- Header -->
     <LinearLayout
-        android:id="@+id/rightPanel"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:padding="6dp">
+        android:id="@+id/headerRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
 
-        <!-- Row 1: Header — info cards + action buttons -->
+        <!-- "POSITION" label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="POSITION"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:textColor="#5A8AAA"
+            android:fontFamily="@font/poppins_bold"
+            android:layout_marginEnd="6dp" />
+
+        <!-- Coordinates box -->
         <LinearLayout
-            android:id="@+id/headerRow"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:id="@+id/coordCard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_200"
-            android:paddingStart="10dp"
+            android:paddingStart="8dp"
             android:paddingEnd="8dp"
-            android:paddingTop="0dp"
-            android:paddingBottom="0dp"
-            android:layout_marginBottom="6dp">
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
 
-            <!-- Coordinates pill card -->
-            <LinearLayout
-                android:id="@+id/coordCard"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:layout_marginEnd="5dp">
-
-                <!-- Cyan accent dot -->
-                <View
-                    android:layout_width="5dp"
-                    android:layout_height="5dp"
-                    android:background="@drawable/circle_background"
-                    android:backgroundTint="@color/cyan"
-                    android:layout_marginEnd="6dp" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="POSITION"
-                        android:textSize="6sp"
-                        android:letterSpacing="0.10"
-                        android:textColor="#5A8AAA"
-                        android:fontFamily="@font/poppins_bold" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <TextView
-                            android:id="@+id/give_vehicle_coord_now"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="—,—"
-                            android:textSize="12sp"
-                            android:textColor="@color/white"
-                            android:fontFamily="@font/poppins_bold" />
-
-                        <TextView
-                            android:id="@+id/give_vehicle_direction_now"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text=" · —"
-                            android:textSize="9sp"
-                            android:textColor="#7AAFCB"
-                            android:fontFamily="@font/poppins_regular"
-                            android:layout_marginStart="3dp" />
-                    </LinearLayout>
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Status pill card -->
-            <LinearLayout
-                android:id="@+id/statusCard"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:layout_marginEnd="8dp">
-
-                <!-- Amber accent dot -->
-                <View
-                    android:layout_width="5dp"
-                    android:layout_height="5dp"
-                    android:background="@drawable/circle_background"
-                    android:backgroundTint="#F5A623"
-                    android:layout_marginEnd="6dp" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="STATUS"
-                        android:textSize="6sp"
-                        android:letterSpacing="0.10"
-                        android:textColor="#5A8AAA"
-                        android:fontFamily="@font/poppins_bold" />
-
-                    <TextView
-                        android:id="@+id/give_vehicle_status_now"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Idle"
-                        android:textSize="11sp"
-                        android:textColor="@color/white"
-                        android:fontFamily="@font/poppins_regular" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Action buttons group: same 36dp height, same pill background, evenly spaced -->
-            <ImageButton
-                android:id="@+id/btnAddCoordinate"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
-                android:contentDescription="Place obstacle or vehicle"
-                android:padding="8dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/plus_for_enter"
-                android:layout_marginEnd="5dp"
-                app:tint="@color/cyan" />
-
-            <!-- Day/Night theme toggle -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnThemeToggle"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:text="☀"
-                android:textSize="14sp"
-                android:textColor="@color/cyan"
-                android:padding="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:layout_marginEnd="5dp"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
-                app:iconPadding="0dp" />
-
-            <!-- Bluetooth button + status dot -->
-            <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp">
-
-                <ImageButton
-                    android:id="@+id/btnBluetooth"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/rounded_status_background"
-                    android:backgroundTint="#1A3A5C"
-                    android:contentDescription="Bluetooth"
-                    android:padding="8dp"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_bluetooth_24dp"
-                    app:tint="@color/cyan" />
-
-                <ImageView
-                    android:id="@+id/bluetoothStatus"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:layout_gravity="end|bottom"
-                    android:background="@drawable/circle_background"
-                    android:backgroundTint="@color/status_disconnected"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_status_disconnected_24dp" />
-            </FrameLayout>
-
-        </LinearLayout>
-
-        <!-- Row 2: Joystick + Tabs -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:orientation="horizontal">
-
-            <!-- D-pad + reverse buttons -->
-            <LinearLayout
+            <TextView
+                android:id="@+id/give_vehicle_coord_now"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="top|center_horizontal"
-                android:layout_marginTop="8dp"
-                android:layout_marginEnd="6dp">
+                android:text="—,—"
+                android:textSize="12sp"
+                android:textColor="@color/white"
+                android:fontFamily="@font/poppins_bold" />
 
-                <!-- D-pad cross -->
+            <TextView
+                android:id="@+id/give_vehicle_direction_now"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" · —"
+                android:textSize="9sp"
+                android:textColor="#7AAFCB"
+                android:fontFamily="@font/poppins_regular"
+                android:layout_marginStart="3dp" />
+        </LinearLayout>
+
+        <!-- Vertical divider between coord and status -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33000000"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Status card (no background) -->
+        <LinearLayout
+            android:id="@+id/statusCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Amber accent dot -->
+            <View
+                android:layout_width="5dp"
+                android:layout_height="5dp"
+                android:background="@drawable/circle_background"
+                android:backgroundTint="#F5A623"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/give_vehicle_status_now"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Idle"
+                android:textSize="11sp"
+                android:textColor="@color/white"
+                android:fontFamily="@font/poppins_regular" />
+        </LinearLayout>
+
+        <!-- Gap before pinned header actions. -->
+        <Space
+            android:layout_width="8dp"
+            android:layout_height="1dp"
+            android:layout_weight="0" />
+
+        <!-- Day/Night theme toggle -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnThemeToggle"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:text="☀"
+            android:textSize="14sp"
+            android:padding="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:layout_marginEnd="5dp"
+            app:iconPadding="0dp" />
+
+        <!-- Bluetooth button + status dot -->
+        <FrameLayout
+            android:layout_width="48dp"
+            android:layout_height="48dp">
+
+            <ImageButton
+                android:id="@+id/btnBluetooth"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:background="@drawable/rounded_status_background"
+                android:contentDescription="Bluetooth"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_bluetooth_24dp"
+                app:tint="@color/cyan" />
+
+            <ImageView
+                android:id="@+id/bluetoothStatus"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="end|bottom"
+                android:background="@drawable/circle_background"
+                android:backgroundTint="@color/status_disconnected"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_status_disconnected_24dp" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <!-- Divider under header -->
+    <View
+        android:id="@+id/divider_header"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#33000000" />
+
+    <!-- Body: left column (grid + footer) + right panel (tabs) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Left column: grid on top, bottom bar below -->
+        <LinearLayout
+            android:id="@+id/leftColumn"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="58"
+            android:orientation="vertical">
+
+            <!-- Grid area -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/constraintGridMapView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:padding="8dp">
+
+                <!-- Y-axis: constrained top/bottom to gridMapView, part of horizontal chain -->
                 <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:id="@+id/y_axis_numbers"
+                    android:layout_width="24dp"
+                    android:layout_height="0dp"
+                    android:gravity="center"
                     android:orientation="vertical"
-                    android:gravity="center">
+                    app:layout_constraintTop_toTopOf="@id/gridMapView"
+                    app:layout_constraintBottom_toBottomOf="@id/gridMapView"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/gridMapView"
+                    app:layout_constraintHorizontal_chainStyle="packed"
+                    app:layout_constraintHorizontal_bias="0.5" />
 
-                    <!-- Up -->
-                    <Button
-                        android:id="@+id/dpad_up"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:text="▲"
-                        android:textSize="18sp"
-                        android:textColor="#4AD8F0"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1E4A65"
-                        android:padding="0dp"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:layout_marginBottom="3dp" />
+                <!-- X-axis: aligned to gridMapView start/end, below gridMapView -->
+                <LinearLayout
+                    android:id="@+id/x_axis_numbers"
+                    android:layout_width="0dp"
+                    android:layout_height="24dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    app:layout_constraintTop_toBottomOf="@id/gridMapView"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="@id/gridMapView"
+                    app:layout_constraintEnd_toEndOf="@id/gridMapView" />
 
-                    <!-- Middle row: Left + Center spacer + Right -->
-                    <LinearLayout
+                <!-- Grid (square ratio) — part of horizontal chain with y_axis, vertical chain with x_axis -->
+                <LinearLayout
+                    android:id="@+id/gridMapView"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:orientation="vertical"
+                    app:layout_constraintVertical_chainStyle="packed"
+                    app:layout_constraintHorizontal_bias="0.5"
+                    app:layout_constraintStart_toEndOf="@id/y_axis_numbers"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toTopOf="@id/x_axis_numbers"
+                    app:layout_constraintDimensionRatio="1:1" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- Divider above footer -->
+            <View
+                android:id="@+id/divider_footer"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33000000" />
+
+            <!-- Bottom bar: stacked in portrait so map actions never clip. -->
+            <LinearLayout
+                android:id="@+id/bottomRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_vertical"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/txt_grid_size_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center"
-                        android:layout_marginBottom="3dp">
+                        android:text="Grid size"
+                        android:textSize="10sp"
+                        android:fontFamily="@font/poppins_regular"
+                        android:layout_marginEnd="8dp" />
 
-                        <Button
-                            android:id="@+id/dpad_left"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:text="◀"
-                            android:textSize="18sp"
-                            android:textColor="#4AD8F0"
-                            android:background="@drawable/button_rounded_square_background"
-                            android:backgroundTint="#1E4A65"
-                            android:padding="0dp"
-                            android:insetTop="0dp"
-                            android:insetBottom="0dp"
-                            android:layout_marginEnd="3dp" />
-
-                        <!-- Center gap -->
-                        <View
-                            android:id="@+id/dpadCenterSquare"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:background="@drawable/button_rounded_square_background"
-                            android:backgroundTint="#2A4A6A" />
-
-                        <Button
-                            android:id="@+id/dpad_right"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:text="▶"
-                            android:textSize="18sp"
-                            android:textColor="#4AD8F0"
-                            android:background="@drawable/button_rounded_square_background"
-                            android:backgroundTint="#1E4A65"
-                            android:padding="0dp"
-                            android:insetTop="0dp"
-                            android:insetBottom="0dp"
-                            android:layout_marginStart="3dp" />
-                    </LinearLayout>
-
-                    <!-- Down -->
-                    <Button
-                        android:id="@+id/dpad_down"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:text="▼"
-                        android:textSize="18sp"
-                        android:textColor="#4AD8F0"
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btn_grid_minus"
+                        android:stateListAnimator="@null"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:text="−"
+                        android:textSize="16sp"
+                        android:textColor="#A8C8E8"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1E4A65"
                         android:padding="0dp"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp" />
+                        android:gravity="center"
+                        android:textAllCaps="false" />
+
+                    <TextView
+                        android:id="@+id/txt_grid_size"
+                        android:layout_width="40dp"
+                        android:layout_height="wrap_content"
+                        android:text="20"
+                        android:textSize="12sp"
+                        android:textColor="#A8C8E8"
+                        android:fontFamily="@font/poppins_bold"
+                        android:gravity="center" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btn_grid_plus"
+                        android:stateListAnimator="@null"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:text="+"
+                        android:textSize="16sp"
+                        android:textColor="#A8C8E8"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:padding="0dp"
+                        android:gravity="center"
+                        android:textAllCaps="false" />
                 </LinearLayout>
 
-                <!-- Reverse buttons below d-pad -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center"
-                    android:layout_marginTop="6dp">
+                    android:layout_marginTop="8dp">
 
-                    <!-- Reverse Left: icon + label -->
-                    <LinearLayout
-                        android:id="@+id/reverse_left_button"
-                        android:layout_width="52dp"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/reset_map_button"
+                        android:stateListAnimator="@null"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:text="Reset"
+                        android:textSize="10sp"
+                        android:textColor="#A8C8E8"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1E4A65"
-                        android:paddingTop="5dp"
-                        android:paddingBottom="4dp"
-                        android:layout_marginEnd="3dp">
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textAllCaps="false"
+                        android:layout_marginEnd="6dp" />
 
-                        <ImageView
-                            android:id="@+id/revLeftIcon"
-                            android:layout_width="22dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/reverse_left_button"
-                            android:scaleType="fitCenter"
-                            app:tint="@color/cyan" />
-
-                        <TextView
-                            android:id="@+id/revLeftLabel"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Rev ◀"
-                            android:textSize="7sp"
-                            android:textColor="#4AD8F0"
-                            android:fontFamily="@font/poppins_bold"
-                            android:layout_marginTop="2dp" />
-                    </LinearLayout>
-
-                    <!-- Reverse Right: icon + label -->
-                    <LinearLayout
-                        android:id="@+id/reverse_right_button"
-                        android:layout_width="52dp"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/save_map_button"
+                        android:stateListAnimator="@null"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:text="Save"
+                        android:textSize="10sp"
                         android:background="@drawable/button_rounded_square_background"
-                        android:backgroundTint="#1E4A65"
-                        android:paddingTop="5dp"
-                        android:paddingBottom="4dp">
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textAllCaps="false"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="6dp" />
 
-                        <ImageView
-                            android:id="@+id/revRightIcon"
-                            android:layout_width="22dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/reverse_right_button"
-                            android:scaleType="fitCenter"
-                            app:tint="@color/cyan" />
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/load_map_button"
+                        android:stateListAnimator="@null"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:text="Load"
+                        android:textSize="10sp"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textAllCaps="false"
+                        android:layout_marginStart="6dp" />
 
-                        <TextView
-                            android:id="@+id/revRightLabel"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Rev ▶"
-                            android:textSize="7sp"
-                            android:textColor="#4AD8F0"
-                            android:fontFamily="@font/poppins_bold"
-                            android:layout_marginTop="2dp" />
-                    </LinearLayout>
                 </LinearLayout>
+
             </LinearLayout>
 
-            <!-- Tabs -->
+        </LinearLayout>
+
+        <!-- Vertical divider between left and right -->
+        <View
+            android:id="@+id/divider_vertical"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#33000000" />
+
+        <!-- Right panel: tabs only -->
+        <LinearLayout
+            android:id="@+id/rightPanel"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="42"
+            android:orientation="vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
             <LinearLayout
                 android:id="@+id/sub_navigation_container"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -439,7 +393,9 @@
                     app:tabGravity="fill"
                     app:tabMinWidth="0dp"
                     app:tabPaddingStart="0dp"
-                    app:tabPaddingEnd="0dp" />
+                    app:tabPaddingEnd="0dp"
+                    app:tabInlineLabel="true"
+                    app:tabTextAppearance="@style/TabTextNoCaps" />
 
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/sub_navigation_bar"
@@ -447,121 +403,6 @@
                     android:layout_height="0dp"
                     android:layout_weight="1" />
             </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- Row 3: Bottom buttons -->
-        <LinearLayout
-            android:id="@+id/bottomRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/rounded_status_background"
-            android:backgroundTint="#1E3A5F"
-            android:layout_marginTop="6dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp">
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_grid_size"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Size"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/reset_map_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Reset"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/save_map_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Save"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/load_map_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Load"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="16dp"
-                android:background="#3A6A9B" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/clear_logs_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="Clear"
-                android:textSize="10sp"
-                android:textColor="#A8C8E8"
-                android:singleLine="true"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:fontFamily="@font/poppins_regular"
-                app:iconPadding="0dp" />
 
         </LinearLayout>
 

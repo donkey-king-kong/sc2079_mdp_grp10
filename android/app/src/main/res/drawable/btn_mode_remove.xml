@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Remove mode button: red-tinted when activated, white when inactive -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_activated="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#1A9E1515" />
+            <corners android:radius="8dp" />
+            <stroke android:width="2dp" android:color="#669E1515" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="8dp" />
+            <stroke android:width="2dp" android:color="#47000000" />
+        </shape>
+    </item>
+</selector>

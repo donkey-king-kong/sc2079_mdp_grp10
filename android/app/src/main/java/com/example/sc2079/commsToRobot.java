@@ -39,8 +39,18 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
 
     // Moved bluetooth logic to MainActivity, no need to bound bluetooth to this fragment
 
+    public commsToRobot() {}
+
     public commsToRobot(GridMapClass gridMap) {
         this.gridMap = gridMap;
+    }
+
+    @Override
+    public void onAttach(android.content.Context context) {
+        super.onAttach(context);
+        if (gridMap == null && context instanceof MainActivity) {
+            gridMap = ((MainActivity) context).currentGridMapOrNull();
+        }
     }
     /*
     private final ServiceConnection conn = new ServiceConnection() {

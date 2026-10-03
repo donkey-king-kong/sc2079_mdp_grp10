@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Semantic day/night colours — dark (night) values -->
+    <color name="bg_primary">#0E1117</color>
+    <color name="bg_panel">#151B27</color>
+    <color name="bg_surface">#1C2333</color>
+    <color name="bg_surface2">#1C2333</color>
+    <color name="border_strong">#24FFFFFF</color>
+    <color name="text_primary">#E8EAF0</color>
+    <color name="text_muted">#73E8EAF0</color>
+    <color name="text_dim">#47E8EAF0</color>
+    <color name="accent">#6C8EF5</color>
+</resources>

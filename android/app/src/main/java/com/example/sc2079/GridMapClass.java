@@ -448,30 +448,31 @@ public class GridMapClass extends View {
         float right = left + cellWidth;
         float bottom = top + cellHeight;
         float startX, startY, endX, endY;
+        float offset = paintColor.getStrokeWidth() / 2f;
 
         switch (obstacle.getDirection()) {
             case NORTH:
                 startX = left;
-                startY = top;
+                startY = top + offset;
                 endX = right;
-                endY = top;
+                endY = top + offset;
                 break;
             case SOUTH:
                 startX = left;
-                startY = bottom;
+                startY = bottom - offset;
                 endX = right;
-                endY = bottom;
+                endY = bottom - offset;
                 break;
             case EAST:
-                startX = right;
+                startX = right - offset;
                 startY = top;
-                endX = right;
+                endX = right - offset;
                 endY = bottom;
                 break;
             case WEST:
-                startX = left;
+                startX = left + offset;
                 startY = top;
-                endX = left;
+                endX = left + offset;
                 endY = bottom;
                 break;
             default:

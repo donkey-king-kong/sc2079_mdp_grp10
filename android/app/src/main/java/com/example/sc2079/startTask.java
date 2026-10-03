@@ -1,6 +1,7 @@
 package com.example.sc2079;
 
 import android.content.ContentUris;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -41,9 +42,18 @@ public class startTask extends Fragment {
     private Runnable timerRunnable;
 
 
+    public startTask() {}
+
     public startTask(GridMapClass gridMap){
         this.gridMap = gridMap;
+    }
 
+    @Override
+    public void onAttach(android.content.Context context) {
+        super.onAttach(context);
+        if (gridMap == null && context instanceof MainActivity) {
+            gridMap = ((MainActivity) context).currentGridMapOrNull();
+        }
     }
 
     @Nullable
