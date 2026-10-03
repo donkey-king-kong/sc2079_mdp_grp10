@@ -256,10 +256,15 @@ class MainActivity : AppCompatActivity() {
         )
         super.onCreate(savedInstanceState)
 
+        // Keep system splash on screen until our overlay is attached, so there's no white flash
+        var overlayReady = false
+        val splash = installSplashScreen()
+        splash.setKeepOnScreenCondition { !overlayReady }
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Show full-screen splash overlay with large icon + title text for 1.5s
+        // Full-screen overlay: large icon + title text for 1.5s, then fades out
         if (savedInstanceState == null) {
             val overlay = layoutInflater.inflate(R.layout.activity_splash_overlay, null)
             val decorView = window.decorView as android.view.ViewGroup
@@ -267,11 +272,14 @@ class MainActivity : AppCompatActivity() {
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT
             ))
+            overlayReady = true  // release system splash — overlay is now covering the screen
             overlay.postDelayed({
                 overlay.animate().alpha(0f).setDuration(300).withEndAction {
                     decorView.removeView(overlay)
                 }.start()
             }, 1500)
+        } else {
+            overlayReady = true
         }
 
         btnBluetooth = findViewById(R.id.btnBluetooth)
