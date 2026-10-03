@@ -34,6 +34,7 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
 
     private EditText input;
     private ImageButton sendBtn;
+    private Button clearLogButton;
     private TextView chatView;
     private GridMapClass gridMap;
 
@@ -173,8 +174,16 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
 
         input = addCommsView.findViewById(R.id.typeBoxEditText);
         sendBtn = addCommsView.findViewById(R.id.messageButton);
+        clearLogButton = addCommsView.findViewById(R.id.clearLogButton);
         chatView = addCommsView.findViewById(R.id.messageBlock);
         chatView.setMovementMethod(new ScrollingMovementMethod());
+
+        clearLogButton.setOnClickListener(v -> {
+            MainActivity activity = (MainActivity) requireActivity();
+            if (activity != null) {
+                activity.clearMessageLog();
+            }
+        });
 
         /*
         sendBtn.setOnClickListener(v -> {
