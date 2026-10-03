@@ -20,6 +20,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import android.util.TypedValue
 import android.view.Gravity
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -37,16 +38,19 @@ import androidx.viewpager.widget.ViewPager
 import com.example.sc2079.databinding.ActivityMainBinding
 import com.example.sc2079.service.BluetoothService
 import com.example.sc2079.ui.bluetooth.BluetoothFragment
-import com.google.android.material.button.MaterialButton
 import com.google.android.material.tabs.TabLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import android.util.Base64
-import android.widget.NumberPicker
-import androidx.appcompat.app.AlertDialog
-import com.example.sc2079.ui.coordinates.AddCoordinateFragment
 import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment
 import com.example.sc2079.ui.coordinates.SharedViewModel
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import com.example.sc2079.ui.DAY
+import com.example.sc2079.ui.NIGHT
+import com.example.sc2079.ui.Palette
+import com.example.sc2079.ui.ThemeAware
+import com.example.sc2079.ui.box
 import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
@@ -56,7 +60,6 @@ class MainActivity : AppCompatActivity() {
     private var isBound = false
     private lateinit var binding: ActivityMainBinding
     private lateinit var btnBluetooth: ImageButton
-    private lateinit var btnAddCoordinate: ImageButton
     private lateinit var bluetoothStatus: ImageView
     private var activateJoyStickBool = false
     private var isDayMode = false
@@ -138,6 +141,8 @@ class MainActivity : AppCompatActivity() {
     fun getIsConnected(): Boolean {
         return isConnected
     }
+
+    fun currentPalette(): Palette = if (isDayMode) DAY else NIGHT
 
     fun getMessageLog(): ArrayList<String> {
         return messageLog
@@ -478,6 +483,14 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Apply system bar insets as padding on the root container (targetSdk 36 enforces edge-to-edge)
+        val container = binding.root
+        ViewCompat.setOnApplyWindowInsetsListener(container) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+
         if (savedInstanceState == null) {
             val overlay = layoutInflater.inflate(R.layout.activity_splash_overlay, null)
             val decorView = window.decorView as android.view.ViewGroup
@@ -494,18 +507,9 @@ class MainActivity : AppCompatActivity() {
         } else {
             overlayReady = true
         }
-        //val navView: BottomNavigationView = binding.navView
-        //val navController = findNavController(R.id.nav_host_fragment_activity_main)
 
-        //navView.setupWithNavController(navController)
         btnBluetooth = findViewById(R.id.btnBluetooth)
         bluetoothStatus = findViewById(R.id.bluetoothStatus)
-
-        btnAddCoordinate = findViewById(R.id.btnAddCoordinate)
-
-        btnAddCoordinate.setOnClickListener {
-            showAddCoordinatesFragment()
-        }
 
         updateBluetoothStatus()
 
@@ -522,12 +526,6 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
         }
 
-        val btnLogClear: com.google.android.material.button.MaterialButton =
-            findViewById(R.id.clear_logs_button)
-        btnLogClear.setOnClickListener {
-            clearMessageLog()
-        }
-
         var autoActive = false
 
         val customNavigatorBar: customNavigator = customNavigator(
@@ -541,131 +539,98 @@ class MainActivity : AppCompatActivity() {
         val rightPanel = findViewById<android.widget.LinearLayout>(R.id.rightPanel)
         val gridArea = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.constraintGridMapView)
         val subNavContainer = findViewById<android.widget.LinearLayout>(R.id.sub_navigation_container)
-        val dpadCenter = findViewById<android.view.View>(R.id.dpadCenterSquare)
 
         val headerRow = findViewById<android.widget.LinearLayout>(R.id.headerRow)
         val bottomRow = findViewById<android.widget.LinearLayout>(R.id.bottomRow)
         val coordCard = findViewById<android.widget.LinearLayout>(R.id.coordCard)
         val statusCard = findViewById<android.widget.LinearLayout>(R.id.statusCard)
-        val btnAddCoordinate = findViewById<android.widget.ImageButton>(R.id.btnAddCoordinate)
         val btnBluetooth = findViewById<android.widget.ImageButton>(R.id.btnBluetooth)
-        val dpadUp = findViewById<android.widget.Button>(R.id.dpad_up)
-        val dpadDown = findViewById<android.widget.Button>(R.id.dpad_down)
-        val dpadLeft = findViewById<android.widget.Button>(R.id.dpad_left)
-        val dpadRight = findViewById<android.widget.Button>(R.id.dpad_right)
-        val reverseLeft = findViewById<android.widget.LinearLayout>(R.id.reverse_left_button)
-        val reverseRight = findViewById<android.widget.LinearLayout>(R.id.reverse_right_button)
-        val revLeftIcon = findViewById<android.widget.ImageView>(R.id.revLeftIcon)
-        val revLeftLabel = findViewById<android.widget.TextView>(R.id.revLeftLabel)
-        val revRightIcon = findViewById<android.widget.ImageView>(R.id.revRightIcon)
-        val revRightLabel = findViewById<android.widget.TextView>(R.id.revRightLabel)
         val coordText = findViewById<android.widget.TextView>(R.id.give_vehicle_coord_now)
         val dirText = findViewById<android.widget.TextView>(R.id.give_vehicle_direction_now)
         val statusText = findViewById<android.widget.TextView>(R.id.give_vehicle_status_now)
 
-        // Bottom bar buttons — declared here so applyTheme can reach them
-        val btnGridSize = findViewById<MaterialButton>(R.id.btn_grid_size)
-        val btnReset = findViewById<MaterialButton>(R.id.reset_map_button)
-        val saveGridMapButton = findViewById<MaterialButton>(R.id.save_map_button)
-        val loadGridMapButton = findViewById<MaterialButton>(R.id.load_map_button)
+        // Bottom bar buttons
+        val btnGridMinus = findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btn_grid_minus)
+        val btnGridPlus = findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btn_grid_plus)
+        val txtGridSize = findViewById<android.widget.TextView>(R.id.txt_grid_size)
+        val txtGridSizeLabel = findViewById<android.widget.TextView>(R.id.txt_grid_size_label)
+        val btnReset = findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.reset_map_button)
+        val saveGridMapButton = findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.save_map_button)
+        val loadGridMapButton = findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.load_map_button)
         val tabs = findViewById<TabLayout>(R.id.tabs)
 
+        // Load persisted theme preference (default: day mode)
+        val uiPrefs = getSharedPreferences("ui_prefs", MODE_PRIVATE)
+        isDayMode = uiPrefs.getBoolean("day_mode", true)
+
         fun applyTheme(day: Boolean) {
-            fun tint(color: String) = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(color))
-            fun col(color: String) = android.graphics.Color.parseColor(color)
-            if (day) {
-                btnThemeToggle.text = "🌙"
-                rootContainer.setBackgroundColor(col("#EDF1F7"))
-                rightPanel.setBackgroundColor(col("#EDF1F7"))
-                gridArea.setBackgroundColor(col("#EDF1F7"))
-                subNavContainer.setBackgroundColor(col("#EDF1F7"))
-                headerRow.backgroundTintList = tint("#D6DEF0")
-                bottomRow.backgroundTintList = tint("#D6DEF0")
-                coordCard.backgroundTintList = tint("#C2CEDF")
-                statusCard.backgroundTintList = tint("#C2CEDF")
-                btnAddCoordinate.backgroundTintList = tint("#C2CEDF")
-                btnThemeToggle.backgroundTintList = tint("#C2CEDF")
-                btnBluetooth.backgroundTintList = tint("#C2CEDF")
-                // D-pad: darker blue bg so the navy arrow text pops
-                dpadUp.backgroundTintList = tint("#7A9BBF")
-                dpadDown.backgroundTintList = tint("#7A9BBF")
-                dpadLeft.backgroundTintList = tint("#7A9BBF")
-                dpadRight.backgroundTintList = tint("#7A9BBF")
-                dpadUp.setTextColor(col("#FFFFFF"))
-                dpadDown.setTextColor(col("#FFFFFF"))
-                dpadLeft.setTextColor(col("#FFFFFF"))
-                dpadRight.setTextColor(col("#FFFFFF"))
-                reverseLeft.backgroundTintList = tint("#7A9BBF")
-                reverseRight.backgroundTintList = tint("#7A9BBF")
-                revLeftIcon.imageTintList = tint("#FFFFFF")
-                revLeftLabel.setTextColor(col("#FFFFFF"))
-                revRightIcon.imageTintList = tint("#FFFFFF")
-                revRightLabel.setTextColor(col("#FFFFFF"))
-                dpadCenter.backgroundTintList = tint("#C5D5E8")
-                coordText.setTextColor(col("#1A2A4A"))
-                dirText.setTextColor(col("#3A5A8A"))
-                statusText.setTextColor(col("#1A2A4A"))
-                // Bottom bar buttons: dark text on light bar
-                val darkNavy = col("#1A2A4A")
-                btnGridSize.setTextColor(darkNavy)
-                btnReset.setTextColor(darkNavy)
-                saveGridMapButton.setTextColor(darkNavy)
-                loadGridMapButton.setTextColor(darkNavy)
-                btnLogClear.setTextColor(darkNavy)
-                // Tab bar: match panel background
-                tabs.setBackgroundColor(col("#EDF1F7"))
-                tabs.setSelectedTabIndicatorColor(col("#2563A8"))
-                tabs.setTabIconTint(android.content.res.ColorStateList.valueOf(col("#1A2A4A")))
-                updateAxisTextColor(false)
-            } else {
-                btnThemeToggle.text = "☀"
-                rootContainer.setBackgroundColor(col("#0F1C3A"))
-                rightPanel.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                gridArea.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                subNavContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                headerRow.backgroundTintList = tint("#182D4B")
-                bottomRow.backgroundTintList = tint("#1E3A5F")
-                coordCard.backgroundTintList = tint("#1A3A5C")
-                statusCard.backgroundTintList = tint("#1A3A5C")
-                btnAddCoordinate.backgroundTintList = tint("#1A3A5C")
-                btnThemeToggle.backgroundTintList = tint("#1A3A5C")
-                btnBluetooth.backgroundTintList = tint("#1A3A5C")
-                dpadUp.backgroundTintList = tint("#1E4A65")
-                dpadDown.backgroundTintList = tint("#1E4A65")
-                dpadLeft.backgroundTintList = tint("#1E4A65")
-                dpadRight.backgroundTintList = tint("#1E4A65")
-                dpadUp.setTextColor(col("#4AD8F0"))
-                dpadDown.setTextColor(col("#4AD8F0"))
-                dpadLeft.setTextColor(col("#4AD8F0"))
-                dpadRight.setTextColor(col("#4AD8F0"))
-                reverseLeft.backgroundTintList = tint("#1E4A65")
-                reverseRight.backgroundTintList = tint("#1E4A65")
-                revLeftIcon.imageTintList = tint("#26B5CB")
-                revLeftLabel.setTextColor(col("#4AD8F0"))
-                revRightIcon.imageTintList = tint("#26B5CB")
-                revRightLabel.setTextColor(col("#4AD8F0"))
-                dpadCenter.backgroundTintList = tint("#2A4A6A")
-                coordText.setTextColor(android.graphics.Color.WHITE)
-                dirText.setTextColor(col("#7AAFCB"))
-                statusText.setTextColor(android.graphics.Color.WHITE)
-                // Bottom bar buttons: restore original light-blue text
-                val cyanText = col("#26B5CB")
-                val paleText = col("#A8C8E8")
-                btnGridSize.setTextColor(paleText)
-                btnReset.setTextColor(paleText)
-                saveGridMapButton.setTextColor(paleText)
-                loadGridMapButton.setTextColor(paleText)
-                btnLogClear.setTextColor(paleText)
-                // Tab bar: restore dark background
-                tabs.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                tabs.setSelectedTabIndicatorColor(col("#F137A5"))
-                tabs.setTabIconTint(android.content.res.ColorStateList.valueOf(col("#FFFFFF")))
-                updateAxisTextColor(true)
+            val p = if (day) DAY else NIGHT
+            btnThemeToggle.text = if (day) "🌙" else "☀"
+            // Container backgrounds
+            rootContainer.setBackgroundColor(p.panel)
+            headerRow.setBackgroundColor(p.panel)
+            bottomRow.setBackgroundColor(p.panel)
+            rightPanel.setBackgroundColor(p.panel)
+            subNavContainer.setBackgroundColor(p.panel)
+            gridArea.setBackgroundColor(p.bg)
+            // coordCard as rounded box
+            coordCard.background = box(this, p.surface2, p.borderStrong, 6f)
+            coordCard.backgroundTintList = null
+            coordText.setTextColor(p.text)
+            dirText.setTextColor(p.text)
+            statusText.setTextColor(p.text)
+            // Theme toggle — MaterialButton: use tint APIs, NOT setBackground
+            val dp2px: (Float) -> Int = { dp -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, resources.displayMetrics).toInt() }
+            btnThemeToggle.backgroundTintList = android.content.res.ColorStateList.valueOf(p.surface2)
+            btnThemeToggle.strokeColor = android.content.res.ColorStateList.valueOf(p.borderStrong)
+            btnThemeToggle.strokeWidth = dp2px(2f)
+            btnThemeToggle.cornerRadius = dp2px(8f)
+            btnThemeToggle.setTextColor(p.text)
+            // Bluetooth button
+            btnBluetooth.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnBluetooth.backgroundTintList = null
+            // Grid size controls
+            btnGridMinus.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnGridMinus.backgroundTintList = null
+            btnGridMinus.setTextColor(p.text)
+            btnGridPlus.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnGridPlus.backgroundTintList = null
+            btnGridPlus.setTextColor(p.text)
+            txtGridSize.setTextColor(p.text)
+            txtGridSizeLabel.setTextColor(p.textMuted)
+            // Map action buttons
+            btnReset.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnReset.backgroundTintList = null
+            btnReset.setTextColor(p.text)
+            saveGridMapButton.background = box(this, p.surface2, p.borderStrong, 8f)
+            saveGridMapButton.backgroundTintList = null
+            saveGridMapButton.setTextColor(p.text)
+            loadGridMapButton.background = box(this, p.surface2, p.borderStrong, 8f)
+            loadGridMapButton.backgroundTintList = null
+            loadGridMapButton.setTextColor(p.text)
+            // Tabs
+            tabs.setBackgroundColor(p.panel)
+            tabs.setSelectedTabIndicatorColor(p.accent)
+            tabs.setTabTextColors(p.textMuted, p.accent)
+            val tabIconTint = android.content.res.ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_selected),
+                    intArrayOf()
+                ),
+                intArrayOf(p.accent, p.textMuted)
+            )
+            tabs.setTabIconTint(tabIconTint)
+            // Axis numbers
+            updateAxisTextColor(!day)
+            // Dispatch to ThemeAware fragments
+            supportFragmentManager.fragments.forEach { frag ->
+                if (frag is ThemeAware) frag.applyTheme(p)
             }
         }
 
         btnThemeToggle.setOnClickListener {
             isDayMode = !isDayMode
+            uiPrefs.edit().putBoolean("day_mode", isDayMode).apply()
             applyTheme(isDayMode)
         }
 
@@ -675,34 +640,21 @@ class MainActivity : AppCompatActivity() {
         gridMapObj.setGridColumns(20)
         gridMapObj.setGridRows(20)
         gridMapView.addView(gridMapObj)
-        setupGraphAxes(this, true)
+        setupGraphAxes(this, !isDayMode)
 
-        // D-pad buttons
-        dpadUp.setOnClickListener {
-            activateJoyStickBool = true
-            gridMapObj.moveVehicleStraight(ObstacleData.Direction.NORTH, true)
+        // Grid size +/- buttons (min=5, max=20, square grid so cols==rows)
+        fun updateGridSizeLabel() {
+            txtGridSize.text = gridMapObj.getGridColumns().toString()
         }
-        dpadDown.setOnClickListener {
-            activateJoyStickBool = true
-            gridMapObj.moveVehicleStraight(ObstacleData.Direction.SOUTH, true)
+        btnGridMinus.setOnClickListener {
+            val current = gridMapObj.getGridColumns()
+            if (current > 5) applyGridSize(current - 1, current - 1)
+            updateGridSizeLabel()
         }
-        dpadLeft.setOnClickListener {
-            activateJoyStickBool = true
-            gridMapObj.moveVehicleStraight(ObstacleData.Direction.WEST, true)
-        }
-        dpadRight.setOnClickListener {
-            activateJoyStickBool = true
-            gridMapObj.moveVehicleStraight(ObstacleData.Direction.EAST, true)
-        }
-
-        reverseLeft.setOnClickListener {
-            Log.d("JoystickButtons", "Reverse Left clicked")
-            gridMapObj.reverseLeftVehicle(true)
-        }
-
-        reverseRight.setOnClickListener {
-            Log.d("JoystickButtons", "Reverse Right clicked")
-            gridMapObj.reverseRightVehicle(true)
+        btnGridPlus.setOnClickListener {
+            val current = gridMapObj.getGridColumns()
+            if (current < 20) applyGridSize(current + 1, current + 1)
+            updateGridSizeLabel()
         }
 
         saveGridMapButton.setOnClickListener {
@@ -713,18 +665,14 @@ class MainActivity : AppCompatActivity() {
             loadGridMapData()
         }
 
-        btnGridSize.setOnClickListener {
-            showGridSizeDialog()
-        }
-
         btnReset.setOnClickListener {
             gridMapObj.clearGridMap()
         }
 
         // Initalize navigation tabz
-        customNavigatorBar.addFragment(AddObstacle(gridMapObj), "")
-        customNavigatorBar.addFragment(commsToRobot(gridMapObj), "")
-        customNavigatorBar.addFragment(startTask(gridMapObj), "")
+        customNavigatorBar.addFragment(AddObstacle(gridMapObj), "Place")
+        customNavigatorBar.addFragment(commsToRobot(gridMapObj), "Chat")
+        customNavigatorBar.addFragment(startTask(gridMapObj), "Panels")
 
         // Initializes Navigation Bar
         val subNavigationBar = findViewById<ViewPager?>(R.id.sub_navigation_bar)
@@ -735,6 +683,9 @@ class MainActivity : AppCompatActivity() {
         tabs.getTabAt(0)?.setIcon(R.drawable.plus_for_enter)
         tabs.getTabAt(1)?.setIcon(R.drawable.send_message)
         tabs.getTabAt(2)?.setIcon(R.drawable.ic_dashboard_black_24dp)
+
+        // Apply persisted theme on startup
+        applyTheme(isDayMode)
     }
 
     override fun onStart() {
@@ -810,6 +761,7 @@ class MainActivity : AppCompatActivity() {
             bluetoothStatus.backgroundTintList = ContextCompat.getColorStateList(this, R.color.status_disconnected)
         }
     }
+
     fun clearMessageLog() {
         messageLog.clear()
         messageListener?.onLogCleared() // Notify listener to clear the displayed text
@@ -829,7 +781,7 @@ class MainActivity : AppCompatActivity() {
     fun setupGraphAxes(context: Context, isDark: Boolean) {
         val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
         val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
-        val axisColor = if (isDark) Color.WHITE else Color.BLACK
+        val axisColor = if (isDark) NIGHT.textMuted else DAY.textMuted
         val rows = gridMapObj.getGridRows()
         val cols = gridMapObj.getGridColumns()
 
@@ -859,7 +811,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateAxisTextColor(isDark: Boolean) {
-        val axisColor = if (isDark) Color.WHITE else Color.BLACK
+        val axisColor = if (isDark) NIGHT.textMuted else DAY.textMuted
         val yAxis = findViewById<LinearLayout>(R.id.y_axis_numbers)
         val xAxis = findViewById<LinearLayout>(R.id.x_axis_numbers)
         for (i in 0 until yAxis.childCount) {
@@ -869,20 +821,9 @@ class MainActivity : AppCompatActivity() {
             (xAxis.getChildAt(i) as? TextView)?.setTextColor(axisColor)
         }
     }
+
     private fun showGridSizeDialog() {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_grid_size, null)
-        val colPicker = dialogView.findViewById<NumberPicker>(R.id.picker_cols)
-        val rowPicker = dialogView.findViewById<NumberPicker>(R.id.picker_rows)
-        colPicker.minValue = 5; colPicker.maxValue = 20; colPicker.value = gridMapObj.getGridColumns()
-        rowPicker.minValue = 5; rowPicker.maxValue = 20; rowPicker.value = gridMapObj.getGridRows()
-        AlertDialog.Builder(this)
-            .setTitle("Arena Size")
-            .setView(dialogView)
-            .setPositiveButton("Apply") { _, _ ->
-                applyGridSize(colPicker.value, rowPicker.value)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        // kept for reference; no longer called from UI
     }
 
     private fun applyGridSize(cols: Int, rows: Int) {

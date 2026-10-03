@@ -4,221 +4,432 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/fragment_container_view_add_coordinates"
-    android:background="@color/ds_panel">
+    android:background="@color/bg_panel">
 
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="10dp">
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Coordinate inputs -->
         <LinearLayout
-            android:id="@+id/linearLayout_add_x_y_coords"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- ── Section 1: MODE ── -->
+            <TextView
+                android:id="@+id/lbl_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MODE"
+                android:textColor="@color/ds_text_muted"
+                android:textSize="11sp"
+                android:fontFamily="@font/poppins_bold"
+                android:letterSpacing="0.12"
+                android:layout_marginBottom="6dp" />
 
             <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginEnd="6dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="X"
-                    android:textColor="@color/ds_accent"
-                    android:textSize="9sp"
-                    android:fontFamily="@font/poppins_bold"
-                    android:layout_marginBottom="2dp"
-                    android:letterSpacing="0.08" />
-
-                <EditText
-                    android:id="@+id/addXCoords"
-                    android:layout_width="match_parent"
-                    android:layout_height="38dp"
-                    android:background="@drawable/btn_input_field"
-                    android:hint="0 – 19"
-                    android:textColorHint="@color/ds_text_dim"
-                    android:textColor="@color/ds_text"
-                    android:fontFamily="@font/poppins_regular"
-                    android:gravity="center"
-                    android:textSize="13sp"
-                    android:inputType="number"
-                    android:padding="4dp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Y"
-                    android:textColor="@color/ds_accent"
-                    android:textSize="9sp"
-                    android:fontFamily="@font/poppins_bold"
-                    android:layout_marginBottom="2dp"
-                    android:letterSpacing="0.08" />
-
-                <EditText
-                    android:id="@+id/addYCoords"
-                    android:layout_width="match_parent"
-                    android:layout_height="38dp"
-                    android:background="@drawable/btn_input_field"
-                    android:hint="0 – 19"
-                    android:textColorHint="@color/ds_text_dim"
-                    android:textColor="@color/ds_text"
-                    android:fontFamily="@font/poppins_regular"
-                    android:gravity="center"
-                    android:textSize="13sp"
-                    android:inputType="number"
-                    android:padding="4dp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- Mode label -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="MODE"
-            android:textColor="@color/ds_text_muted"
-            android:textSize="8sp"
-            android:fontFamily="@font/poppins_bold"
-            android:letterSpacing="0.12"
-            android:layout_marginBottom="4dp" />
-
-        <!-- Mode buttons — plain LinearLayout keeps toggle IDs but uses state-aware drawables -->
-        <LinearLayout
-            android:id="@+id/linearLayout_add_Toogle_Group_Options"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <!-- Wrapping in MaterialButtonToggleGroup preserves existing click-wiring in AddObstacle.java -->
-            <com.google.android.material.button.MaterialButtonToggleGroup
-                android:id="@+id/toggleGroup_Options"
+                android:id="@+id/linearLayout_add_Toogle_Group_Options"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/toggleGroup_Options"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/add_starting_point"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="Vehicle"
+                        android:textSize="9sp"
+                        android:stateListAnimator="@null"
+                        android:textAllCaps="false"
+                        app:icon="@drawable/vehicle_icon"
+                        app:iconGravity="top"
+                        app:iconPadding="2dp"
+                        app:iconSize="20dp"
+                        app:strokeWidth="2dp"
+                        app:cornerRadius="8dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/add_obstacle_button"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="Obstacle"
+                        android:textSize="9sp"
+                        android:stateListAnimator="@null"
+                        android:textAllCaps="false"
+                        app:icon="@drawable/obstacle_icon"
+                        app:iconGravity="top"
+                        app:iconPadding="2dp"
+                        app:iconSize="20dp"
+                        app:strokeWidth="2dp"
+                        app:cornerRadius="8dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/remove_obstacle_button"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:text="Remove"
+                        android:textSize="9sp"
+                        android:stateListAnimator="@null"
+                        android:textAllCaps="false"
+                        app:icon="@drawable/outline_delete_24dp"
+                        app:iconGravity="top"
+                        app:iconPadding="2dp"
+                        app:iconSize="20dp"
+                        app:strokeWidth="2dp"
+                        app:cornerRadius="8dp" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/txt_mode_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Tap grid to place · tap placed item to cycle direction"
+                android:textSize="12sp"
+                android:fontFamily="@font/poppins_regular"
+                android:gravity="start"
+                android:textAlignment="viewStart"
+                android:layout_marginTop="6dp" />
+
+            <!-- ── Divider 1 ── -->
+            <View
+                android:id="@+id/divider_mode"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33000000"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- ── Section 2: COORDINATES ── -->
+            <TextView
+                android:id="@+id/lbl_coordinates"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="COORDINATES"
+                android:textColor="@color/ds_text_muted"
+                android:textSize="11sp"
+                android:fontFamily="@font/poppins_bold"
+                android:letterSpacing="0.12"
+                android:layout_marginBottom="6dp" />
+
+            <LinearLayout
+                android:id="@+id/linearLayout_add_x_y_coords"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginEnd="6dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="X"
+                        android:textColor="@color/ds_accent"
+                        android:textSize="9sp"
+                        android:fontFamily="@font/poppins_bold"
+                        android:layout_marginBottom="2dp"
+                        android:letterSpacing="0.08" />
+
+                    <EditText
+                        android:id="@+id/addXCoords"
+                        android:layout_width="match_parent"
+                        android:layout_height="38dp"
+                        android:background="@drawable/btn_input_field"
+                        android:hint="0 – 19"
+                        android:textColorHint="@color/ds_text_dim"
+                        android:textColor="@color/ds_text"
+                        android:fontFamily="@font/poppins_regular"
+                        android:gravity="center"
+                        android:textSize="13sp"
+                        android:inputType="number"
+                        android:padding="4dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Y"
+                        android:textColor="@color/ds_accent"
+                        android:textSize="9sp"
+                        android:fontFamily="@font/poppins_bold"
+                        android:layout_marginBottom="2dp"
+                        android:letterSpacing="0.08" />
+
+                    <EditText
+                        android:id="@+id/addYCoords"
+                        android:layout_width="match_parent"
+                        android:layout_height="38dp"
+                        android:background="@drawable/btn_input_field"
+                        android:hint="0 – 19"
+                        android:textColorHint="@color/ds_text_dim"
+                        android:textColor="@color/ds_text"
+                        android:fontFamily="@font/poppins_regular"
+                        android:gravity="center"
+                        android:textSize="13sp"
+                        android:inputType="number"
+                        android:padding="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/txt_coord_range"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Range 0 – 19"
+                android:textSize="12sp"
+                android:fontFamily="@font/poppins_regular"
+                android:gravity="start"
+                android:textAlignment="viewStart"
+                android:layout_marginTop="4dp" />
+
+            <!-- ── Divider 2 ── -->
+            <View
+                android:id="@+id/divider_coords"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33000000"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- ── Section 3: MOVE ── -->
+            <TextView
+                android:id="@+id/lbl_move"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MOVE"
+                android:textColor="@color/ds_text_muted"
+                android:textSize="11sp"
+                android:fontFamily="@font/poppins_bold"
+                android:letterSpacing="0.12"
+                android:layout_marginBottom="8dp" />
+
+            <!-- D-pad cross, centred -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_gravity="center_horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/dpad_up"
+                    android:stateListAnimator="@null"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="▲"
+                    android:textSize="18sp"
+                    android:textColor="#4AD8F0"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:padding="0dp"
+                    android:gravity="center"
+                    android:textAllCaps="false"
+                    android:layout_marginBottom="3dp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="3dp">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/dpad_left"
+                        android:stateListAnimator="@null"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="◀"
+                        android:textSize="18sp"
+                        android:textColor="#4AD8F0"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:padding="0dp"
+                        android:gravity="center"
+                        android:textAllCaps="false"
+                        android:layout_marginEnd="3dp" />
+
+                    <TextView
+                        android:id="@+id/dpadCenterSquare"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="•"
+                        android:gravity="center"
+                        android:background="@drawable/button_rounded_square_background" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/dpad_right"
+                        android:stateListAnimator="@null"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="▶"
+                        android:textSize="18sp"
+                        android:textColor="#4AD8F0"
+                        android:background="@drawable/button_rounded_square_background"
+                        android:padding="0dp"
+                        android:gravity="center"
+                        android:textAllCaps="false"
+                        android:layout_marginStart="3dp" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/dpad_down"
+                    android:stateListAnimator="@null"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="▼"
+                    android:textSize="18sp"
+                    android:textColor="#4AD8F0"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:padding="0dp"
+                    android:gravity="center"
+                    android:textAllCaps="false" />
+            </LinearLayout>
+
+            <!-- Reverse buttons, 100dp wide, 8dp gap, centred -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                app:singleSelection="true">
+                android:gravity="center"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/add_starting_point"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:text="Vehicle"
-                    android:textSize="9sp"
-                    android:textColor="@color/ds_text"
+                <LinearLayout
+                    android:id="@+id/reverse_left_button"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="4dp"
+                    android:layout_marginEnd="8dp">
+
+                    <ImageView
+                        android:id="@+id/revLeftIcon"
+                        android:layout_width="22dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/reverse_left_button"
+                        android:scaleType="fitCenter"
+                        app:tint="@color/cyan" />
+
+                    <TextView
+                        android:id="@+id/revLeftLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Rev ◀"
+                        android:textSize="7sp"
+                        android:textColor="#4AD8F0"
+                        android:fontFamily="@font/poppins_bold"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/reverse_right_button"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="4dp">
+
+                    <ImageView
+                        android:id="@+id/revRightIcon"
+                        android:layout_width="22dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/reverse_right_button"
+                        android:scaleType="fitCenter"
+                        app:tint="@color/cyan" />
+
+                    <TextView
+                        android:id="@+id/revRightLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Rev ▶"
+                        android:textSize="7sp"
+                        android:textColor="#4AD8F0"
+                        android:fontFamily="@font/poppins_bold"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ── Divider 3 ── -->
+            <View
+                android:id="@+id/divider_move"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33000000"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- ── Section 4: ACTIONS ── -->
+            <LinearLayout
+                android:id="@+id/linearLayout_cancel_add_buttons"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/cancelButton"
                     android:stateListAnimator="@null"
-                    app:icon="@drawable/vehicle_icon"
-                    app:iconGravity="top"
-                    app:iconPadding="2dp"
-                    app:iconSize="20dp"
-                    app:iconTint="@color/ds_text"
-                    app:strokeColor="@color/ds_border_strong"
-                    app:strokeWidth="2dp"
-                    app:backgroundTint="@color/ds_surface" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/add_obstacle_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="52dp"
+                    android:layout_height="44dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:text="Obstacle"
-                    android:textSize="9sp"
-                    android:textColor="@color/ds_text"
-                    android:stateListAnimator="@null"
-                    app:icon="@drawable/obstacle_icon"
-                    app:iconGravity="top"
-                    app:iconPadding="2dp"
-                    app:iconSize="20dp"
-                    app:iconTint="@color/ds_text"
-                    app:strokeColor="@color/ds_border_strong"
-                    app:strokeWidth="2dp"
-                    app:backgroundTint="@color/ds_surface" />
+                    android:layout_marginEnd="6dp"
+                    android:text="✕ Clear"
+                    android:textSize="13sp"
+                    android:textColor="@color/ds_red"
+                    android:background="@drawable/btn_cancel"
+                    android:gravity="center"
+                    android:textAllCaps="false" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/remove_obstacle_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/addObstacleButton"
+                    android:stateListAnimator="@null"
                     android:layout_width="0dp"
-                    android:layout_height="52dp"
+                    android:layout_height="44dp"
                     android:layout_weight="1"
-                    android:text="Remove"
-                    android:textSize="9sp"
-                    android:textColor="@color/ds_text"
-                    android:stateListAnimator="@null"
-                    app:icon="@drawable/outline_delete_24dp"
-                    app:iconGravity="top"
-                    app:iconPadding="2dp"
-                    app:iconSize="20dp"
-                    app:iconTint="@color/ds_text"
-                    app:strokeColor="@color/ds_border_strong"
-                    app:strokeWidth="2dp"
-                    app:backgroundTint="@color/ds_surface" />
+                    android:text="✓ Confirm"
+                    android:textSize="13sp"
+                    android:textColor="@color/ds_green"
+                    android:background="@drawable/btn_confirm"
+                    android:gravity="center"
+                    android:textAllCaps="false" />
 
-            </com.google.android.material.button.MaterialButtonToggleGroup>
+            </LinearLayout>
 
         </LinearLayout>
-
-        <!-- Hint text -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Tap grid to place · tap placed item to cycle direction"
-            android:textColor="@color/ds_text_dim"
-            android:textSize="8sp"
-            android:fontFamily="@font/poppins_regular"
-            android:gravity="center"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="6dp" />
-
-        <!-- Action buttons -->
-        <LinearLayout
-            android:id="@+id/linearLayout_cancel_add_buttons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="4dp">
-
-            <ImageButton
-                android:id="@+id/cancelButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:foregroundGravity="center"
-                android:scaleType="fitCenter"
-                android:src="@drawable/cross_for_exit"
-                android:contentDescription="Cancel"
-                android:background="@drawable/btn_cancel"
-                app:tint="@color/ds_red" />
-
-            <ImageButton
-                android:id="@+id/addObstacleButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:foregroundGravity="center"
-                android:scaleType="fitCenter"
-                android:src="@drawable/plus_for_enter"
-                android:contentDescription="Confirm"
-                android:background="@drawable/btn_confirm"
-                app:tint="@color/ds_green" />
-        </LinearLayout>
-
-    </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
