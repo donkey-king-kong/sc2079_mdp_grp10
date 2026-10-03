@@ -28,7 +28,7 @@
             android:letterSpacing="0.08"
             android:textColor="#5A8AAA"
             android:fontFamily="@font/poppins_bold"
-            android:layout_marginEnd="8dp" />
+            android:layout_marginEnd="6dp" />
 
         <!-- Coordinates box -->
         <LinearLayout
@@ -68,14 +68,15 @@
             android:layout_width="1dp"
             android:layout_height="20dp"
             android:background="#33000000"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp" />
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp" />
 
         <!-- Status card (no background) -->
         <LinearLayout
             android:id="@+id/statusCard"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -89,19 +90,22 @@
 
             <TextView
                 android:id="@+id/give_vehicle_status_now"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="Idle"
                 android:textSize="11sp"
                 android:textColor="@color/white"
                 android:fontFamily="@font/poppins_regular" />
         </LinearLayout>
 
-        <!-- Spacer pushes theme toggle + Bluetooth to the right -->
+        <!-- Gap before pinned header actions. -->
         <Space
-            android:layout_width="0dp"
+            android:layout_width="8dp"
             android:layout_height="1dp"
-            android:layout_weight="1" />
+            android:layout_weight="0" />
 
         <!-- Day/Night theme toggle -->
         <com.google.android.material.button.MaterialButton
