@@ -789,12 +789,17 @@ class MainActivity : AppCompatActivity() {
         val axisColor = if (isDark) NIGHT.textMuted else DAY.textMuted
         val rows = gridMapObj.getGridRows()
         val cols = gridMapObj.getGridColumns()
+        val axisTextSizeSp = if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) 8f else 10f
 
         for (i in (rows - 1) downTo 0) {
             val textView = TextView(context)
             textView.text = i.toString()
             textView.setTextColor(axisColor)
+            textView.textSize = axisTextSizeSp
             textView.gravity = Gravity.CENTER
+            textView.includeFontPadding = false
+            textView.maxLines = 1
+            textView.setHorizontallyScrolling(true)
             textView.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0, 1f
@@ -806,7 +811,11 @@ class MainActivity : AppCompatActivity() {
             val textView = TextView(context)
             textView.text = i.toString()
             textView.setTextColor(axisColor)
+            textView.textSize = axisTextSizeSp
             textView.gravity = Gravity.CENTER
+            textView.includeFontPadding = false
+            textView.maxLines = 1
+            textView.setHorizontallyScrolling(true)
             textView.layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.MATCH_PARENT, 1f

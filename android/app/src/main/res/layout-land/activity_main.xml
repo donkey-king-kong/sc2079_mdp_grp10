@@ -178,7 +178,7 @@
                 <!-- Y-axis: constrained top/bottom to gridMapView, part of horizontal chain -->
                 <LinearLayout
                     android:id="@+id/y_axis_numbers"
-                    android:layout_width="24dp"
+                    android:layout_width="30dp"
                     android:layout_height="0dp"
                     android:gravity="center"
                     android:orientation="vertical"
@@ -193,7 +193,7 @@
                 <LinearLayout
                     android:id="@+id/x_axis_numbers"
                     android:layout_width="0dp"
-                    android:layout_height="24dp"
+                    android:layout_height="30dp"
                     android:gravity="center"
                     android:orientation="horizontal"
                     app:layout_constraintTop_toBottomOf="@id/gridMapView"
