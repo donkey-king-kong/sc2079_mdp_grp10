@@ -1,29 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/ds_panel">
+    android:layout_height="match_parent">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="8dp">
 
         <!-- Task 1 card -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/btn_input_field"
+            android:background="@drawable/rounded_status_background"
+            android:backgroundTint="@color/dark_blue_700"
             android:padding="10dp"
             android:layout_marginBottom="8dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="TASK 1: TRAVERSE MAP"
-                android:textColor="@color/ds_text_muted"
+                android:text="TASK 1: Traverse Map"
+                android:textColor="#5A8AAA"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -33,12 +34,12 @@
                 android:id="@+id/calculateObstacleTimer"
                 android:layout_width="match_parent"
                 android:layout_height="40dp"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/ds_bg"
+                android:backgroundTint="#1A3A5C"
                 android:gravity="center"
                 android:text="00:00"
-                android:textColor="@color/ds_accent"
+                android:textColor="@color/white"
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
@@ -50,9 +51,10 @@
                 android:textOff="TASK 1 START"
                 android:textOn="STOP"
                 android:textSize="11sp"
-                android:textColor="@color/ds_text"
+                android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/btn_toggle_task" />
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#2563A8" />
         </LinearLayout>
 
         <!-- Task 2 card -->
@@ -60,15 +62,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/btn_input_field"
+            android:background="@drawable/rounded_status_background"
+            android:backgroundTint="@color/dark_blue_700"
             android:padding="10dp"
             android:layout_marginBottom="8dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="TASK 2: FASTEST ROUND"
-                android:textColor="@color/ds_text_muted"
+                android:text="TASK 2: Fastest Round"
+                android:textColor="#5A8AAA"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -78,12 +81,12 @@
                 android:id="@+id/fastestTimeTimer"
                 android:layout_width="match_parent"
                 android:layout_height="40dp"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="@color/ds_bg"
+                android:backgroundTint="#1A3A5C"
                 android:gravity="center"
                 android:text="00:00"
-                android:textColor="@color/ds_accent"
+                android:textColor="@color/white"
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
@@ -95,9 +98,10 @@
                 android:textOff="TASK 2 START"
                 android:textOn="STOP"
                 android:textSize="11sp"
-                android:textColor="@color/ds_text"
+                android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/btn_toggle_task" />
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#2563A8" />
         </LinearLayout>
 
         <!-- Stitch card -->
@@ -105,14 +109,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/btn_input_field"
+            android:background="@drawable/rounded_status_background"
+            android:backgroundTint="@color/dark_blue_700"
             android:padding="10dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="RETRIEVE STITCHED IMAGES"
-                android:textColor="@color/ds_text_muted"
+                android:textColor="#5A8AAA"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -126,9 +131,22 @@
                 android:textOff="STITCH START"
                 android:textOn="STOP"
                 android:textSize="11sp"
-                android:textColor="@color/ds_text"
+                android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/btn_toggle_stitch" />
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#5A2D8A" />
+
+            <Button
+                android:id="@+id/viewSavedImagesButton"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:layout_marginTop="6dp"
+                android:text="VIEW SAVED IMAGES"
+                android:textSize="11sp"
+                android:textColor="@color/white"
+                android:fontFamily="@font/poppins_bold"
+                android:background="@drawable/rounded_status_background"
+                android:backgroundTint="#2563A8" />
         </LinearLayout>
 
     </LinearLayout>

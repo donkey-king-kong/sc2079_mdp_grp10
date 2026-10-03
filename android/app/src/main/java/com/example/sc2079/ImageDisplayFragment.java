@@ -61,6 +61,8 @@ public class ImageDisplayFragment extends DialogFragment {
                     // 2. Decode byte array to Bitmap
                     Bitmap bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
 
+                    if (bitmap == null) throw new IllegalArgumentException("Invalid image data");
+
                     // 3. Display the Bitmap
                     imageView.setImageBitmap(bitmap);
 

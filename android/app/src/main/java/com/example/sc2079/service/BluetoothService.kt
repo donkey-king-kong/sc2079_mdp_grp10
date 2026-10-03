@@ -23,7 +23,52 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.IOException
+import java.io.ByteArrayOutputStream
 import java.util.*
+
+/** RFCOMM reads may split one message or contain several messages. */
+internal class BluetoothMessageBuffer {
+    private val pending = ByteArrayOutputStream()
+    private var json = false
+    private var inString = false
+    private var escaped = false
+    private var depth = 0
+
+    fun feed(bytes: ByteArray, length: Int = bytes.size): List<String> {
+        val messages = mutableListOf<String>()
+        for (i in 0 until length) {
+            val c = (bytes[i].toInt() and 0xff).toChar()
+            if (pending.size() == 0) {
+                if (c <= ' ') continue
+                json = c == '{'
+            }
+            pending.write(bytes[i].toInt())
+            if (json) {
+                if (inString) {
+                    if (escaped) escaped = false
+                    else if (c == '\\') escaped = true
+                    else if (c == '"') inString = false
+                } else when (c) {
+                    '"' -> inString = true
+                    '{' -> depth++
+                    '}' -> depth--
+                }
+            }
+            // RPi sends newline-delimited JSON. Also accept complete JSON from
+            // older peers that omit the newline. Decode UTF-8 only after assembly.
+            if (c == '\n' || (json && depth == 0 && !inString)) {
+                val message = pending.toByteArray().toString(Charsets.UTF_8).trim()
+                if (message.isNotEmpty()) messages.add(message)
+                pending.reset()
+                json = false
+                inString = false
+                escaped = false
+                depth = 0
+            }
+        }
+        return messages
+    }
+}
 
 
 class BluetoothService : Service() {
@@ -179,27 +224,34 @@ class BluetoothService : Service() {
     }
 
     private fun startReader(sock: BluetoothSocket) {
-        serviceScope.launch {
-            val input = sock.inputStream
+        readerJob = serviceScope.launch {
             val buf = ByteArray(1024)
+            val messages = BluetoothMessageBuffer()
             try {
+                val input = sock.inputStream
                 while (true) {
                     val n = input.read(buf)
                     if (n == -1) break
-                    val data = buf.copyOf(n)
-                    LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
-                        Intent(ACTION_MESSAGE).apply {
-                            putExtra(EXTRA_BYTES, data)
-                            putExtra(EXTRA_TEXT, runCatching { String(data) }.getOrNull())
-                        }
-                    )
+                    for (message in messages.feed(buf, n)) {
+                        LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
+                            Intent(ACTION_MESSAGE).apply {
+                                putExtra(EXTRA_BYTES, message.toByteArray(Charsets.UTF_8))
+                                putExtra(EXTRA_TEXT, message)
+                            }
+                        )
+                    }
                 }
             } catch (e: IOException) {
                 Log.w(TAG, "reader ended: ${e.message}")
             } finally {
-                closeQuietly()
-                sendConnState("disconnected", bluetoothDevice)
-                reconnect()
+                // A reader from an old connection must not close the new socket.
+                synchronized(this@BluetoothService) {
+                    if (bluetoothSocket === sock) {
+                        closeQuietly()
+                        sendConnState("disconnected", bluetoothDevice)
+                        reconnect()
+                    }
+                }
             }
         }
     }

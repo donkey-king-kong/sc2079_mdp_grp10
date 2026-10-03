@@ -1,25 +1,35 @@
 package com.example.sc2079;
 
+import android.content.ContentUris;
 import android.content.Context;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.ToggleButton;
+import java.util.ArrayList;
 import java.lang.Thread;
 import java.util.Locale;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 public class startTask extends Fragment {
     private ToggleButton startExplorationButton;
     private ToggleButton startFastestButton;
     private ToggleButton startStichButton;
+    private Button viewSavedImagesButton;
     View addStartTaskView;
     private GridMapClass gridMap;
     private boolean startTraverseMap = false;
@@ -55,6 +65,7 @@ public class startTask extends Fragment {
         startExplorationButton = addStartTaskView.findViewById(R.id.beginExplorationButton);
         startFastestButton = addStartTaskView.findViewById(R.id.beginFastestButton);
         startStichButton = addStartTaskView.findViewById(R.id.beginStichButton);
+        viewSavedImagesButton = addStartTaskView.findViewById(R.id.viewSavedImagesButton);
         calculateObstacleTimerView = addStartTaskView.findViewById(R.id.calculateObstacleTimer);
         fastestTimeTimerView = addStartTaskView.findViewById(R.id.fastestTimeTimer);
         timerRunnable = new Runnable() {
@@ -161,6 +172,92 @@ public class startTask extends Fragment {
         }
         });
 
+        viewSavedImagesButton.setOnClickListener(new View.OnClickListener()
+        {
+            @Override
+            public void onClick(View view){
+                showSavedImagesDialog();
+            }
+        });
+
             return addStartTaskView;
+    }
+
+    private void showSavedImagesDialog() {
+        ArrayList<SavedImage> savedImages = loadSavedImages();
+
+        if (savedImages.isEmpty()) {
+            Toast.makeText(requireContext(), "No saved stitched images found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] imageNames = new String[savedImages.size()];
+        for (int i = 0; i < savedImages.size(); i++) {
+            imageNames[i] = savedImages.get(i).name;
+        }
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Saved Stitched Images")
+                .setItems(imageNames, (dialog, which) -> openSavedImage(savedImages.get(which).uri))
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private ArrayList<SavedImage> loadSavedImages() {
+        ArrayList<SavedImage> savedImages = new ArrayList<>();
+        String[] projection = {
+                MediaStore.Images.Media._ID,
+                MediaStore.Images.Media.DISPLAY_NAME
+        };
+        String selection = MediaStore.Images.Media.RELATIVE_PATH + "=?";
+        String[] selectionArgs = {"Pictures/SC2079/"};
+        String sortOrder = MediaStore.Images.Media.DATE_ADDED + " DESC";
+
+        try (Cursor cursor = requireContext().getContentResolver().query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                sortOrder
+        )) {
+            if (cursor == null) {
+                return savedImages;
+            }
+
+            int idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID);
+            int nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME);
+
+            while (cursor.moveToNext()) {
+                long id = cursor.getLong(idColumn);
+                String name = cursor.getString(nameColumn);
+                Uri uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+                savedImages.add(new SavedImage(name, uri));
+            }
+        }
+
+        return savedImages;
+    }
+
+    private void openSavedImage(Uri imageUri) {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(imageUri, "image/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        try {
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Unable to open image", Toast.LENGTH_SHORT).show();
+            Log.e("startTask", "Unable to open saved stitched image", e);
+        }
+    }
+
+    private static class SavedImage {
+        final String name;
+        final Uri uri;
+
+        SavedImage(String name, Uri uri) {
+            this.name = name;
+            this.uri = uri;
+        }
     }
 }
