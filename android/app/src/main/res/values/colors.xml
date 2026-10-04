@@ -15,4 +15,96 @@
     <color name="status_connected">#4CCB67</color>
     <color name="status_connecting">#f79736</color>
     <color name="status_disconnected">#EF5252</color>
+
+    <!-- Design system tokens — dark (default/runtime) -->
+    <color name="ds_bg">#0E1117</color>
+    <color name="ds_panel">#151B27</color>
+    <color name="ds_surface">#1C2333</color>
+    <color name="ds_accent">#6C8EF5</color>
+    <color name="ds_pink">#D45A8E</color>
+    <color name="ds_green">#3DBA6E</color>
+    <color name="ds_red">#E05252</color>
+    <color name="ds_text">#E8EAF0</color>
+    <color name="ds_text_muted">#73E8EAF0</color>
+    <color name="ds_text_dim">#47E8EAF0</color>
+    <color name="ds_border">#14FFFFFF</color>
+    <color name="ds_border_strong">#24FFFFFF</color>
+    <color name="ds_accent_dim">#2E6C8EF5</color>
+    <color name="ds_accent_border">#596C8EF5</color>
+    <color name="ds_pink_dim">#33D45A8E</color>
+    <color name="ds_red_dim">#26E05252</color>
+    <color name="ds_green_dim">#263DBA6E</color>
+
+    <!-- Design system tokens — explicit dark suffix -->
+    <color name="ds_bg_dark">#0E1117</color>
+    <color name="ds_panel_dark">#151B27</color>
+    <color name="ds_surface_dark">#1C2333</color>
+    <color name="ds_accent_dark">#6C8EF5</color>
+    <color name="ds_pink_dark">#D45A8E</color>
+    <color name="ds_green_dark">#3DBA6E</color>
+    <color name="ds_red_dark">#E05252</color>
+    <color name="ds_text_dark">#E8EAF0</color>
+    <color name="ds_text_muted_dark">#73E8EAF0</color>
+    <color name="ds_text_dim_dark">#47E8EAF0</color>
+    <color name="ds_border_dark">#14FFFFFF</color>
+    <color name="ds_border_strong_dark">#24FFFFFF</color>
+    <color name="ds_accent_dim_dark">#2E6C8EF5</color>
+    <color name="ds_accent_border_dark">#596C8EF5</color>
+    <color name="ds_pink_dim_dark">#33D45A8E</color>
+    <color name="ds_red_dim_dark">#26E05252</color>
+    <color name="ds_green_dim_dark">#263DBA6E</color>
+
+    <!-- Semantic day/night colours — light (day) values -->
+    <!-- These names resolve to values-night/colors.xml in dark mode via AppCompatDelegate -->
+    <color name="bg_primary">#C8CDD4</color>
+    <color name="bg_panel">#E8EAED</color>
+    <color name="bg_surface">#DDE0E4</color>
+    <color name="bg_surface2">#FFFFFF</color>
+    <color name="border_strong">#47000000</color>
+    <color name="text_primary">#0C0E11</color>
+    <color name="text_muted">#8C0C0E11</color>
+    <color name="text_dim">#610C0E11</color>
+    <color name="accent">#1A3ECF</color>
+
+    <!-- Grid colors -->
+    <color name="ds_grid_base_light">#C8D4C8</color>
+    <color name="ds_grid_check_light">#B8C8B8</color>
+    <color name="ds_grid_base_dark">#111A11</color>
+    <color name="ds_grid_check_dark">#192019</color>
+
+    <!-- Design system tokens — explicit light suffix -->
+    <!-- bg_primary #c8cdd4, bg_panel #e8eaed, bg_surface #dde0e4, bg_surface2 #ffffff -->
+    <color name="ds_bg_light">#C8CDD4</color>
+    <color name="ds_panel_light">#E8EAED</color>
+    <color name="ds_surface_light">#DDE0E4</color>
+    <color name="ds_surface2_light">#FFFFFF</color>
+    <color name="ds_accent_light">#1A3ECF</color>
+    <color name="ds_pink_light">#9E0F44</color>
+    <color name="ds_green_light">#155E32</color>
+    <color name="ds_red_light">#9E1515</color>
+    <color name="ds_text_light">#0C0E11</color>
+    <!-- text_muted: rgba(12,14,17,0.55) = 0x8C -->
+    <color name="ds_text_muted_light">#8C0C0E11</color>
+    <!-- text_dim: rgba(12,14,17,0.38) = 0x61 -->
+    <color name="ds_text_dim_light">#610C0E11</color>
+    <!-- border: rgba(0,0,0,0.18) = 0x2E -->
+    <color name="ds_border_light">#2E000000</color>
+    <!-- border_strong: rgba(0,0,0,0.28) = 0x47 -->
+    <color name="ds_border_strong_light">#47000000</color>
+    <!-- accent_dim: rgba(26,62,207,0.10) = 0x1A -->
+    <color name="ds_accent_dim_light">#1A1A3ECF</color>
+    <!-- accent_border: rgba(26,62,207,0.45) = 0x73 -->
+    <color name="ds_accent_border_light">#731A3ECF</color>
+    <!-- pink_dim: rgba(158,15,68,0.10) = 0x1A -->
+    <color name="ds_pink_dim_light">#1A9E0F44</color>
+    <!-- pink_border: rgba(158,15,68,0.40) = 0x66 -->
+    <color name="ds_pink_border_light">#669E0F44</color>
+    <!-- green_dim: rgba(21,94,50,0.10) = 0x1A -->
+    <color name="ds_green_dim_light">#1A155E32</color>
+    <!-- green_border: rgba(21,94,50,0.40) = 0x66 -->
+    <color name="ds_green_border_light">#66155E32</color>
+    <!-- red_dim: rgba(158,21,21,0.10) = 0x1A -->
+    <color name="ds_red_dim_light">#1A9E1515</color>
+    <!-- red_border: rgba(158,21,21,0.40) = 0x66 -->
+    <color name="ds_red_border_light">#669E1515</color>
 </resources>

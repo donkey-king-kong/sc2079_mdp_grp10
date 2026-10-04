@@ -11,11 +11,27 @@
         <item name="colorOnSecondary">@color/black</item>
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
-        <!-- Customize your theme here. -->
+        <!-- Disable automatic forced dark mode — we handle it via AppCompatDelegate -->
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#064E3B</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Sc2079</item>
+    </style>
+    <style name="Theme.Sc2079.Splash" parent="Theme.Sc2079">
+        <item name="android:windowBackground">#0D4A3A</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:statusBarColor">#0D4A3A</item>
     </style>
     <style name="MyButton" parent="Widget.MaterialComponents.Button">
         <item name="android:fontFamily">@font/poppins_bold</item>
         <item name="fontFamily">@font/poppins_bold</item>
         <item name="android:radius">30dp</item>
+    </style>
+    <style name="TabTextNoCaps" parent="@style/TextAppearance.Design.Tab">
+        <item name="android:textAllCaps">false</item>
+        <item name="textAllCaps">false</item>
     </style>
 </resources>

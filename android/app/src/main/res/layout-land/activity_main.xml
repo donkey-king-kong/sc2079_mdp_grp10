@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/dark_blue_700">
+
+    <!-- Header -->
+    <LinearLayout
+        android:id="@+id/headerRow"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
+
+        <!-- "POSITION" label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="POSITION"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:textColor="#5A8AAA"
+            android:fontFamily="@font/poppins_bold"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Coordinates box -->
+        <LinearLayout
+            android:id="@+id/coordCard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/rounded_status_background"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:id="@+id/give_vehicle_coord_now"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—,—"
+                android:textSize="12sp"
+                android:textColor="@color/white"
+                android:fontFamily="@font/poppins_bold" />
+
+            <TextView
+                android:id="@+id/give_vehicle_direction_now"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" · —"
+                android:textSize="9sp"
+                android:textColor="#7AAFCB"
+                android:fontFamily="@font/poppins_regular"
+                android:layout_marginStart="3dp" />
+        </LinearLayout>
+
+        <!-- Vertical divider between coord and status -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33000000"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp" />
+
+        <!-- Status card (no background) -->
+        <LinearLayout
+            android:id="@+id/statusCard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Amber accent dot -->
+            <View
+                android:layout_width="5dp"
+                android:layout_height="5dp"
+                android:background="@drawable/circle_background"
+                android:backgroundTint="#F5A623"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/give_vehicle_status_now"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Idle"
+                android:textSize="11sp"
+                android:textColor="@color/white"
+                android:fontFamily="@font/poppins_regular" />
+        </LinearLayout>
+
+        <!-- Spacer pushes theme toggle + Bluetooth to the right -->
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Day/Night theme toggle -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnThemeToggle"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:text="☀"
+            android:textSize="14sp"
+            android:padding="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:layout_marginEnd="5dp"
+            app:iconPadding="0dp" />
+
+        <!-- Bluetooth button + status dot -->
+        <FrameLayout
+            android:layout_width="36dp"
+            android:layout_height="36dp">
+
+            <ImageButton
+                android:id="@+id/btnBluetooth"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/rounded_status_background"
+                android:contentDescription="Bluetooth"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_bluetooth_24dp"
+                app:tint="@color/cyan" />
+
+            <ImageView
+                android:id="@+id/bluetoothStatus"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="end|bottom"
+                android:background="@drawable/circle_background"
+                android:backgroundTint="@color/status_disconnected"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_status_disconnected_24dp" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <!-- Divider under header -->
+    <View
+        android:id="@+id/divider_header"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#33000000" />
+
+    <!-- Body: left column (grid + footer) + right panel (tabs) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <!-- Left column: grid on top, bottom bar below -->
+        <LinearLayout
+            android:id="@+id/leftColumn"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="55"
+            android:orientation="vertical">
+
+            <!-- Grid area -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/constraintGridMapView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:padding="8dp">
+
+                <!-- Y-axis: constrained top/bottom to gridMapView, part of horizontal chain -->
+                <LinearLayout
+                    android:id="@+id/y_axis_numbers"
+                    android:layout_width="30dp"
+                    android:layout_height="0dp"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    app:layout_constraintTop_toTopOf="@id/gridMapView"
+                    app:layout_constraintBottom_toBottomOf="@id/gridMapView"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/gridMapView"
+                    app:layout_constraintHorizontal_chainStyle="packed"
+                    app:layout_constraintHorizontal_bias="0.5" />
+
+                <!-- X-axis: aligned to gridMapView start/end, below gridMapView -->
+                <LinearLayout
+                    android:id="@+id/x_axis_numbers"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    app:layout_constraintTop_toBottomOf="@id/gridMapView"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="@id/gridMapView"
+                    app:layout_constraintEnd_toEndOf="@id/gridMapView" />
+
+                <!-- Grid (square ratio) — part of horizontal chain with y_axis, vertical chain with x_axis -->
+                <LinearLayout
+                    android:id="@+id/gridMapView"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:orientation="vertical"
+                    app:layout_constraintVertical_chainStyle="packed"
+                    app:layout_constraintHorizontal_bias="0.5"
+                    app:layout_constraintStart_toEndOf="@id/y_axis_numbers"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toTopOf="@id/x_axis_numbers"
+                    app:layout_constraintDimensionRatio="1:1" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- Divider above footer -->
+            <View
+                android:id="@+id/divider_footer"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33000000" />
+
+            <!-- Bottom bar: compact weighted actions for phone landscape. -->
+            <LinearLayout
+                android:id="@+id/bottomRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
+
+                <TextView
+                    android:id="@+id/txt_grid_size_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Grid size"
+                    android:textSize="10sp"
+                    android:fontFamily="@font/poppins_regular"
+                    android:layout_marginEnd="3dp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btn_grid_minus"
+                    android:stateListAnimator="@null"
+                    android:layout_width="30dp"
+                    android:layout_height="32dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="−"
+                    android:textSize="16sp"
+                    android:textColor="#A8C8E8"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:padding="0dp"
+                    android:gravity="center"
+                    android:textAllCaps="false"
+                    android:layout_marginEnd="2dp" />
+
+                <TextView
+                    android:id="@+id/txt_grid_size"
+                    android:layout_width="24dp"
+                    android:layout_height="wrap_content"
+                    android:text="20"
+                    android:textSize="12sp"
+                    android:textColor="#A8C8E8"
+                    android:fontFamily="@font/poppins_bold"
+                    android:gravity="center"
+                    android:layout_marginEnd="2dp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btn_grid_plus"
+                    android:stateListAnimator="@null"
+                    android:layout_width="30dp"
+                    android:layout_height="32dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="+"
+                    android:textSize="16sp"
+                    android:textColor="#A8C8E8"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:padding="0dp"
+                    android:gravity="center"
+                    android:textAllCaps="false" />
+
+                <!-- Small gap before weighted map actions. -->
+                <Space
+                    android:layout_width="6dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="0" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/reset_map_button"
+                    android:stateListAnimator="@null"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="Reset"
+                    android:textSize="10sp"
+                    android:textColor="#A8C8E8"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:textAllCaps="false"
+                    android:layout_marginStart="4dp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/save_map_button"
+                    android:stateListAnimator="@null"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="Save"
+                    android:textSize="10sp"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:textAllCaps="false"
+                    android:layout_marginStart="4dp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/load_map_button"
+                    android:stateListAnimator="@null"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="Load"
+                    android:textSize="10sp"
+                    android:background="@drawable/button_rounded_square_background"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:textAllCaps="false"
+                    android:layout_marginStart="4dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Vertical divider between left and right -->
+        <View
+            android:id="@+id/divider_vertical"
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="#33000000" />
+
+        <!-- Right panel: tabs only -->
+        <LinearLayout
+            android:id="@+id/rightPanel"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="45"
+            android:orientation="vertical"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp">
+
+            <LinearLayout
+                android:id="@+id/sub_navigation_container"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <com.google.android.material.tabs.TabLayout
+                    android:id="@+id/tabs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:tabMode="fixed"
+                    app:tabGravity="fill"
+                    app:tabMinWidth="0dp"
+                    app:tabPaddingStart="0dp"
+                    app:tabPaddingEnd="0dp"
+                    app:tabInlineLabel="true"
+                    app:tabTextAppearance="@style/TabTextNoCaps" />
+
+                <androidx.viewpager.widget.ViewPager
+                    android:id="@+id/sub_navigation_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -8,7 +8,6 @@ import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.util.Log;
 import android.widget.EditText;
 import android.text.TextUtils;
@@ -19,17 +18,21 @@ import android.widget.Toast;
 import androidx.fragment.app.Fragment;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
+import com.example.sc2079.ui.Palette;
+import com.example.sc2079.ui.ThemePaletteKt;
+import com.example.sc2079.ui.ThemeAware;
 
-public class AddObstacle extends Fragment{
-    private ImageButton addObstacleButton;
-    private ImageButton cancelButton;
+public class AddObstacle extends Fragment implements ThemeAware {
+    private android.widget.Button addObstacleButton;
+    private android.widget.Button cancelButton;
     private EditText addXCoords;
     private EditText addYCoords;
     private MaterialButton addStartingPointButton;
     private MaterialButton addObstacleToggle;
     private MaterialButton removeButton;
-    private MaterialButton resetMapButton;
-    private MaterialButton saveMapButton;
+    private android.widget.Button resetMapButton;
+    private android.widget.Button saveMapButton;
+    private Palette currentPalette = com.example.sc2079.ui.ThemePaletteKt.getNIGHT();
 
 
     View addCoordsView;
@@ -38,8 +41,25 @@ public class AddObstacle extends Fragment{
 
     private GridMapClass gridMap;
 
+    public AddObstacle() {}
+
     public AddObstacle(GridMapClass gridMap){
         this.gridMap = gridMap;
+    }
+
+    @Override
+    public void onAttach(android.content.Context context) {
+        super.onAttach(context);
+        if (gridMap == null && context instanceof MainActivity) {
+            gridMap = ((MainActivity) context).currentGridMapOrNull();
+        }
+    }
+
+    private GridMapClass resolveGridMap() {
+        if (gridMap == null && getActivity() instanceof MainActivity) {
+            gridMap = ((MainActivity) getActivity()).currentGridMapOrNull();
+        }
+        return gridMap;
     }
 
     @Nullable
@@ -64,6 +84,33 @@ public class AddObstacle extends Fragment{
         addXCoords = addCoordsView.findViewById(R.id.addXCoords);
         addYCoords = addCoordsView.findViewById(R.id.addYCoords);
 
+        // D-pad click listeners
+        android.widget.Button dpadUp = addCoordsView.findViewById(R.id.dpad_up);
+        android.widget.Button dpadDown = addCoordsView.findViewById(R.id.dpad_down);
+        android.widget.Button dpadLeft = addCoordsView.findViewById(R.id.dpad_left);
+        android.widget.Button dpadRight = addCoordsView.findViewById(R.id.dpad_right);
+        android.widget.LinearLayout reverseLeft = addCoordsView.findViewById(R.id.reverse_left_button);
+        android.widget.LinearLayout reverseRight = addCoordsView.findViewById(R.id.reverse_right_button);
+
+        dpadUp.setOnClickListener(v -> {
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.moveVehicleStraight(ObstacleData.Direction.NORTH, true); } catch (Exception e) { e.printStackTrace(); }
+        });
+        dpadDown.setOnClickListener(v -> {
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.moveVehicleStraight(ObstacleData.Direction.SOUTH, true); } catch (Exception e) { e.printStackTrace(); }
+        });
+        dpadLeft.setOnClickListener(v -> {
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.moveVehicleStraight(ObstacleData.Direction.WEST, true); } catch (Exception e) { e.printStackTrace(); }
+        });
+        dpadRight.setOnClickListener(v -> {
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.moveVehicleStraight(ObstacleData.Direction.EAST, true); } catch (Exception e) { e.printStackTrace(); }
+        });
+        reverseLeft.setOnClickListener(v -> {
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.reverseLeftVehicle(true); } catch (Exception e) { e.printStackTrace(); }
+        });
+        reverseRight.setOnClickListener(v -> {
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.reverseRightVehicle(true); } catch (Exception e) { e.printStackTrace(); }
+        });
+
         // Buttons that were in the toggle group
         addStartingPointButton = addCoordsView.findViewById(R.id.add_starting_point);
         addObstacleToggle = addCoordsView.findViewById(R.id.add_obstacle_button);
@@ -76,7 +123,8 @@ public class AddObstacle extends Fragment{
             public void onClick(View view){
                 Log.d("activity_main","Restarting Map!");
                 Toast.makeText(getContext(), "Resetting Map back to default!", Toast.LENGTH_SHORT).show();
-                gridMap.clearGridMap();
+                GridMapClass activeGridMap = resolveGridMap();
+                if (activeGridMap != null) activeGridMap.clearGridMap();
             }
         });
         /*
@@ -114,6 +162,11 @@ public class AddObstacle extends Fragment{
                     Log.d("add_coordinate.xml","No Option Selected");
                     Toast.makeText(getActivity(), "Please select an option first!", Toast.LENGTH_SHORT).show();
                 }else{
+                    GridMapClass activeGridMap = resolveGridMap();
+                    if (activeGridMap == null) {
+                        Toast.makeText(getActivity(), "Grid is not ready yet. Please try again.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     String buttonName = getResources().getResourceEntryName(currentSelectedButtonId);
                     boolean checkXCoords = checkCoordCorrect(addXCoords, "X");
                     boolean checkYCoords = checkCoordCorrect(addYCoords, "Y");
@@ -135,7 +188,7 @@ public class AddObstacle extends Fragment{
                     switch(buttonName){
                         case "add_obstacle_button":
                             Log.d("add_coordinate.xml","Clicked add_obstacle_button");
-                            statusReturn = gridMap.addNewObstacleToGrid(x_coord_add, y_coord_add);
+                            statusReturn = activeGridMap.addNewObstacleToGrid(x_coord_add, y_coord_add);
                             switch(statusReturn){
                                 case 0:
                                     Toast.makeText(getContext(), "Invalid Coordinates added! Please reenter input", Toast.LENGTH_SHORT).show();
@@ -154,7 +207,7 @@ public class AddObstacle extends Fragment{
 
                         case "remove_obstacle_button":
                             Log.d("add_coordinate.xml","Clicked remove Button");
-                            statusReturn = gridMap.removeFromGrid(x_coord_add, y_coord_add, true);
+                            statusReturn = activeGridMap.removeFromGrid(x_coord_add, y_coord_add, true);
                             switch(statusReturn){
                                 case 0:
                                     Toast.makeText(getContext(), "Invalid Coordinates! Please reenter input", Toast.LENGTH_SHORT).show();
@@ -176,7 +229,7 @@ public class AddObstacle extends Fragment{
 
                         case "add_starting_point":
                             Log.d("add_coordinate.xml","Clicked add_starting_point Button");
-                            statusReturn = gridMap.addVehicleToMap(x_coord_add, y_coord_add);
+                            statusReturn = activeGridMap.addVehicleToMap(x_coord_add, y_coord_add);
                             switch(statusReturn){
                                 case 0:
                                     Toast.makeText(getContext(), "Invalid Coordinates to add vehicle! Please reenter input", Toast.LENGTH_SHORT).show();
@@ -211,28 +264,190 @@ public class AddObstacle extends Fragment{
                 updateButtonState();
             }
         });
+
+        currentSelectedButtonId = View.NO_ID;
+        updateButtonState();
+
+        // Apply current theme
+        if (getActivity() instanceof MainActivity) {
+            applyTheme(((MainActivity) getActivity()).currentPalette());
+        }
         return addCoordsView;
     }
 
     private void updateButtonState(){
-        addStartingPointButton.setActivated(addStartingPointButton.getId() == currentSelectedButtonId);
-        addObstacleToggle.setActivated(addObstacleToggle.getId() == currentSelectedButtonId);
-        removeButton.setActivated(removeButton.getId() == currentSelectedButtonId);
+        Palette p = currentPalette;
+        boolean vehicleActive   = addStartingPointButton.getId() == currentSelectedButtonId;
+        boolean obstacleActive  = addObstacleToggle.getId()      == currentSelectedButtonId;
+        boolean removeActive    = removeButton.getId()            == currentSelectedButtonId;
+        GridMapClass activeGridMap = resolveGridMap();
 
-        if (currentSelectedButtonId == addStartingPointButton.getId()) {
-            gridMap.setGridMode(GridMapClass.GridMode.ADD_VEHICLE);
-        } else if (currentSelectedButtonId == addObstacleToggle.getId()) {
-            gridMap.setGridMode(GridMapClass.GridMode.ADD_OBSTACLE);
-        } else if (currentSelectedButtonId == removeButton.getId()) {
-            gridMap.setGridMode(GridMapClass.GridMode.REMOVE);
-        } else {
-            gridMap.setGridMode(GridMapClass.GridMode.NONE);
+        // MaterialButtonToggleGroup requires children to keep their MaterialShapeDrawable
+        // background — setBackground() breaks it. Use tint + strokeColor instead.
+        addStartingPointButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+            vehicleActive ? p.getAccentDim() : p.getSurface2()));
+        addStartingPointButton.setStrokeColor(android.content.res.ColorStateList.valueOf(
+            vehicleActive ? p.getAccentBorder() : p.getBorderStrong()));
+
+        addObstacleToggle.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+            obstacleActive ? p.getPinkDim() : p.getSurface2()));
+        addObstacleToggle.setStrokeColor(android.content.res.ColorStateList.valueOf(
+            obstacleActive ? p.getPinkBorder() : p.getBorderStrong()));
+
+        removeButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+            removeActive ? p.getRedDim() : p.getSurface2()));
+        removeButton.setStrokeColor(android.content.res.ColorStateList.valueOf(
+            removeActive ? p.getRedBorder() : p.getBorderStrong()));
+
+        int vehicleTextColor  = vehicleActive  ? p.getAccent()    : p.getTextMuted();
+        int obstacleTextColor = obstacleActive ? p.getPink()      : p.getTextMuted();
+        int removeTextColor   = removeActive   ? p.getRed()       : p.getTextMuted();
+
+        addStartingPointButton.setTextColor(vehicleTextColor);
+        addObstacleToggle.setTextColor(obstacleTextColor);
+        removeButton.setTextColor(removeTextColor);
+
+        android.content.res.ColorStateList vehicleIconTint  = android.content.res.ColorStateList.valueOf(vehicleTextColor);
+        android.content.res.ColorStateList obstacleIconTint = android.content.res.ColorStateList.valueOf(obstacleTextColor);
+        android.content.res.ColorStateList removeIconTint   = android.content.res.ColorStateList.valueOf(removeTextColor);
+        addStartingPointButton.setIconTint(vehicleIconTint);
+        addObstacleToggle.setIconTint(obstacleIconTint);
+        removeButton.setIconTint(removeIconTint);
+
+        if (activeGridMap == null) {
+            return;
         }
+
+        if (vehicleActive) {
+            activeGridMap.setGridMode(GridMapClass.GridMode.ADD_VEHICLE);
+        } else if (obstacleActive) {
+            activeGridMap.setGridMode(GridMapClass.GridMode.ADD_OBSTACLE);
+        } else if (removeActive) {
+            activeGridMap.setGridMode(GridMapClass.GridMode.REMOVE);
+        } else {
+            activeGridMap.setGridMode(GridMapClass.GridMode.NONE);
+        }
+    }
+
+    @Override
+    public void applyTheme(Palette p) {
+        if (addCoordsView == null) return;
+        currentPalette = p;
+        android.content.Context ctx = requireContext();
+
+        // Root background
+        addCoordsView.setBackgroundColor(p.getPanel());
+
+        // Section labels
+        android.widget.TextView lblMode = addCoordsView.findViewById(R.id.lbl_mode);
+        android.widget.TextView lblCoords = addCoordsView.findViewById(R.id.lbl_coordinates);
+        android.widget.TextView lblMove = addCoordsView.findViewById(R.id.lbl_move);
+        android.widget.TextView txtModeHint = addCoordsView.findViewById(R.id.txt_mode_hint);
+        android.widget.TextView txtCoordRange = addCoordsView.findViewById(R.id.txt_coord_range);
+        if (lblMode != null) lblMode.setTextColor(p.getTextMuted());
+        if (lblCoords != null) lblCoords.setTextColor(p.getTextMuted());
+        if (lblMove != null) lblMove.setTextColor(p.getTextMuted());
+        if (txtModeHint != null) txtModeHint.setTextColor(p.getTextMuted());
+        if (txtCoordRange != null) txtCoordRange.setTextColor(p.getTextMuted());
+
+        // X/Y labels (children of linearLayout_add_x_y_coords)
+        android.widget.LinearLayout coordsLayout = addCoordsView.findViewById(R.id.linearLayout_add_x_y_coords);
+        if (coordsLayout != null) {
+            for (int i = 0; i < coordsLayout.getChildCount(); i++) {
+                android.view.View child = coordsLayout.getChildAt(i);
+                if (child instanceof android.widget.LinearLayout) {
+                    android.widget.LinearLayout col = (android.widget.LinearLayout) child;
+                    if (col.getChildCount() > 0 && col.getChildAt(0) instanceof android.widget.TextView) {
+                        ((android.widget.TextView) col.getChildAt(0)).setTextColor(p.getTextMuted());
+                    }
+                }
+            }
+        }
+
+        // Dividers
+        android.view.View divMode = addCoordsView.findViewById(R.id.divider_mode);
+        android.view.View divCoords = addCoordsView.findViewById(R.id.divider_coords);
+        android.view.View divMove = addCoordsView.findViewById(R.id.divider_move);
+        if (divMode != null) divMode.setBackgroundColor(p.getBorderStrong());
+        if (divCoords != null) divCoords.setBackgroundColor(p.getBorderStrong());
+        if (divMove != null) divMove.setBackgroundColor(p.getBorderStrong());
+
+        // Coordinate inputs
+        if (addXCoords != null) {
+            addXCoords.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 8f, 2f));
+            addXCoords.setTextColor(p.getText());
+            addXCoords.setHintTextColor(p.getTextDim());
+        }
+        if (addYCoords != null) {
+            addYCoords.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 8f, 2f));
+            addYCoords.setTextColor(p.getText());
+            addYCoords.setHintTextColor(p.getTextDim());
+        }
+
+        // Dpad buttons
+        android.widget.Button dUp = addCoordsView.findViewById(R.id.dpad_up);
+        android.widget.Button dDown = addCoordsView.findViewById(R.id.dpad_down);
+        android.widget.Button dLeft = addCoordsView.findViewById(R.id.dpad_left);
+        android.widget.Button dRight = addCoordsView.findViewById(R.id.dpad_right);
+        android.graphics.drawable.GradientDrawable dpadBg = ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f);
+        if (dUp != null)    { dUp.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f)); dUp.setTextColor(p.getText()); }
+        if (dDown != null)  { dDown.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f)); dDown.setTextColor(p.getText()); }
+        if (dLeft != null)  { dLeft.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f)); dLeft.setTextColor(p.getText()); }
+        if (dRight != null) { dRight.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f)); dRight.setTextColor(p.getText()); }
+
+        // DpadCenterSquare
+        android.widget.TextView dpadCenter = addCoordsView.findViewById(R.id.dpadCenterSquare);
+        if (dpadCenter != null) {
+            dpadCenter.setBackground(ThemePaletteKt.box(ctx, p.getSurface(), p.getBorderStrong(), 10f, 2f));
+            dpadCenter.setTextColor(p.getTextMuted());
+        }
+
+        // Reverse buttons
+        android.widget.LinearLayout revLeft = addCoordsView.findViewById(R.id.reverse_left_button);
+        android.widget.LinearLayout revRight = addCoordsView.findViewById(R.id.reverse_right_button);
+        if (revLeft != null) {
+            revLeft.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f));
+            android.widget.ImageView revLeftIcon = addCoordsView.findViewById(R.id.revLeftIcon);
+            android.widget.TextView revLeftLabel = addCoordsView.findViewById(R.id.revLeftLabel);
+            if (revLeftIcon != null) {
+                revLeftIcon.setImageTintList(android.content.res.ColorStateList.valueOf(p.getText()));
+                revLeftIcon.setColorFilter(p.getText(), android.graphics.PorterDuff.Mode.SRC_IN);
+            }
+            if (revLeftLabel != null) revLeftLabel.setTextColor(p.getText());
+        }
+        if (revRight != null) {
+            revRight.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f));
+            android.widget.ImageView revRightIcon = addCoordsView.findViewById(R.id.revRightIcon);
+            android.widget.TextView revRightLabel = addCoordsView.findViewById(R.id.revRightLabel);
+            if (revRightIcon != null) {
+                revRightIcon.setImageTintList(android.content.res.ColorStateList.valueOf(p.getText()));
+                revRightIcon.setColorFilter(p.getText(), android.graphics.PorterDuff.Mode.SRC_IN);
+            }
+            if (revRightLabel != null) revRightLabel.setTextColor(p.getText());
+        }
+
+        // Action buttons
+        if (cancelButton != null) {
+            cancelButton.setBackground(ThemePaletteKt.box(ctx, p.getRedDim(), p.getRedBorder(), 8f, 2f));
+            cancelButton.setTextColor(p.getRed());
+        }
+        if (addObstacleButton != null) {
+            addObstacleButton.setBackground(ThemePaletteKt.box(ctx, p.getGreenDim(), p.getGreenBorder(), 8f, 2f));
+            addObstacleButton.setTextColor(p.getGreen());
+        }
+
+        // Mode buttons (delegates to updateButtonState which reads currentPalette)
+        updateButtonState();
     }
 
 
     public boolean checkCoordCorrect(EditText inputFromUser, String x_or_y){
         Log.d("checkCoordCorrect Function", "Checking Coordinates for "+x_or_y);
+        GridMapClass activeGridMap = resolveGridMap();
+        if (activeGridMap == null) {
+            Toast.makeText(getActivity(), "Grid is not ready yet. Please try again.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
 
         String input = inputFromUser.getText().toString().trim();
 
@@ -243,7 +458,7 @@ public class AddObstacle extends Fragment{
 
         try{
             int value = Integer.parseInt(input);
-            if(value >= gridMap.lowLimit && value <= gridMap.hardLimit-1){
+            if(value >= activeGridMap.lowLimit && value <= activeGridMap.hardLimit-1){
                 return true;
             } else{
                 Toast.makeText(getActivity(), "Value must be between 0 and 19 for input "+x_or_y, Toast.LENGTH_SHORT).show();

@@ -83,6 +83,23 @@ public class GridMapClass extends View {
     private utilities utilitiesClass = new utilities();
     private String vehicleText = "Vehicle not placed";
     private boolean firstTimeInitalize = false;
+
+    public interface OnGridChangedListener {
+        void onGridChanged();
+    }
+
+    private OnGridChangedListener gridChangedListener;
+
+    public void setOnGridChangedListener(OnGridChangedListener listener) {
+        this.gridChangedListener = listener;
+    }
+
+    private void notifyGridChanged() {
+        if (gridChangedListener != null) {
+            gridChangedListener.onGridChanged();
+        }
+    }
+
     // Constructors
     public GridMapClass(Context context) {
         this(context, null);
@@ -298,26 +315,29 @@ public class GridMapClass extends View {
         obstacleCount = 0;       // Reset the counter back to zero
         firstTimeInitalize = false; // Reset the vehicle status text too
         Log.d("GridMapClass,java", "Grid Map Cleared");
+        notifyGridChanged();
         return true;
     }
 
     public boolean addGridMapSaved(ArrayList<ArrayList<ObstacleData>> loadedData) {
-        for (int y = 0; y < hardLimit; y++) {
-            for (int x = 0; x < hardLimit; x++) {
-                ObstacleData retrievedInfo = loadedData.get(y).get(x);
-                changeObstacleData(x,y,retrievedInfo.getOccupied(),retrievedInfo.getDirection(),retrievedInfo.getObstacleType(),retrievedInfo.getVerified(),retrievedInfo.getObstacleNumber());
-            }
-        }
         gridMapData = loadedData;
+        placedObstacles.clear();
+        obstacleCount = 0;
 
         // placedObstacles
         for (int y = 0; y < hardLimit; y++) {
             for (int x = 0; x < hardLimit; x++) {
                 if(gridMapData.get(y).get(x).getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle){
-                    placedObstacles.add(gridMapData.get(y).get(x));
+                    ObstacleData obstacle = gridMapData.get(y).get(x);
+                    placedObstacles.add(obstacle);
+                    if (obstacle.getObstacleNumber() > obstacleCount) {
+                        obstacleCount = obstacle.getObstacleNumber();
+                    }
                 }
             }
         }
+        invalidate();
+        notifyGridChanged();
         return true;
     }
 
@@ -341,7 +361,25 @@ public class GridMapClass extends View {
     }
 
     public ArrayList<ArrayList<ObstacleData>> returnGridMap(){
-        return gridMapData;
+        ArrayList<ArrayList<ObstacleData>> gridMapCopy = new ArrayList<>();
+        for (int y = 0; y < gridMapData.size(); y++) {
+            ArrayList<ObstacleData> rowCopy = new ArrayList<>();
+            for (int x = 0; x < gridMapData.get(y).size(); x++) {
+                ObstacleData original = gridMapData.get(y).get(x);
+                ObstacleData cellCopy = new ObstacleData(
+                        original.getXCoord(),
+                        original.getYCoord(),
+                        original.getDirection(),
+                        original.getOccupied(),
+                        original.getObstacleType(),
+                        original.getVerified(),
+                        original.getObstacleNumber()
+                );
+                rowCopy.add(cellCopy);
+            }
+            gridMapCopy.add(rowCopy);
+        }
+        return gridMapCopy;
     }
 
     private void calculateDimensions(){
@@ -448,30 +486,31 @@ public class GridMapClass extends View {
         float right = left + cellWidth;
         float bottom = top + cellHeight;
         float startX, startY, endX, endY;
+        float offset = paintColor.getStrokeWidth() / 2f;
 
         switch (obstacle.getDirection()) {
             case NORTH:
                 startX = left;
-                startY = top;
+                startY = top + offset;
                 endX = right;
-                endY = top;
+                endY = top + offset;
                 break;
             case SOUTH:
                 startX = left;
-                startY = bottom;
+                startY = bottom - offset;
                 endX = right;
-                endY = bottom;
+                endY = bottom - offset;
                 break;
             case EAST:
-                startX = right;
+                startX = right - offset;
                 startY = top;
-                endX = right;
+                endX = right - offset;
                 endY = bottom;
                 break;
             case WEST:
-                startX = left;
+                startX = left + offset;
                 startY = top;
-                endX = left;
+                endX = left + offset;
                 endY = bottom;
                 break;
             default:
@@ -749,6 +788,7 @@ public class GridMapClass extends View {
                 return 2;
             }
         } else {
+            notifyGridChanged();
             return 0;
         }
     }
@@ -770,11 +810,13 @@ public class GridMapClass extends View {
                 placedObstacles.add(gridMapObstacle);
                 invalidate();
                 sendObstacleDirectionBluetooth(x_coord, y_coord);
+                notifyGridChanged();
                 return 1;
             } else {
                 return 2;
             }
         } else {
+            notifyGridChanged();
             return 0;
         }
     }
@@ -792,11 +834,13 @@ public class GridMapClass extends View {
                 placedObstacles.add(gridMapObstacle);
                 invalidate();
                 sendObstacleDirectionBluetooth(x_coord, y_coord);
+                notifyGridChanged();
                 return 1;
             } else {
                 return 2;
             }
         } else {
+            notifyGridChanged();
             return 0;
         }
     }
@@ -843,6 +887,7 @@ public class GridMapClass extends View {
                 // Just clear the single cell to avoid recursion.
                 changeObstacleData(x_coord, y_coord, false, ObstacleData.Direction.EMPTY, ObstacleData.OBSTACLETYPE.EMPTY, false, 0);
                 invalidate();
+                notifyGridChanged();
                 return 1;
             }
         }
@@ -856,11 +901,13 @@ public class GridMapClass extends View {
                 }
                 changeObstacleData(x_coord, y_coord, false, ObstacleData.Direction.EMPTY, ObstacleData.OBSTACLETYPE.EMPTY, false, 0);
                 invalidate();
+                notifyGridChanged();
                 return 1;
             } else {
                 return 2;
             }
         } else {
+            notifyGridChanged();
             return 0;
         }
     }
@@ -874,6 +921,7 @@ public class GridMapClass extends View {
                 }
             }
         }
+        notifyGridChanged();
         return 1;
     }
 
@@ -901,6 +949,7 @@ public class GridMapClass extends View {
                 }
             }
             sendTabletUpdateToAMD("Robot", x_coord, y_coord, ObstacleData.Direction.NORTH);
+            notifyGridChanged();
             return 1;
         }
     }
@@ -913,12 +962,15 @@ public class GridMapClass extends View {
             changeObstacleData(x_coord, y_coord, gridMapObstacle.getOccupied(), takeInNewDirection, gridMapObstacle.getObstacleType(), gridMapObstacle.getVerified(), gridMapObstacle.getObstacleNumber());
             invalidate();
             sendObstacleDirectionBluetooth(x_coord, y_coord);
+            notifyGridChanged();
             return 1;
         }else if(gridMapObstacle.getObstacleType() == ObstacleData.OBSTACLETYPE.Vehicle){
             changeVehicleDirection(takeInNewDirection);
             invalidate();
+            notifyGridChanged();
             return 3;
         }else{
+            notifyGridChanged();
             return 4;
         }
 
@@ -961,6 +1013,7 @@ public class GridMapClass extends View {
             }
         }
         sendObstacleDirectionBluetooth(x_coord, y_coord);
+        notifyGridChanged();
         return true;
     }
 
@@ -1153,6 +1206,7 @@ public class GridMapClass extends View {
             ObstacleData newBottomLeft = gridMapData.get(newPos[1]).get(newPos[0]);
             sendTabletUpdateToAMD("Robot", newPos[0], newPos[1], newBottomLeft.getDirection());
         }
+        notifyGridChanged();
         return true;
     }
 
@@ -1467,10 +1521,8 @@ public class GridMapClass extends View {
         }
         //if(checkChangeLeftDirectionOfVehicle(true)) {
         turnLeftDirectionOfVehicle(gridMapData.get(vehicleBottomData[1]).get(vehicleBottomData[0]).getDirection(), true, sendToBluetooth);
+        notifyGridChanged();
         return true;
-        //}else{
-        //return false;
-        //}
     }
 
     public boolean reverseRightVehicle(boolean sendToBluetooth){
@@ -1480,10 +1532,8 @@ public class GridMapClass extends View {
         }
         //if(checkChangeRightDirectionOfVehicle(true)) {
         turnRightDirectionOfVehicle(gridMapData.get(vehicleBottomData[1]).get(vehicleBottomData[0]).getDirection(), true, sendToBluetooth);
+        notifyGridChanged();
         return true;
-        //}else{
-        //return false;
-        //}
     }
 
     public boolean forLoopUp(ObstacleData.Direction directionToMove) {
@@ -1542,6 +1592,7 @@ public class GridMapClass extends View {
             sendTabletUpdateToAMD("Robot", firstX, firstY, newDirection);
         }
         invalidate();
+        notifyGridChanged();
         return true;
     }
 
@@ -1779,6 +1830,7 @@ public class GridMapClass extends View {
             changeDirectionOfObstacleFlexible(xInt, yInt, direction);
         }
         postInvalidate();
+        notifyGridChanged();
         return result > 0 ? 1 : 0;
 
     }
@@ -1818,6 +1870,7 @@ public class GridMapClass extends View {
         } catch (Exception e) {
             Log.d("GridMapClass.java", "Error parsing grid hex: " + e.getMessage());
         }
+        notifyGridChanged();
     }
 
     public String receiveStichImageMessageBluetooth(String msg){
@@ -2078,6 +2131,7 @@ public class GridMapClass extends View {
                 gridMapData.get(Integer.parseInt(y)).get(Integer.parseInt(x)).setObstacleNumber(Integer.parseInt(imageId));
                 rearrangeObstacleData(Integer.parseInt(x), Integer.parseInt(y));
                 invalidate();
+                notifyGridChanged();
                 return 1;
             } else {
                 Log.d("About Verified", "Obstacle Does not exist!");
@@ -2089,6 +2143,7 @@ public class GridMapClass extends View {
             e.printStackTrace();
             Log.d("Error This", "What went wrong");
         }
+        notifyGridChanged();
         return -2;
     }
 
@@ -2203,6 +2258,7 @@ public class GridMapClass extends View {
             changeDirectionOfObstacleFlexible(x, y, direction);
         }
         postInvalidate();
+        notifyGridChanged();
     }
 
     public void updateObstacleTarget(int obstacleNumber, String targetId) {
@@ -2217,12 +2273,12 @@ public class GridMapClass extends View {
                         Log.e("GridMapClass", "Non-numeric Target ID: " + targetId);
                     }
                     postInvalidate();
+                    notifyGridChanged();
                     return;
                 }
             }
         }
+        notifyGridChanged();
     }
 }
-
-
 
