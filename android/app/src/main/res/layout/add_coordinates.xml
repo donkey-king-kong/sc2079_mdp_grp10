@@ -291,152 +291,254 @@
                 android:letterSpacing="0.12"
                 android:layout_marginBottom="8dp" />
 
-            <!-- D-pad cross, centred -->
+            <!-- D-pad + knobs row -->
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:id="@+id/move_controls_row"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:layout_gravity="center_horizontal">
+                android:orientation="horizontal"
+                android:layout_gravity="center_horizontal"
+                android:gravity="center">
 
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/dpad_up"
-                    android:stateListAnimator="@null"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:text="▲"
-                    android:textSize="22sp"
-                    android:textColor="#4AD8F0"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:padding="0dp"
-                    android:gravity="center"
-                    android:textAllCaps="false"
-                    android:layout_marginBottom="3dp" />
-
+                <!-- Left side: d-pad + rev buttons stacked -->
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:layout_marginBottom="3dp">
-
-                    <androidx.appcompat.widget.AppCompatButton
-                        android:id="@+id/dpad_left"
-                        android:stateListAnimator="@null"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:text="◀"
-                        android:textSize="22sp"
-                        android:textColor="#4AD8F0"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:padding="0dp"
-                        android:gravity="center"
-                        android:textAllCaps="false"
-                        android:layout_marginEnd="3dp" />
-
-                    <TextView
-                        android:id="@+id/dpadCenterSquare"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:text="•"
-                        android:gravity="center"
-                        android:background="@drawable/button_rounded_square_background" />
-
-                    <androidx.appcompat.widget.AppCompatButton
-                        android:id="@+id/dpad_right"
-                        android:stateListAnimator="@null"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:text="▶"
-                        android:textSize="22sp"
-                        android:textColor="#4AD8F0"
-                        android:background="@drawable/button_rounded_square_background"
-                        android:padding="0dp"
-                        android:gravity="center"
-                        android:textAllCaps="false"
-                        android:layout_marginStart="3dp" />
-                </LinearLayout>
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/dpad_down"
-                    android:stateListAnimator="@null"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:text="▼"
-                    android:textSize="22sp"
-                    android:textColor="#4AD8F0"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:padding="0dp"
-                    android:gravity="center"
-                    android:textAllCaps="false" />
-            </LinearLayout>
-
-            <!-- Reverse buttons, 100dp wide, 8dp gap, centred -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="8dp">
-
-                <LinearLayout
-                    android:id="@+id/reverse_left_button"
-                    android:layout_width="100dp"
-                    android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:gravity="center"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:paddingTop="5dp"
-                    android:paddingBottom="4dp"
-                    android:layout_marginEnd="8dp">
+                    android:gravity="center_horizontal">
 
-                    <ImageView
-                        android:id="@+id/revLeftIcon"
-                        android:layout_width="22dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/reverse_left_button"
-                        android:scaleType="fitCenter"
-                        app:tint="@color/cyan" />
-
-                    <TextView
-                        android:id="@+id/revLeftLabel"
+                    <!-- D-pad cross -->
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Rev ◀"
-                        android:textSize="7sp"
-                        android:textColor="#4AD8F0"
-                        android:fontFamily="@font/poppins_bold"
-                        android:layout_marginTop="2dp" />
-                </LinearLayout>
+                        android:orientation="vertical"
+                        android:gravity="center_horizontal">
 
-                <LinearLayout
-                    android:id="@+id/reverse_right_button"
-                    android:layout_width="100dp"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:background="@drawable/button_rounded_square_background"
-                    android:paddingTop="5dp"
-                    android:paddingBottom="4dp">
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/dpad_up"
+                            android:stateListAnimator="@null"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:text="▲"
+                            android:textSize="22sp"
+                            android:textColor="#4AD8F0"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:padding="0dp"
+                            android:gravity="center"
+                            android:textAllCaps="false"
+                            android:layout_marginBottom="3dp" />
 
-                    <ImageView
-                        android:id="@+id/revRightIcon"
-                        android:layout_width="22dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/reverse_right_button"
-                        android:scaleType="fitCenter"
-                        app:tint="@color/cyan" />
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center"
+                            android:layout_marginBottom="3dp">
 
-                    <TextView
-                        android:id="@+id/revRightLabel"
+                            <androidx.appcompat.widget.AppCompatButton
+                                android:id="@+id/dpad_left"
+                                android:stateListAnimator="@null"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:text="◀"
+                                android:textSize="22sp"
+                                android:textColor="#4AD8F0"
+                                android:background="@drawable/button_rounded_square_background"
+                                android:padding="0dp"
+                                android:gravity="center"
+                                android:textAllCaps="false"
+                                android:layout_marginEnd="3dp" />
+
+                            <TextView
+                                android:id="@+id/dpadCenterSquare"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:text="•"
+                                android:gravity="center"
+                                android:background="@drawable/button_rounded_square_background" />
+
+                            <androidx.appcompat.widget.AppCompatButton
+                                android:id="@+id/dpad_right"
+                                android:stateListAnimator="@null"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:text="▶"
+                                android:textSize="22sp"
+                                android:textColor="#4AD8F0"
+                                android:background="@drawable/button_rounded_square_background"
+                                android:padding="0dp"
+                                android:gravity="center"
+                                android:textAllCaps="false"
+                                android:layout_marginStart="3dp" />
+                        </LinearLayout>
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/dpad_down"
+                            android:stateListAnimator="@null"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:text="▼"
+                            android:textSize="22sp"
+                            android:textColor="#4AD8F0"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:padding="0dp"
+                            android:gravity="center"
+                            android:textAllCaps="false" />
+                    </LinearLayout>
+
+                    <!-- Reverse buttons -->
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Rev ▶"
-                        android:textSize="7sp"
-                        android:textColor="#4AD8F0"
-                        android:fontFamily="@font/poppins_bold"
-                        android:layout_marginTop="2dp" />
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="8dp">
+
+                        <LinearLayout
+                            android:id="@+id/reverse_left_button"
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:paddingTop="5dp"
+                            android:paddingBottom="4dp"
+                            android:layout_marginEnd="8dp">
+
+                            <ImageView
+                                android:id="@+id/revLeftIcon"
+                                android:layout_width="22dp"
+                                android:layout_height="16dp"
+                                android:src="@drawable/reverse_left_button"
+                                android:scaleType="fitCenter"
+                                app:tint="@color/cyan" />
+
+                            <TextView
+                                android:id="@+id/revLeftLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Rev ◀"
+                                android:textSize="7sp"
+                                android:textColor="#4AD8F0"
+                                android:fontFamily="@font/poppins_bold"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/reverse_right_button"
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/button_rounded_square_background"
+                            android:paddingTop="5dp"
+                            android:paddingBottom="4dp">
+
+                            <ImageView
+                                android:id="@+id/revRightIcon"
+                                android:layout_width="22dp"
+                                android:layout_height="16dp"
+                                android:src="@drawable/reverse_right_button"
+                                android:scaleType="fitCenter"
+                                app:tint="@color/cyan" />
+
+                            <TextView
+                                android:id="@+id/revRightLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Rev ▶"
+                                android:textSize="7sp"
+                                android:textColor="#4AD8F0"
+                                android:fontFamily="@font/poppins_bold"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Thin vertical divider -->
+                <View
+                    android:id="@+id/knob_divider"
+                    android:layout_width="1dp"
+                    android:layout_height="120dp"
+                    android:background="#33E8002D"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_gravity="center_vertical" />
+
+                <!-- Right side: 3 F1 knobs stacked vertically -->
+                <LinearLayout
+                    android:id="@+id/knobs_column"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:layout_gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center_horizontal"
+                        android:layout_marginBottom="8dp">
+                        <com.example.sc2079.ui.KnobView
+                            android:id="@+id/knob_1"
+                            android:layout_width="44dp"
+                            android:layout_height="44dp" />
+                        <TextView
+                            android:id="@+id/knob_1_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="SPD"
+                            android:textSize="8sp"
+                            android:textColor="#555555"
+                            android:fontFamily="@font/poppins_bold"
+                            android:letterSpacing="0.08"
+                            android:layout_marginTop="3dp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center_horizontal"
+                        android:layout_marginBottom="8dp">
+                        <com.example.sc2079.ui.KnobView
+                            android:id="@+id/knob_2"
+                            android:layout_width="44dp"
+                            android:layout_height="44dp" />
+                        <TextView
+                            android:id="@+id/knob_2_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="TURN"
+                            android:textSize="8sp"
+                            android:textColor="#555555"
+                            android:fontFamily="@font/poppins_bold"
+                            android:letterSpacing="0.08"
+                            android:layout_marginTop="3dp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center_horizontal">
+                        <com.example.sc2079.ui.KnobView
+                            android:id="@+id/knob_3"
+                            android:layout_width="44dp"
+                            android:layout_height="44dp" />
+                        <TextView
+                            android:id="@+id/knob_3_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="SENS"
+                            android:textSize="8sp"
+                            android:textColor="#555555"
+                            android:fontFamily="@font/poppins_bold"
+                            android:letterSpacing="0.08"
+                            android:layout_marginTop="3dp" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
