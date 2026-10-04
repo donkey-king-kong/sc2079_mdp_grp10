@@ -61,10 +61,11 @@ class MainActivity : AppCompatActivity() {
         SYSTEM
     }
 
-    data class ChatLogEntry(
+    data class ChatLogEntry @JvmOverloads constructor(
         val type: ChatLogType,
         val message: String,
-        val timestamp: Long = System.currentTimeMillis()
+        val timestamp: Long = System.currentTimeMillis(),
+        val imageUri: android.net.Uri? = null
     )
 
     private val base64Data = StringBuilder();
