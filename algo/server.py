@@ -403,9 +403,36 @@ def _handle_error(exc):                                  # pragma: no cover
     return jsonify({"error": "internal error: %s" % (exc,)}), 500
 
 
+def _opt_out_of_power_throttling() -> None:
+    """Stop Windows from throttling this process (EcoQoS) when it is idle or on a
+    power-saving mode. The rescue search has a wall-clock budget, so a slowed
+    process plans fewer obstacles. Does nothing on macOS and Linux."""
+    import sys
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        k.GetCurrentProcess.restype = wt.HANDLE
+        k.SetProcessInformation.argtypes = [wt.HANDLE, ctypes.c_int, ctypes.c_void_p, wt.DWORD]
+
+        class State(ctypes.Structure):
+            _fields_ = [("Version", wt.ULONG), ("ControlMask", wt.ULONG), ("StateMask", wt.ULONG)]
+
+        s = State(1, 1, 0)   # execution-speed throttling: controlled by us, and off
+        if not k.SetProcessInformation(k.GetCurrentProcess(), 4, ctypes.byref(s), ctypes.sizeof(s)):
+            print("Power throttling opt-out failed (error %d)" % ctypes.get_last_error())
+    except Exception as exc:
+        print("Power throttling opt-out failed: %s" % (exc,))
+
+
 def main() -> None:
     import argparse
     import os
+
+    _opt_out_of_power_throttling()
 
     parser = argparse.ArgumentParser(description="SC2079 Group 10 algorithm server")
     parser.add_argument("--host", default=os.environ.get("HOST", cfg.HOST))
