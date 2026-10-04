@@ -81,7 +81,6 @@ class MainActivity : AppCompatActivity() {
 
     private var isConnected = false
     internal lateinit var gridMapObj: GridMapClass
-    private val messageLog = ArrayList<ChatLogEntry>()
     private var messageListener: MessageListener? = null
 
     fun currentGridMapOrNull(): GridMapClass? =
@@ -161,7 +160,7 @@ class MainActivity : AppCompatActivity() {
     fun currentPalette(): Palette = if (isDayMode) DAY else NIGHT
 
     fun getMessageLog(): ArrayList<ChatLogEntry> {
-        return messageLog
+        return sharedViewModel.messageLog
     }
 
     fun setMessageListener(listener: MessageListener?) {
@@ -170,19 +169,19 @@ class MainActivity : AppCompatActivity() {
 
     fun logIncoming(message: String) {
         val entry = ChatLogEntry(ChatLogType.INCOMING, message)
-        messageLog.add(entry)
+        sharedViewModel.messageLog.add(entry)
         messageListener?.onNewMessage(entry)
     }
 
     fun logOutgoing(message: String) {
         val entry = ChatLogEntry(ChatLogType.OUTGOING, message)
-        messageLog.add(entry)
+        sharedViewModel.messageLog.add(entry)
         messageListener?.onNewMessage(entry)
     }
 
     fun logSystem(message: String) {
         val entry = ChatLogEntry(ChatLogType.SYSTEM, message)
-        messageLog.add(entry)
+        sharedViewModel.messageLog.add(entry)
         messageListener?.onNewMessage(entry)
     }
 
@@ -787,7 +786,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun clearMessageLog() {
-        messageLog.clear()
+        sharedViewModel.messageLog.clear()
         messageListener?.onLogCleared() // Notify listener to clear the displayed text
         Toast.makeText(this, "Bluetooth message log cleared", Toast.LENGTH_SHORT).show()
     }
