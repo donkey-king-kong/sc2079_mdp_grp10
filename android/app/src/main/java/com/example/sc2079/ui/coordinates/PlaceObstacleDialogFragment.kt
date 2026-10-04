@@ -259,7 +259,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         btnGo.isEnabled = canPlace
         if (canPlace) {
             if (isF1) {
-                btnGo.background = box(requireContext(), palette.surface, palette.accentBorder, 8f, 1f)
+                btnGo.background = box(requireContext(), palette.surface2, palette.accentBorder, 8f, 2f)
                 btnGo.backgroundTintList = null
                 btnGo.setTextColor(palette.accent)
             } else {
