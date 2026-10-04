@@ -25,7 +25,11 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
-public class startTask extends Fragment {
+import com.example.sc2079.ui.Palette;
+import com.example.sc2079.ui.ThemeAware;
+import com.example.sc2079.ui.ThemePaletteKt;
+
+public class startTask extends Fragment implements ThemeAware {
     private ToggleButton startExplorationButton;
     private ToggleButton startFastestButton;
     private ToggleButton startStichButton;
@@ -40,6 +44,7 @@ public class startTask extends Fragment {
     public static Handler timerHandler = new Handler(Looper.getMainLooper());
     private int timerReflectOnText = 0;
     private Runnable timerRunnable;
+    private View rootView;
 
 
     public startTask() {}
@@ -188,7 +193,73 @@ public class startTask extends Fragment {
             }
         });
 
-            return addStartTaskView;
+        rootView = addStartTaskView;
+        if (getActivity() instanceof MainActivity) {
+            applyTheme(((MainActivity) getActivity()).currentPalette());
+        }
+
+        return addStartTaskView;
+    }
+
+    @Override
+    public void applyTheme(Palette p) {
+        if (rootView == null) return;
+        Context ctx = rootView.getContext();
+
+        // Card backgrounds
+        android.view.View card1 = rootView.findViewById(R.id.card_task1);
+        android.view.View card2 = rootView.findViewById(R.id.card_task2);
+        android.view.View card3 = rootView.findViewById(R.id.card_stitch);
+        if (card1 != null) card1.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+        if (card2 != null) card2.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+        if (card3 != null) card3.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+
+        // Section label TextViews
+        android.widget.TextView lbl1 = rootView.findViewWithTag("lbl_task1");
+        android.widget.TextView lbl2 = rootView.findViewWithTag("lbl_task2");
+        android.widget.TextView lbl3 = rootView.findViewWithTag("lbl_stitch");
+
+        // Timer display boxes
+        if (calculateObstacleTimerView != null) {
+            calculateObstacleTimerView.setBackground(ThemePaletteKt.box(ctx, p.getBg(), p.getBorderStrong(), 8f, 1f));
+            calculateObstacleTimerView.setTextColor(p.getText());
+        }
+        if (fastestTimeTimerView != null) {
+            fastestTimeTimerView.setBackground(ThemePaletteKt.box(ctx, p.getBg(), p.getBorderStrong(), 8f, 1f));
+            fastestTimeTimerView.setTextColor(p.getText());
+        }
+
+        // Task 1 START/STOP toggle — accent colour
+        if (startExplorationButton != null) {
+            startExplorationButton.setBackground(ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
+            startExplorationButton.setTextColor(p.getAccent());
+        }
+        // Task 2 START/STOP toggle — accent colour
+        if (startFastestButton != null) {
+            startFastestButton.setBackground(ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
+            startFastestButton.setTextColor(p.getAccent());
+        }
+        // Stitch START/STOP toggle — pink colour
+        if (startStichButton != null) {
+            startStichButton.setBackground(ThemePaletteKt.box(ctx, p.getPinkDim(), p.getPinkBorder(), 8f, 1f));
+            startStichButton.setTextColor(p.getPink());
+        }
+        // View Saved Images button — green colour
+        if (viewSavedImagesButton != null) {
+            viewSavedImagesButton.setBackground(ThemePaletteKt.box(ctx, p.getGreenDim(), p.getGreenBorder(), 8f, 1f));
+            viewSavedImagesButton.setTextColor(p.getGreen());
+        }
+
+        // Section label TextViews — find by id after we add them in the XML change below
+        android.widget.TextView lblTask1 = rootView.findViewById(R.id.lbl_task1);
+        android.widget.TextView lblTask2 = rootView.findViewById(R.id.lbl_task2);
+        android.widget.TextView lblStitch = rootView.findViewById(R.id.lbl_stitch);
+        if (lblTask1 != null) lblTask1.setTextColor(p.getTextMuted());
+        if (lblTask2 != null) lblTask2.setTextColor(p.getTextMuted());
+        if (lblStitch != null) lblStitch.setTextColor(p.getTextMuted());
+
+        // ScrollView / root background
+        rootView.setBackgroundColor(p.getBg());
     }
 
     private void showSavedImagesDialog() {
