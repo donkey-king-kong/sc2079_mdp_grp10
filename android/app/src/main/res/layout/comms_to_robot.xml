@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="MESSAGE LOG"
-            android:textColor="@color/ds_text"
+            android:textColor="#555555"
             android:textSize="11sp"
             android:fontFamily="@font/poppins_bold"
             android:letterSpacing="0.12" />
