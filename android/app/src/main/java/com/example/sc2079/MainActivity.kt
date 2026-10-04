@@ -989,6 +989,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun createThemedDialogTitle(
+        title: String,
+        textColor: Int,
+        surfaceColor: Int
+    ): TextView {
+        return TextView(this).apply {
+            text = title
+            setTextColor(textColor)
+            textSize = 20f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setBackgroundColor(surfaceColor)
+            setPadding(dpToPx(24), dpToPx(20), dpToPx(24), dpToPx(8))
+        }
+    }
+
     private fun showSaveMapSlotDialog() {
         val bgColor: Int
         val surfaceColor: Int
@@ -1043,7 +1058,7 @@ class MainActivity : AppCompatActivity() {
 
         lateinit var dialog: AlertDialog
         dialog = AlertDialog.Builder(this)
-            .setTitle("Save Map")
+            .setCustomTitle(createThemedDialogTitle("Save Map", textColor, surfaceColor))
             .setView(createSlotSelectionView(isLoadDialog = false) { slotIndex ->
                 dialog.dismiss()
                 handleSaveSlotSelected(slotIndex)
@@ -1053,8 +1068,6 @@ class MainActivity : AppCompatActivity() {
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
         dialog.show()
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
-        dialog.findViewById<TextView>(resources.getIdentifier("alertTitle", "id", "android"))
-            ?.setTextColor(textColor)
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(accentColor)
     }
 
@@ -1112,7 +1125,7 @@ class MainActivity : AppCompatActivity() {
 
         lateinit var dialog: AlertDialog
         dialog = AlertDialog.Builder(this)
-            .setTitle("Load Map")
+            .setCustomTitle(createThemedDialogTitle("Load Map", textColor, surfaceColor))
             .setView(createSlotSelectionView(isLoadDialog = true) { slotIndex ->
                 dialog.dismiss()
                 loadGridMapData(slotIndex)
@@ -1122,8 +1135,6 @@ class MainActivity : AppCompatActivity() {
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
         dialog.show()
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
-        dialog.findViewById<TextView>(resources.getIdentifier("alertTitle", "id", "android"))
-            ?.setTextColor(textColor)
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(accentColor)
     }
 
@@ -1309,7 +1320,7 @@ class MainActivity : AppCompatActivity() {
         if (sharedPreferences.contains(gridMapDataKey(slotIndex))) {
             val slotName = getSlotDisplayName(slotIndex)
             val dialog = AlertDialog.Builder(this)
-                .setTitle("Overwrite $slotName?")
+                .setCustomTitle(createThemedDialogTitle("Overwrite $slotName?", textColor, surfaceColor))
                 .setPositiveButton("Yes") { _, _ ->
                     showSaveNameDialog(slotIndex)
                 }
@@ -1318,8 +1329,6 @@ class MainActivity : AppCompatActivity() {
             dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
             dialog.show()
             dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
-            dialog.findViewById<TextView>(resources.getIdentifier("alertTitle", "id", "android"))
-                ?.setTextColor(textColor)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(accentColor)
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(textMuted)
         } else {
@@ -1394,7 +1403,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Name Save Slot ${slotIndex + 1}")
+            .setCustomTitle(createThemedDialogTitle("Name Save Slot ${slotIndex + 1}", textColor, surfaceColor))
             .setView(nameInput)
             .setPositiveButton("Save") { _, _ ->
                 val enteredName = nameInput.text.toString().trim()
@@ -1406,8 +1415,6 @@ class MainActivity : AppCompatActivity() {
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
         dialog.show()
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
-        dialog.findViewById<TextView>(resources.getIdentifier("alertTitle", "id", "android"))
-            ?.setTextColor(textColor)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(accentColor)
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(textMuted)
     }
