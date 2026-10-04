@@ -18,7 +18,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 import java.util.ArrayList;
-import java.lang.Thread;
 import java.util.Locale;
 
 import androidx.annotation.Nullable;
@@ -121,11 +120,6 @@ public class startTask extends Fragment implements ThemeAware {
             public void onClick(View view) {
                 if (!startTraverseMap) {
                     resolveGridMap().sendArenaDataBluetooth();
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
                     // gridMap.sendBeginExplorationBluetooth();
                     startTraverseMap = true;
                     timerHandler.removeCallbacks(timerRunnable);
@@ -146,11 +140,6 @@ public class startTask extends Fragment implements ThemeAware {
             public void onClick(View view){
                 if (!startFastestRound) {
                     resolveGridMap().sendArenaDataBluetooth();
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
                     // gridMap.sendBeginExplorationBluetooth();
                     startFastestRound = true;
                     timerHandler.removeCallbacks(timerRunnable);
@@ -172,11 +161,6 @@ public class startTask extends Fragment implements ThemeAware {
             public void onClick(View view){
             if (!startSendStich) {
                 resolveGridMap().sendStichSignalBluetooth();
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
                 // gridMap.sendBeginExplorationBluetooth();
                 startSendStich = true;
             }else{
