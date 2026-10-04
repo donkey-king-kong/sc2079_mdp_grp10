@@ -13,6 +13,8 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -23,14 +25,18 @@ import android.provider.MediaStore
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatButton
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentPagerAdapter
@@ -751,11 +757,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         saveGridMapButton.setOnClickListener {
-            saveGridMapData(gridMapObj.returnGridMap())
+            showSaveMapSlotDialog()
         }
 
         loadGridMapButton.setOnClickListener {
-            loadGridMapData()
+            showLoadMapSlotDialog()
         }
 
         btnReset.setOnClickListener {
@@ -961,34 +967,560 @@ class MainActivity : AppCompatActivity() {
         sharedViewModel.gridCols = gridMapObj.getGridColumns()
     }
 
-    private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {
-        val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
+    private fun gridMapPreferences() = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
 
-        val gson = Gson()
-        val json = gson.toJson(gridMapData) // convert to JSON string
+    private fun gridMapDataKey(slotIndex: Int) = "gridMapData_$slotIndex"
 
-        editor.putString("gridMapData", json)
-        editor.apply()
-        Toast.makeText(this, "Map was successfully saved!", Toast.LENGTH_SHORT).show()
+    private fun gridMapNameKey(slotIndex: Int) = "gridMapName_$slotIndex"
+
+    private fun migrateLegacyGridMapSave() {
+        val sharedPreferences = gridMapPreferences()
+        val legacyJson = sharedPreferences.getString("gridMapData", null)
+
+        if (legacyJson != null && !sharedPreferences.contains(gridMapDataKey(0))) {
+            sharedPreferences.edit()
+                .putString(gridMapDataKey(0), legacyJson)
+                .remove("gridMapData")
+                .apply()
+        } else if (legacyJson != null) {
+            sharedPreferences.edit()
+                .remove("gridMapData")
+                .apply()
+        }
     }
 
-    private fun loadGridMapData() {
-        val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
-        val gson = Gson()
-        val json = sharedPreferences.getString("gridMapData", null)
+    private fun createThemedDialogTitle(
+        title: String,
+        textColor: Int,
+        surfaceColor: Int
+    ): TextView {
+        return TextView(this).apply {
+            text = title
+            setTextColor(textColor)
+            textSize = 20f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setBackgroundColor(surfaceColor)
+            setPadding(dpToPx(24), dpToPx(20), dpToPx(24), dpToPx(8))
+        }
+    }
+
+    private fun showSaveMapSlotDialog() {
+        val bgColor: Int
+        val surfaceColor: Int
+        val cardColor: Int
+        val accentColor: Int
+        val textColor: Int
+        val textMuted: Int
+        val buttonText: Int
+        val borderColor: Int
+        val disabledBg: Int
+        val disabledText: Int
+        when (themeMode) {
+            ThemeMode.DAY -> {
+                bgColor = Color.parseColor("#C8CDD4")
+                surfaceColor = Color.parseColor("#E8EAED")
+                cardColor = Color.parseColor("#DDE0E4")
+                accentColor = Color.parseColor("#1A3ECF")
+                textColor = Color.parseColor("#0C0E11")
+                textMuted = Color.parseColor("#8C0C0E11")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2E000000")
+                disabledBg = Color.parseColor("#DDE0E4")
+                disabledText = Color.parseColor("#610C0E11")
+            }
+            ThemeMode.NIGHT -> {
+                bgColor = Color.parseColor("#0E1117")
+                surfaceColor = Color.parseColor("#151B27")
+                cardColor = Color.parseColor("#1C2333")
+                accentColor = Color.parseColor("#6C8EF5")
+                textColor = Color.parseColor("#E8EAF0")
+                textMuted = Color.parseColor("#73E8EAF0")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#14FFFFFF")
+                disabledBg = Color.parseColor("#1C2333")
+                disabledText = Color.parseColor("#47E8EAF0")
+            }
+            ThemeMode.F1 -> {
+                bgColor = Color.parseColor("#060606")
+                surfaceColor = Color.parseColor("#0E0E0E")
+                cardColor = Color.parseColor("#1A1A1A")
+                accentColor = Color.parseColor("#E8002D")
+                textColor = Color.parseColor("#FFFFFF")
+                textMuted = Color.parseColor("#666666")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2A2A2A")
+                disabledBg = Color.parseColor("#2A2A2A")
+                disabledText = Color.parseColor("#555555")
+            }
+        }
+
+        migrateLegacyGridMapSave()
+
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(this)
+            .setCustomTitle(createThemedDialogTitle("Save Map", textColor, surfaceColor))
+            .setView(createSlotSelectionView(isLoadDialog = false, parentDialog = null) { slotIndex ->
+                dialog.dismiss()
+                handleSaveSlotSelected(slotIndex)
+            })
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+        dialog.show()
+        dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(accentColor)
+    }
+
+    private fun showLoadMapSlotDialog() {
+        val bgColor: Int
+        val surfaceColor: Int
+        val cardColor: Int
+        val accentColor: Int
+        val textColor: Int
+        val textMuted: Int
+        val buttonText: Int
+        val borderColor: Int
+        val disabledBg: Int
+        val disabledText: Int
+        when (themeMode) {
+            ThemeMode.DAY -> {
+                bgColor = Color.parseColor("#C8CDD4")
+                surfaceColor = Color.parseColor("#E8EAED")
+                cardColor = Color.parseColor("#DDE0E4")
+                accentColor = Color.parseColor("#1A3ECF")
+                textColor = Color.parseColor("#0C0E11")
+                textMuted = Color.parseColor("#8C0C0E11")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2E000000")
+                disabledBg = Color.parseColor("#DDE0E4")
+                disabledText = Color.parseColor("#610C0E11")
+            }
+            ThemeMode.NIGHT -> {
+                bgColor = Color.parseColor("#0E1117")
+                surfaceColor = Color.parseColor("#151B27")
+                cardColor = Color.parseColor("#1C2333")
+                accentColor = Color.parseColor("#6C8EF5")
+                textColor = Color.parseColor("#E8EAF0")
+                textMuted = Color.parseColor("#73E8EAF0")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#14FFFFFF")
+                disabledBg = Color.parseColor("#1C2333")
+                disabledText = Color.parseColor("#47E8EAF0")
+            }
+            ThemeMode.F1 -> {
+                bgColor = Color.parseColor("#060606")
+                surfaceColor = Color.parseColor("#0E0E0E")
+                cardColor = Color.parseColor("#1A1A1A")
+                accentColor = Color.parseColor("#E8002D")
+                textColor = Color.parseColor("#FFFFFF")
+                textMuted = Color.parseColor("#666666")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2A2A2A")
+                disabledBg = Color.parseColor("#2A2A2A")
+                disabledText = Color.parseColor("#555555")
+            }
+        }
+
+        migrateLegacyGridMapSave()
+
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(this)
+            .setCustomTitle(createThemedDialogTitle("Load Map", textColor, surfaceColor))
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.setView(createSlotSelectionView(isLoadDialog = true, parentDialog = dialog) { slotIndex ->
+            dialog.dismiss()
+            loadGridMapData(slotIndex)
+        })
+        dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+        dialog.show()
+        dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(accentColor)
+    }
+
+    private fun createSlotSelectionView(
+        isLoadDialog: Boolean,
+        parentDialog: AlertDialog? = null,
+        onSlotSelected: (Int) -> Unit
+    ): ScrollView {
+        val bgColor: Int
+        val surfaceColor: Int
+        val cardColor: Int
+        val accentColor: Int
+        val textColor: Int
+        val textMuted: Int
+        val buttonText: Int
+        val borderColor: Int
+        val disabledBg: Int
+        val disabledText: Int
+        when (themeMode) {
+            ThemeMode.DAY -> {
+                bgColor = Color.parseColor("#C8CDD4")
+                surfaceColor = Color.parseColor("#E8EAED")
+                cardColor = Color.parseColor("#DDE0E4")
+                accentColor = Color.parseColor("#1A3ECF")
+                textColor = Color.parseColor("#0C0E11")
+                textMuted = Color.parseColor("#8C0C0E11")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2E000000")
+                disabledBg = Color.parseColor("#DDE0E4")
+                disabledText = Color.parseColor("#610C0E11")
+            }
+            ThemeMode.NIGHT -> {
+                bgColor = Color.parseColor("#0E1117")
+                surfaceColor = Color.parseColor("#151B27")
+                cardColor = Color.parseColor("#1C2333")
+                accentColor = Color.parseColor("#6C8EF5")
+                textColor = Color.parseColor("#E8EAF0")
+                textMuted = Color.parseColor("#73E8EAF0")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#14FFFFFF")
+                disabledBg = Color.parseColor("#1C2333")
+                disabledText = Color.parseColor("#47E8EAF0")
+            }
+            ThemeMode.F1 -> {
+                bgColor = Color.parseColor("#060606")
+                surfaceColor = Color.parseColor("#0E0E0E")
+                cardColor = Color.parseColor("#1A1A1A")
+                accentColor = Color.parseColor("#E8002D")
+                textColor = Color.parseColor("#FFFFFF")
+                textMuted = Color.parseColor("#666666")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2A2A2A")
+                disabledBg = Color.parseColor("#2A2A2A")
+                disabledText = Color.parseColor("#555555")
+            }
+        }
+
+        val sharedPreferences = gridMapPreferences()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+            setBackgroundColor(surfaceColor)
+        }
+
+        for (slotIndex in 0 until 5) {
+            val hasData = sharedPreferences.contains(gridMapDataKey(slotIndex))
+            val slotName = getSlotDisplayName(slotIndex)
+            val isEnabled = !isLoadDialog || hasData
+
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = GradientDrawable().apply {
+                    setColor(cardColor)
+                    cornerRadius = dpToPx(4).toFloat()
+                    setStroke(dpToPx(1), borderColor)
+                }
+                setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = dpToPx(4)
+                }
+            }
+
+            val label = TextView(this).apply {
+                text = "Slot ${slotIndex + 1}: $slotName"
+                textSize = 16f
+                setTextColor(if (isEnabled) textColor else textMuted)
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            }
+
+            val trashButton = ImageButton(this).apply {
+                setImageResource(R.drawable.ic_trash)
+                setColorFilter(
+                    if (hasData) accentColor else disabledText,
+                    android.graphics.PorterDuff.Mode.SRC_IN
+                )
+                background = null
+                this.isEnabled = hasData
+                alpha = if (hasData) 1f else 0.4f
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+                layoutParams = LinearLayout.LayoutParams(dpToPx(36), dpToPx(36)).apply {
+                    marginEnd = dpToPx(8)
+                }
+                setOnClickListener {
+                    if (hasData) {
+                        val confirmDialog = AlertDialog.Builder(this@MainActivity)
+                            .setCustomTitle(createThemedDialogTitle("Delete slot?", textColor, surfaceColor))
+                            .setMessage("This will permanently delete \"$slotName\". This cannot be undone.")
+                            .setPositiveButton("Delete") { _, _ ->
+                                deleteMapSlot(slotIndex)
+                                parentDialog?.dismiss()
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .create()
+                        confirmDialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+                        confirmDialog.show()
+                        confirmDialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+                        confirmDialog.findViewById<TextView>(android.R.id.message)
+                            ?.setTextColor(textMuted)
+                        confirmDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                            ?.setTextColor(Color.parseColor("#E05252"))
+                        confirmDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+                            ?.setTextColor(textMuted)
+                    }
+                }
+            }
+
+            val actionButton = AppCompatButton(this).apply {
+                text = if (isLoadDialog) "Load" else "Save"
+                this.isEnabled = isEnabled
+                if (android.os.Build.VERSION.SDK_INT >= 21) {
+                    stateListAnimator = null
+                }
+                background = GradientDrawable().apply {
+                    setColor(if (isEnabled) accentColor else disabledBg)
+                    cornerRadius = dpToPx(8).toFloat()
+                }
+                setTextColor(if (isEnabled) buttonText else disabledText)
+                textSize = 12f
+                minWidth = 0
+                minHeight = 0
+                setPadding(0, 0, 0, 0)
+                layoutParams = LinearLayout.LayoutParams(dpToPx(80), dpToPx(36))
+                setOnClickListener {
+                    if (isEnabled) {
+                        onSlotSelected(slotIndex)
+                    }
+                }
+            }
+
+            row.addView(label)
+            if (isLoadDialog) {
+                row.addView(trashButton)
+            }
+            row.addView(actionButton)
+            container.addView(row)
+        }
+
+        return ScrollView(this).apply {
+            setBackgroundColor(surfaceColor)
+            addView(container)
+        }
+    }
+
+    private fun handleSaveSlotSelected(slotIndex: Int) {
+        val bgColor: Int
+        val surfaceColor: Int
+        val cardColor: Int
+        val accentColor: Int
+        val textColor: Int
+        val textMuted: Int
+        val buttonText: Int
+        val borderColor: Int
+        val disabledBg: Int
+        val disabledText: Int
+        when (themeMode) {
+            ThemeMode.DAY -> {
+                bgColor = Color.parseColor("#C8CDD4")
+                surfaceColor = Color.parseColor("#E8EAED")
+                cardColor = Color.parseColor("#DDE0E4")
+                accentColor = Color.parseColor("#1A3ECF")
+                textColor = Color.parseColor("#0C0E11")
+                textMuted = Color.parseColor("#8C0C0E11")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2E000000")
+                disabledBg = Color.parseColor("#DDE0E4")
+                disabledText = Color.parseColor("#610C0E11")
+            }
+            ThemeMode.NIGHT -> {
+                bgColor = Color.parseColor("#0E1117")
+                surfaceColor = Color.parseColor("#151B27")
+                cardColor = Color.parseColor("#1C2333")
+                accentColor = Color.parseColor("#6C8EF5")
+                textColor = Color.parseColor("#E8EAF0")
+                textMuted = Color.parseColor("#73E8EAF0")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#14FFFFFF")
+                disabledBg = Color.parseColor("#1C2333")
+                disabledText = Color.parseColor("#47E8EAF0")
+            }
+            ThemeMode.F1 -> {
+                bgColor = Color.parseColor("#060606")
+                surfaceColor = Color.parseColor("#0E0E0E")
+                cardColor = Color.parseColor("#1A1A1A")
+                accentColor = Color.parseColor("#E8002D")
+                textColor = Color.parseColor("#FFFFFF")
+                textMuted = Color.parseColor("#666666")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2A2A2A")
+                disabledBg = Color.parseColor("#2A2A2A")
+                disabledText = Color.parseColor("#555555")
+            }
+        }
+
+        val sharedPreferences = gridMapPreferences()
+
+        if (sharedPreferences.contains(gridMapDataKey(slotIndex))) {
+            val slotName = getSlotDisplayName(slotIndex)
+            val dialog = AlertDialog.Builder(this)
+                .setCustomTitle(createThemedDialogTitle("Overwrite $slotName?", textColor, surfaceColor))
+                .setPositiveButton("Yes") { _, _ ->
+                    showSaveNameDialog(slotIndex)
+                }
+                .setNegativeButton("No", null)
+                .create()
+            dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+            dialog.show()
+            dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(accentColor)
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(textMuted)
+        } else {
+            showSaveNameDialog(slotIndex)
+        }
+    }
+
+    private fun showSaveNameDialog(slotIndex: Int) {
+        val bgColor: Int
+        val surfaceColor: Int
+        val cardColor: Int
+        val accentColor: Int
+        val textColor: Int
+        val textMuted: Int
+        val buttonText: Int
+        val borderColor: Int
+        val disabledBg: Int
+        val disabledText: Int
+        when (themeMode) {
+            ThemeMode.DAY -> {
+                bgColor = Color.parseColor("#C8CDD4")
+                surfaceColor = Color.parseColor("#E8EAED")
+                cardColor = Color.parseColor("#DDE0E4")
+                accentColor = Color.parseColor("#1A3ECF")
+                textColor = Color.parseColor("#0C0E11")
+                textMuted = Color.parseColor("#8C0C0E11")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2E000000")
+                disabledBg = Color.parseColor("#DDE0E4")
+                disabledText = Color.parseColor("#610C0E11")
+            }
+            ThemeMode.NIGHT -> {
+                bgColor = Color.parseColor("#0E1117")
+                surfaceColor = Color.parseColor("#151B27")
+                cardColor = Color.parseColor("#1C2333")
+                accentColor = Color.parseColor("#6C8EF5")
+                textColor = Color.parseColor("#E8EAF0")
+                textMuted = Color.parseColor("#73E8EAF0")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#14FFFFFF")
+                disabledBg = Color.parseColor("#1C2333")
+                disabledText = Color.parseColor("#47E8EAF0")
+            }
+            ThemeMode.F1 -> {
+                bgColor = Color.parseColor("#060606")
+                surfaceColor = Color.parseColor("#0E0E0E")
+                cardColor = Color.parseColor("#1A1A1A")
+                accentColor = Color.parseColor("#E8002D")
+                textColor = Color.parseColor("#FFFFFF")
+                textMuted = Color.parseColor("#666666")
+                buttonText = Color.parseColor("#FFFFFF")
+                borderColor = Color.parseColor("#2A2A2A")
+                disabledBg = Color.parseColor("#2A2A2A")
+                disabledText = Color.parseColor("#555555")
+            }
+        }
+
+        val sharedPreferences = gridMapPreferences()
+        val defaultName = sharedPreferences.getString(gridMapNameKey(slotIndex), null)
+            ?: "Map ${slotIndex + 1}"
+        val nameInput = EditText(this).apply {
+            background = GradientDrawable().apply {
+                setColor(cardColor)
+                cornerRadius = dpToPx(4).toFloat()
+                setStroke(dpToPx(1), borderColor)
+            }
+            setTextColor(textColor)
+            setHintTextColor(textMuted)
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+            setText(defaultName)
+            selectAll()
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setCustomTitle(createThemedDialogTitle("Name Save Slot ${slotIndex + 1}", textColor, surfaceColor))
+            .setView(nameInput)
+            .setPositiveButton("Save") { _, _ ->
+                val enteredName = nameInput.text.toString().trim()
+                val slotName = enteredName.ifEmpty { "Map ${slotIndex + 1}" }
+                saveGridMapData(slotIndex, slotName, gridMapObj.returnGridMap())
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+        dialog.show()
+        dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(accentColor)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(textMuted)
+    }
+
+    private fun deleteMapSlot(slotIndex: Int) {
+        gridMapPreferences().edit()
+            .remove(gridMapDataKey(slotIndex))
+            .remove(gridMapNameKey(slotIndex))
+            .apply()
+
+        Toast.makeText(this, "Slot ${slotIndex + 1} deleted", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun saveGridMapData(
+        slotIndex: Int,
+        slotName: String,
+        gridMapData: ArrayList<ArrayList<ObstacleData>>
+    ) {
+        val json = Gson().toJson(gridMapData)
+
+        gridMapPreferences().edit()
+            .putString(gridMapDataKey(slotIndex), json)
+            .putString(gridMapNameKey(slotIndex), slotName)
+            .apply()
+
+        Toast.makeText(this, "Saved to $slotName", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun loadGridMapData(slotIndex: Int) {
+        val json = gridMapPreferences().getString(gridMapDataKey(slotIndex), null)
 
         if (json != null) {
             val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
-            val loadedData: ArrayList<ArrayList<ObstacleData>> = gson.fromJson(json, type)
+            val loadedData: ArrayList<ArrayList<ObstacleData>> = Gson().fromJson(json, type)
+            val slotName = getSlotDisplayName(slotIndex)
+
             gridMapObj.clearGridMap()
             gridMapObj.addGridMapSaved(loadedData)
             gridMapObj.sendArenaDataBluetooth()
-        }else{
-            Toast.makeText(this, "No Map was saved!", Toast.LENGTH_SHORT).show()
 
+            Toast.makeText(this, "Loaded $slotName", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Slot ${slotIndex + 1} is empty", Toast.LENGTH_SHORT).show()
         }
     }
+
+    private fun getSlotDisplayName(slotIndex: Int): String {
+        val sharedPreferences = gridMapPreferences()
+        val hasData = sharedPreferences.contains(gridMapDataKey(slotIndex))
+        val savedName = sharedPreferences.getString(gridMapNameKey(slotIndex), null)
+
+        return when {
+            !hasData -> "Empty"
+            !savedName.isNullOrBlank() -> savedName
+            else -> "Map ${slotIndex + 1}"
+        }
+    }
+
+    private fun dpToPx(dp: Int): Int =
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
 
 
 }
