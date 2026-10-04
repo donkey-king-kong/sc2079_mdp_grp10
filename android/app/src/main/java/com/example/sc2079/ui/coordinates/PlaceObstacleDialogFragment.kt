@@ -1,19 +1,21 @@
 package com.example.sc2079.ui.coordinates
 
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.GridLayout
-import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.content.ContextCompat
+import androidx.cardview.widget.CardView
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
+import com.example.sc2079.MainActivity
 import com.example.sc2079.ObstacleData
 import com.example.sc2079.R
+import com.example.sc2079.ui.NIGHT
+import com.example.sc2079.ui.Palette
+import com.example.sc2079.ui.box
 
 class PlaceObstacleDialogFragment : DialogFragment() {
 
@@ -37,9 +39,9 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     private var selectedX = 0
     private var selectedY = 0
     private var selectedDirection: ObstacleData.Direction = ObstacleData.Direction.NORTH
-
-    private lateinit var layoutCoordSelection: LinearLayout
-    private lateinit var layoutDirectionSelection: LinearLayout
+    private var hasSelectedX = false
+    private var hasSelectedY = false
+    private var hasSelectedDirection = false
 
     private lateinit var gridX: GridLayout
     private lateinit var gridY: GridLayout
@@ -47,7 +49,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     private lateinit var tvYLabel: TextView
     private lateinit var tvCoordSummary: TextView
     private lateinit var tvPlaceTitle: TextView
-    private lateinit var tvDirectionTitle: TextView
+    private lateinit var btnGo: Button
 
     private val xButtons = mutableListOf<Button>()
     private val yButtons = mutableListOf<Button>()
@@ -58,11 +60,11 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         savedInstanceState: Bundle?
     ): View {
         val root = inflater.inflate(R.layout.dialog_place_obstacle, container, false)
+        dialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val palette = (activity as? MainActivity)?.currentPalette() ?: NIGHT
         isVehicleMode = arguments?.getBoolean(ARG_IS_VEHICLE_MODE) ?: false
         val placementLabel = if (isVehicleMode) "Vehicle" else "Obstacle"
-
-        layoutCoordSelection = root.findViewById(R.id.layout_coord_selection)
-        layoutDirectionSelection = root.findViewById(R.id.layout_direction_selection)
 
         gridX = root.findViewById(R.id.grid_x)
         gridY = root.findViewById(R.id.grid_y)
@@ -70,26 +72,55 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         tvYLabel = root.findViewById(R.id.tv_y_label)
         tvCoordSummary = root.findViewById(R.id.tv_coord_summary)
         tvPlaceTitle = root.findViewById(R.id.tv_place_title)
-        tvDirectionTitle = root.findViewById(R.id.tv_direction_title)
+        btnGo = root.findViewById(R.id.btn_go)
 
+        val card = root as? CardView
+        card?.setCardBackgroundColor(palette.surface2)
         tvPlaceTitle.text = "Place $placementLabel"
-        setupCoordinateGrids()
+        tvPlaceTitle.setTextColor(palette.text)
+        tvXLabel.text = "X"
+        tvXLabel.setTextColor(palette.textMuted)
+        tvYLabel.text = "Y"
+        tvYLabel.setTextColor(palette.textMuted)
+        tvCoordSummary.text = "Select X and Y"
+        tvCoordSummary.setTextColor(palette.textMuted)
+        (card?.getChildAt(0) as? ViewGroup)?.getChildAt(2)?.setBackgroundColor(palette.borderStrong)
 
-        root.findViewById<Button>(R.id.btn_cancel_coord).setOnClickListener { dismiss() }
-        root.findViewById<Button>(R.id.btn_cancel_dir).setOnClickListener { dismiss() }
+        setupCoordinateGrids(palette)
 
-        root.findViewById<Button>(R.id.btn_next).setOnClickListener {
-            layoutCoordSelection.visibility = View.GONE
-            layoutDirectionSelection.visibility = View.VISIBLE
-            tvDirectionTitle.text = "Add $placementLabel at ($selectedX, $selectedY)"
+        root.findViewById<Button>(R.id.btn_cancel_coord).apply {
+            background = box(requireContext(), palette.redDim, palette.redBorder, 8f, 1f)
+            backgroundTintList = null
+            setTextColor(palette.red)
+            setOnClickListener { dismiss() }
         }
 
-        root.findViewById<Button>(R.id.btn_north).setOnClickListener { selectedDirection = ObstacleData.Direction.NORTH; updateDirectionButtons(root) }
-        root.findViewById<Button>(R.id.btn_south).setOnClickListener { selectedDirection = ObstacleData.Direction.SOUTH; updateDirectionButtons(root) }
-        root.findViewById<Button>(R.id.btn_east).setOnClickListener { selectedDirection = ObstacleData.Direction.EAST; updateDirectionButtons(root) }
-        root.findViewById<Button>(R.id.btn_west).setOnClickListener { selectedDirection = ObstacleData.Direction.WEST; updateDirectionButtons(root) }
+        root.findViewById<Button>(R.id.btn_north).setOnClickListener {
+            selectedDirection = ObstacleData.Direction.NORTH
+            hasSelectedDirection = true
+            updateDirectionButtons(root, palette)
+            updatePlaceButtonState(palette)
+        }
+        root.findViewById<Button>(R.id.btn_south).setOnClickListener {
+            selectedDirection = ObstacleData.Direction.SOUTH
+            hasSelectedDirection = true
+            updateDirectionButtons(root, palette)
+            updatePlaceButtonState(palette)
+        }
+        root.findViewById<Button>(R.id.btn_east).setOnClickListener {
+            selectedDirection = ObstacleData.Direction.EAST
+            hasSelectedDirection = true
+            updateDirectionButtons(root, palette)
+            updatePlaceButtonState(palette)
+        }
+        root.findViewById<Button>(R.id.btn_west).setOnClickListener {
+            selectedDirection = ObstacleData.Direction.WEST
+            hasSelectedDirection = true
+            updateDirectionButtons(root, palette)
+            updatePlaceButtonState(palette)
+        }
 
-        root.findViewById<Button>(R.id.btn_go).setOnClickListener {
+        btnGo.setOnClickListener {
             val request = ObstacleAddition(selectedX, selectedY, selectedDirection)
             if (isVehicleMode) {
                 sharedViewModel.newVehicleRequest.postValue(request)
@@ -99,31 +130,35 @@ class PlaceObstacleDialogFragment : DialogFragment() {
             dismiss()
         }
 
-        updateDirectionButtons(root)
+        updateDirectionButtons(root, palette)
+        updatePlaceButtonState(palette)
 
         return root
     }
 
-    private fun setupCoordinateGrids() {
+    private fun setupCoordinateGrids(palette: Palette) {
         for (i in 0..19) {
-            val btnX = createGridButton(i, true)
+            val btnX = createGridButton(i, true, palette)
             xButtons.add(btnX)
             gridX.addView(btnX)
 
-            val btnY = createGridButton(i, false)
+            val btnY = createGridButton(i, false, palette)
             yButtons.add(btnY)
             gridY.addView(btnY)
         }
-        updateSelectionStyles()
+        updateSelectionStyles(palette)
     }
 
-    private fun createGridButton(value: Int, isX: Boolean): Button {
-        val btn = Button(requireContext(), null, com.google.android.material.R.style.Widget_Material3_Button_OutlinedButton)
+    private fun createGridButton(value: Int, isX: Boolean, palette: Palette): Button {
+        val btn = Button(requireContext())
         btn.text = value.toString()
+        btn.background = box(requireContext(), palette.surface, palette.borderStrong, 4f, 1f)
+        btn.backgroundTintList = null
+        btn.setTextColor(palette.textMuted)
         btn.setPadding(0, 0, 0, 0)
         btn.minWidth = 0
         btn.minHeight = 0
-        btn.textSize = 10f
+        btn.textSize = 11f
         
         val params = GridLayout.LayoutParams()
         params.width = 0
@@ -133,63 +168,91 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         btn.layoutParams = params
 
         btn.setOnClickListener {
-            if (isX) selectedX = value else selectedY = value
-            updateSelectionStyles()
-            updateLabels()
+            if (isX) {
+                selectedX = value
+                hasSelectedX = true
+            } else {
+                selectedY = value
+                hasSelectedY = true
+            }
+            updateSelectionStyles(palette)
+            updateLabels(palette)
+            updatePlaceButtonState(palette)
         }
         return btn
     }
 
-    private fun updateSelectionStyles() {
+    private fun updateSelectionStyles(palette: Palette) {
         xButtons.forEachIndexed { index, button ->
-            if (index == selectedX) {
-                button.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.cyan))
-                button.setTextColor(Color.WHITE)
+            if (hasSelectedX && index == selectedX) {
+                button.background = box(requireContext(), palette.accent, palette.accent, 4f, 1f)
+                button.backgroundTintList = null
+                button.setTextColor(palette.surface2)
             } else {
-                button.setBackgroundColor(Color.WHITE)
-                button.setTextColor(Color.BLACK)
+                button.background = box(requireContext(), palette.surface, palette.borderStrong, 4f, 1f)
+                button.backgroundTintList = null
+                button.setTextColor(palette.textMuted)
             }
         }
         yButtons.forEachIndexed { index, button ->
-            if (index == selectedY) {
-                button.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.cyan))
-                button.setTextColor(Color.WHITE)
+            if (hasSelectedY && index == selectedY) {
+                button.background = box(requireContext(), palette.accent, palette.accent, 4f, 1f)
+                button.backgroundTintList = null
+                button.setTextColor(palette.surface2)
             } else {
-                button.setBackgroundColor(Color.WHITE)
-                button.setTextColor(Color.BLACK)
+                button.background = box(requireContext(), palette.surface, palette.borderStrong, 4f, 1f)
+                button.backgroundTintList = null
+                button.setTextColor(palette.textMuted)
             }
         }
     }
 
-    private fun updateLabels() {
-        tvXLabel.text = "Row (X): $selectedX"
-        tvYLabel.text = "Col (Y): $selectedY"
+    private fun updateLabels(palette: Palette) {
         tvCoordSummary.text = "($selectedX, $selectedY)"
+        tvCoordSummary.setTextColor(palette.text)
     }
 
-    private fun updateDirectionButtons(root: View) {
+    private fun updateDirectionButtons(root: View, palette: Palette) {
         val n = root.findViewById<Button>(R.id.btn_north)
         val s = root.findViewById<Button>(R.id.btn_south)
         val e = root.findViewById<Button>(R.id.btn_east)
         val w = root.findViewById<Button>(R.id.btn_west)
 
-        val selectedColor = ContextCompat.getColor(requireContext(), R.color.cyan)
-        val defaultColor = Color.parseColor("#F2F2F2")
+        updateDirectionButton(n, ObstacleData.Direction.NORTH, palette)
+        updateDirectionButton(s, ObstacleData.Direction.SOUTH, palette)
+        updateDirectionButton(e, ObstacleData.Direction.EAST, palette)
+        updateDirectionButton(w, ObstacleData.Direction.WEST, palette)
+    }
 
-        n.setBackgroundColor(if (selectedDirection == ObstacleData.Direction.NORTH) selectedColor else defaultColor)
-        s.setBackgroundColor(if (selectedDirection == ObstacleData.Direction.SOUTH) selectedColor else defaultColor)
-        e.setBackgroundColor(if (selectedDirection == ObstacleData.Direction.EAST) selectedColor else defaultColor)
-        w.setBackgroundColor(if (selectedDirection == ObstacleData.Direction.WEST) selectedColor else defaultColor)
-        
-        val textColor = if (selectedDirection == ObstacleData.Direction.NORTH) Color.WHITE else Color.BLACK
-        n.setTextColor(if (selectedDirection == ObstacleData.Direction.NORTH) Color.WHITE else Color.BLACK)
-        s.setTextColor(if (selectedDirection == ObstacleData.Direction.SOUTH) Color.WHITE else Color.BLACK)
-        e.setTextColor(if (selectedDirection == ObstacleData.Direction.EAST) Color.WHITE else Color.BLACK)
-        w.setTextColor(if (selectedDirection == ObstacleData.Direction.WEST) Color.WHITE else Color.BLACK)
+    private fun updateDirectionButton(button: Button, direction: ObstacleData.Direction, palette: Palette) {
+        if (hasSelectedDirection && selectedDirection == direction) {
+            button.background = box(requireContext(), palette.accent, palette.accent, 8f, 0f)
+            button.backgroundTintList = null
+            button.setTextColor(palette.surface2)
+        } else {
+            button.background = box(requireContext(), palette.surface, palette.borderStrong, 8f, 1f)
+            button.backgroundTintList = null
+            button.setTextColor(palette.textMuted)
+        }
+    }
+
+    private fun updatePlaceButtonState(palette: Palette) {
+        val canPlace = hasSelectedDirection && hasSelectedX && hasSelectedY
+        btnGo.isEnabled = canPlace
+        if (canPlace) {
+            btnGo.background = box(requireContext(), palette.accent, palette.accent, 8f, 0f)
+            btnGo.backgroundTintList = null
+            btnGo.setTextColor(palette.surface2)
+        } else {
+            btnGo.background = box(requireContext(), palette.surface, palette.borderStrong, 8f, 1f)
+            btnGo.backgroundTintList = null
+            btnGo.setTextColor(palette.textMuted)
+        }
     }
 
     override fun onStart() {
         super.onStart()
+        dialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog?.window?.setLayout(
             (resources.displayMetrics.widthPixels * 0.9).toInt(),
             ViewGroup.LayoutParams.WRAP_CONTENT
