@@ -616,7 +616,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 ThemeMode.DAY   -> Triple(
                     android.graphics.Color.parseColor("#B8C8B8"),
-                    android.graphics.Color.parseColor("#2E000000"),
+                    android.graphics.Color.parseColor("#80000000"),
                     android.graphics.Color.parseColor("#7A9A7A")
                 )
                 ThemeMode.NIGHT -> Triple(
@@ -646,24 +646,28 @@ class MainActivity : AppCompatActivity() {
             btnBluetooth.background = box(this, p.surface2, p.borderStrong, 8f)
             btnBluetooth.backgroundTintList = null
             // Grid size controls
-            btnGridMinus.background = box(this, p.surface2, p.borderStrong, 8f)
+            val btnRadius = if (mode == ThemeMode.F1) 4f else 8f
+            val btnFill = if (mode == ThemeMode.F1) p.bg else p.surface2
+            val btnStroke = if (mode == ThemeMode.F1) p.accentBorder else p.borderStrong
+            val btnTextColor = if (mode == ThemeMode.F1) p.text else p.text
+            btnGridMinus.background = box(this, btnFill, btnStroke, btnRadius)
             btnGridMinus.backgroundTintList = null
-            btnGridMinus.setTextColor(p.text)
-            btnGridPlus.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnGridMinus.setTextColor(btnTextColor)
+            btnGridPlus.background = box(this, btnFill, btnStroke, btnRadius)
             btnGridPlus.backgroundTintList = null
-            btnGridPlus.setTextColor(p.text)
-            txtGridSize.setTextColor(p.text)
+            btnGridPlus.setTextColor(btnTextColor)
+            txtGridSize.setTextColor(btnTextColor)
             txtGridSizeLabel.setTextColor(p.textMuted)
             // Map action buttons
-            btnReset.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnReset.background = box(this, btnFill, btnStroke, btnRadius)
             btnReset.backgroundTintList = null
-            btnReset.setTextColor(p.text)
-            saveGridMapButton.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnReset.setTextColor(btnTextColor)
+            saveGridMapButton.background = box(this, btnFill, btnStroke, btnRadius)
             saveGridMapButton.backgroundTintList = null
-            saveGridMapButton.setTextColor(p.text)
-            loadGridMapButton.background = box(this, p.surface2, p.borderStrong, 8f)
+            saveGridMapButton.setTextColor(btnTextColor)
+            loadGridMapButton.background = box(this, btnFill, btnStroke, btnRadius)
             loadGridMapButton.backgroundTintList = null
-            loadGridMapButton.setTextColor(p.text)
+            loadGridMapButton.setTextColor(btnTextColor)
             // Tabs
             tabs.setBackgroundColor(p.panel)
             tabs.setSelectedTabIndicatorColor(p.accent)
