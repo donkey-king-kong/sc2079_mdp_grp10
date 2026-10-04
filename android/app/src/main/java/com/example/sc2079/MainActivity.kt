@@ -1059,7 +1059,7 @@ class MainActivity : AppCompatActivity() {
         lateinit var dialog: AlertDialog
         dialog = AlertDialog.Builder(this)
             .setCustomTitle(createThemedDialogTitle("Save Map", textColor, surfaceColor))
-            .setView(createSlotSelectionView(isLoadDialog = false) { slotIndex ->
+            .setView(createSlotSelectionView(isLoadDialog = false, parentDialog = null) { slotIndex ->
                 dialog.dismiss()
                 handleSaveSlotSelected(slotIndex)
             })
@@ -1126,12 +1126,12 @@ class MainActivity : AppCompatActivity() {
         lateinit var dialog: AlertDialog
         dialog = AlertDialog.Builder(this)
             .setCustomTitle(createThemedDialogTitle("Load Map", textColor, surfaceColor))
-            .setView(createSlotSelectionView(isLoadDialog = true) { slotIndex ->
-                dialog.dismiss()
-                loadGridMapData(slotIndex)
-            })
             .setNegativeButton("Cancel", null)
             .create()
+        dialog.setView(createSlotSelectionView(isLoadDialog = true, parentDialog = dialog) { slotIndex ->
+            dialog.dismiss()
+            loadGridMapData(slotIndex)
+        })
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
         dialog.show()
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
@@ -1140,6 +1140,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun createSlotSelectionView(
         isLoadDialog: Boolean,
+        parentDialog: AlertDialog? = null,
         onSlotSelected: (Int) -> Unit
     ): ScrollView {
         val bgColor: Int
@@ -1231,6 +1232,44 @@ class MainActivity : AppCompatActivity() {
                 )
             }
 
+            val trashButton = ImageButton(this).apply {
+                setImageResource(R.drawable.ic_trash)
+                setColorFilter(
+                    if (hasData) accentColor else disabledText,
+                    android.graphics.PorterDuff.Mode.SRC_IN
+                )
+                background = null
+                this.isEnabled = hasData
+                alpha = if (hasData) 1f else 0.4f
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+                layoutParams = LinearLayout.LayoutParams(dpToPx(36), dpToPx(36)).apply {
+                    marginEnd = dpToPx(8)
+                }
+                setOnClickListener {
+                    if (hasData) {
+                        val confirmDialog = AlertDialog.Builder(this@MainActivity)
+                            .setCustomTitle(createThemedDialogTitle("Delete slot?", textColor, surfaceColor))
+                            .setMessage("This will permanently delete \"$slotName\". This cannot be undone.")
+                            .setPositiveButton("Delete") { _, _ ->
+                                deleteMapSlot(slotIndex)
+                                parentDialog?.dismiss()
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .create()
+                        confirmDialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+                        confirmDialog.show()
+                        confirmDialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
+                        confirmDialog.findViewById<TextView>(android.R.id.message)
+                            ?.setTextColor(textMuted)
+                        confirmDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                            ?.setTextColor(Color.parseColor("#E05252"))
+                        confirmDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+                            ?.setTextColor(textMuted)
+                    }
+                }
+            }
+
             val actionButton = AppCompatButton(this).apply {
                 text = if (isLoadDialog) "Load" else "Save"
                 this.isEnabled = isEnabled
@@ -1255,6 +1294,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             row.addView(label)
+            if (isLoadDialog) {
+                row.addView(trashButton)
+            }
             row.addView(actionButton)
             container.addView(row)
         }
@@ -1417,6 +1459,15 @@ class MainActivity : AppCompatActivity() {
         dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceColor))
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(accentColor)
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(textMuted)
+    }
+
+    private fun deleteMapSlot(slotIndex: Int) {
+        gridMapPreferences().edit()
+            .remove(gridMapDataKey(slotIndex))
+            .remove(gridMapNameKey(slotIndex))
+            .apply()
+
+        Toast.makeText(this, "Slot ${slotIndex + 1} deleted", Toast.LENGTH_SHORT).show()
     }
 
     private fun saveGridMapData(
