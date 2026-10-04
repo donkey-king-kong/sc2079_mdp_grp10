@@ -47,6 +47,7 @@ public class GridMapClass extends View {
     private Paint textPaint = new Paint(); // Text color in box
     private Paint verifiedPaint = new Paint(); // Verified Status
     private Paint paintObstacleVerified = new Paint();
+    private android.graphics.Bitmap f1CarBitmap;
     private GestureDetector gestureDetector;
     private ArrayList<ArrayList<ObstacleData>> gridMapData = new ArrayList<>();
     private MaterialButton add_obstacle_button;
@@ -127,6 +128,7 @@ public class GridMapClass extends View {
         verifiedPaint.setColor(Color.parseColor("#FFA500")); // Distinguishing Orange
         verifiedPaint.setStrokeWidth(15f); // Thick line
         paintObstacleVerified.setColor(Color.rgb(255, 165, 0));
+        f1CarBitmap = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.ic_f1_car);
         gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener(){
             @Override
             public boolean onDown(MotionEvent event){
@@ -562,12 +564,33 @@ public class GridMapClass extends View {
         // 4. Draw White Arrow in the center cell
         float centerX = left + 1.5f * cellWidth;
         float centerY = top + 1.5f * cellHeight;
-        float arrowSize = Math.min(cellWidth, cellHeight) * 0.8f;
 
-        Paint arrowPaint = new Paint();
-        arrowPaint.setColor(Color.WHITE);
-        arrowPaint.setAntiAlias(true);
-        drawArrow(canvas, centerX, centerY, arrowSize, robotData.getDirection(), arrowPaint);
+        if (f1CarBitmap != null) {
+            float carSize = Math.min(cellWidth, cellHeight) * 2.4f;
+            float carLeft = centerX - carSize / 2f;
+            float carTop = centerY - carSize / 2f;
+            android.graphics.RectF destRect = new android.graphics.RectF(carLeft, carTop, carLeft + carSize, carTop + carSize);
+
+            float degrees;
+            switch (robotData.getDirection()) {
+                case NORTH: degrees = 0f;   break;
+                case EAST:  degrees = 90f;  break;
+                case SOUTH: degrees = 180f; break;
+                case WEST:  degrees = 270f; break;
+                default:    degrees = 0f;   break;
+            }
+
+            canvas.save();
+            canvas.rotate(degrees, centerX, centerY);
+            canvas.drawBitmap(f1CarBitmap, null, destRect, null);
+            canvas.restore();
+        } else {
+            float arrowSize = Math.min(cellWidth, cellHeight) * 0.8f;
+            Paint arrowPaint = new Paint();
+            arrowPaint.setColor(Color.WHITE);
+            arrowPaint.setAntiAlias(true);
+            drawArrow(canvas, centerX, centerY, arrowSize, robotData.getDirection(), arrowPaint);
+        }
     }
 
     private void drawArrow(Canvas canvas, float cx, float cy, float size, ObstacleData.Direction direction, Paint paint) {
@@ -2281,4 +2304,3 @@ public class GridMapClass extends View {
         notifyGridChanged();
     }
 }
-
