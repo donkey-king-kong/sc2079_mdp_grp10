@@ -16,6 +16,7 @@ class EventType(str, Enum):
     STM_UNKNOWN_RESPONSE = "STM_UNKNOWN_RESPONSE"
     CV_RESULT_ACCEPTED = "CV_RESULT_ACCEPTED"
     CV_RETRY_REQUIRED = "CV_RETRY_REQUIRED"
+    CV_CAPTURED = "CV_CAPTURED"
     CV_CONTINUOUS_RESULT = "CV_CONTINUOUS_RESULT"
     CV_REPOSITION_REQUIRED = "CV_REPOSITION_REQUIRED"
     CV_ERROR = "CV_ERROR"
@@ -23,6 +24,7 @@ class EventType(str, Enum):
     IMAGE_TRANSFER_QUEUE_FULL = "IMAGE_TRANSFER_QUEUE_FULL"
     ANDROID_ARENA_RECEIVED = "ANDROID_ARENA_RECEIVED"
     ANDROID_STM_COMMAND = "ANDROID_STM_COMMAND"
+    ANDROID_IMAGE_TRANSFER_COMPLETE = "ANDROID_IMAGE_TRANSFER_COMPLETE"
     ANDROID_ERROR = "ANDROID_ERROR"
     SHUTDOWN = "SHUTDOWN"
 
@@ -49,6 +51,12 @@ class STMCommand:
 @dataclass(frozen=True)
 class CameraRequest:
     obstacle_id: str
+
+
+@dataclass(frozen=True)
+class InferenceRequest:
+    obstacle_id: str
+    frames: tuple[Any, ...]
 
 
 @dataclass(frozen=True)

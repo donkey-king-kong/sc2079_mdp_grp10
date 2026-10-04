@@ -1,6 +1,6 @@
 import time
 
-from protocol import AndroidStreamParser
+from connectors.android import AndroidStreamParser
 
 
 class BluetoothConnector:

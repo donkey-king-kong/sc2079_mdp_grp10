@@ -40,6 +40,14 @@ class ImagingConnector:
         # }
         return self.service.capture_and_predict(obstacle_id, **options)
 
+    def capture_samples(self):
+        """Capture the frames for a SNAP without blocking on YOLO inference."""
+        return self.service.capture_samples()
+
+    def predict_captured(self, obstacle_id, frames, **options):
+        """Run YOLO and persistence for frames captured by the camera worker."""
+        return self.service.predict_captured(obstacle_id, frames, **options)
+
     def start(self):
         """Prepare the camera/model once when the CameraCV worker starts."""
         return self.service.start()

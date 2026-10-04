@@ -2,6 +2,9 @@
 
 The Raspberry Pi acts as the central coordinator for the MDP robot, connecting the Android app, Algo server, STM32 and imaging system.
 
+See [controller migration notes](CHANGELOG.md) for the current layout and the
+mapping from earlier controller work.
+
 ## Architecture
 
 ```text
@@ -28,15 +31,18 @@ Android ──Bluetooth──> Raspberry Pi <──HTTP──> Algo
 rpi_controller/
 ├── connectors/
 │   ├── algo.py
-│   ├── android.py
+│   ├── android.py   # Android parsing, STM mapping, and image sending
 │   ├── bluetooth.py
 │   ├── imaging.py
 │   └── stm.py
 ├── dummy_test/       # manual hardware and integration checks
-├── imaging/          # Picamera2 capture and local YOLO inference
-├── manager.py        # controller entry point
-├── migrate.py        # PC → RPi source sync
-├── protocol.py / router.py
+├── imaging/          # Picamera2 capture, YOLO inference, tracking, and stitching
+├── scripts/          # host-side migration and image-pull tools
+├── task1/
+│   ├── runtime.py    # Task 1 state machine and lifecycle wiring
+│   ├── events.py     # Task 1 event/request definitions
+│   └── workers/      # Android, STM, Algo, camera/inference, and transfer workers
+├── task1.py          # Android-enabled Task 1 launcher
 └── requirements.txt
 ```
 
@@ -89,40 +95,67 @@ capture_and_predict(obstacle_id)
 
 The result contains `obstacle_id`, `image_id`, and `confidence`.
 
-## Setup
+## Run Task 1 from scratch
 
-On the RPi:
+### 1. Create the new RPi checkout — host PC
+
+From this `rpi_controller/` directory, confirm the RPi connection settings in
+`scripts/migrate.py`, then run:
 
 ```bash
-cd rpi_controller
+python3 scripts/migrate.py
+```
+
+This creates `/home/mdp/rpi_refactor` without changing either existing RPi
+checkout. It syncs the current controller source, then copies `.venv/` and
+every `imaging/model*` directory from
+`/home/mdp/rpi_controller_mt_android`.
+
+### 2. Start Algo — host PC
+
+On the PC connected to the RPi network:
+
+```bash
+cd ../algo
+python3 -m venv .venv          # first time only
 source .venv/bin/activate
 pip install -r requirements.txt
-python manager.py
+python3 server.py --host 0.0.0.0 --port 5001
 ```
 
-## Android-free Task 1 integration
+Note the PC's IP address. It is the `ALGO_HOST` value used on the RPi.
 
-Tonight's narrow integration runtime does not start Bluetooth or imaging. It
-uses one Algo HTTP worker plus separate STM TX and RX workers; the Task 1
-kernel is the sole owner of route state and sends the next STM movement only
-after the STM RX worker reports that the prior movement has stopped.
+### 3. Configure and run Task 1 — RPi
 
 ```bash
-python3 task1_integration_test.py
+ssh mdp@10.42.0.1
+cd /home/mdp/rpi_refactor
+source .venv/bin/activate
+python3 task1.py
 ```
 
-The hardcoded robot and obstacle layout is in `task1_integration_test.py`.
-The Algo server must be available at `http://127.0.0.1:5001` and the STM USB
-serial adapter must be `/dev/ttyUSB0`. PC image transfer is optional; configure
-`MDP_PC_HOST`, `MDP_PC_USER`, `MDP_PC_DEST`, and optionally `MDP_PC_SSH_KEY`.
+Before running, update `task1.py` if needed:
 
-YOLO weights belong at `imaging/models/best.pt`.
+- `ALGO_HOST` — host PC's Algo-server IP address
+- `STM_PORT` — usually `/dev/ttyACM0`
+- `CV_MODEL_FILENAME` — a file under `imaging/model/`
+- `BLUETOOTH_DEVICE` — usually `/dev/rfcomm0`
+- `RESET_BLUETOOTH_ON_START` — match the RPi Bluetooth service setup
 
-To sync source, run this on the PC (keeps the RPi `.venv` and model):
+Android sends the robot and obstacle layout. The runtime uses dedicated STM,
+Algo, Android, camera, inference, and transfer workers; the Task 1 kernel is
+the only component that advances mission state.
+
+### 4. Pull captured images — host PC
+
+After the run, return to this directory on the host PC:
 
 ```bash
-python migrate.py
+python3 scripts/pull_images.py
 ```
+
+It copies `/home/mdp/rpi_refactor/imaging/data/` from the RPi to local
+`imaging/data/`.
 
 Manual checks are under `dummy_test/`.
 ```
@@ -139,6 +172,6 @@ Software-tested:
 - Algo API integration and command routing
 - STM command/ACK protocol
 - Imaging integration interface
-- Manager integration flow
+- Task 1 runtime integration flow
 
 Physical end-to-end testing with the Android app, STM hardware and actual imaging system is still pending.

@@ -123,6 +123,7 @@ class ImagingService:
         rotation_angles: tuple[int, ...] = (-45, -30, -15, 0, 15, 30, 45),
         max_bbox_area_ratio: float = 0.50,
         data_dir: str | Path = DATA_DIR,
+        use_contrast_variants: bool = True,
     ):
         self.model_path = Path(model_path)
         self.width = width
@@ -148,6 +149,7 @@ class ImagingService:
         self.bbox_area_similarity_ratio = bbox_area_similarity_ratio
         self.confidence_tie_epsilon = confidence_tie_epsilon
         self.rotation_angles = rotation_angles
+        self.use_contrast_variants = use_contrast_variants
         self.max_bbox_area_ratio = max_bbox_area_ratio
         self.data_dir = Path(data_dir)
         self.detector = LocalYoloDetector(self.model_path, confidence) if self.model_path.is_file() else None
@@ -185,7 +187,29 @@ class ImagingService:
         """
         # Task1's CameraCVWorker calls start() once. Retain this short-lived
         # fallback so existing one-shot callers still work unchanged.
-        frames = self._capture_samples()
+        frames = self.capture_samples()
+        return self.predict_captured(
+            obstacle_id,
+            frames,
+            save_on_no_detection=save_on_no_detection,
+            log_no_detection=log_no_detection,
+            expected_region=expected_region,
+        )
+
+    def capture_samples(self):
+        """Capture the physical frames for a SNAP, without running YOLO."""
+        return self._capture_samples()
+
+    def predict_captured(
+        self,
+        obstacle_id: object,
+        frames,
+        *,
+        save_on_no_detection: bool = True,
+        log_no_detection: bool = True,
+        expected_region: str | None = None,
+    ) -> dict[str, object | None]:
+        """Run inference and persistence for frames captured earlier."""
         frame, result = self._select_from_samples(frames, expected_region=expected_region)
 
         image_path = None
@@ -229,7 +253,12 @@ class ImagingService:
             per_class: dict[str, tuple[object, DetectionResult]] = {}
             for angle in self.rotation_angles:
                 rotated_frame = rotate_frame(frame, angle)
-                for inference_frame in (rotated_frame, *contrast_variants(rotated_frame)):
+                inference_frames = (
+                    (rotated_frame, *contrast_variants(rotated_frame))
+                    if self.use_contrast_variants
+                    else (rotated_frame,)
+                )
+                for inference_frame in inference_frames:
                     raw_detections = self.detector.detect_all(inference_frame)
                     for detection in raw_detections:
                         label = detection.target_id or "unknown"

@@ -1,4 +1,4 @@
-"""Bluetooth workers for Android communication during Task 1."""
+"""Android Bluetooth workers for Task 1."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import queue
 import threading
 from pathlib import Path
 
-from image_sender import AndroidImageSender
-from image_stitcher import stitch_images
-from task1_events import AndroidImageRequest, AndroidMessage, Event, EventType
+from connectors.android import AndroidImageSender
+from imaging.stitcher import stitch_images
+from task1.events import AndroidImageRequest, AndroidMessage, Event, EventType
 
 
 class AndroidRXWorker(threading.Thread):
@@ -194,4 +194,10 @@ class AndroidTXWorker(threading.Thread):
         print(
             f"[ANDROID TX] Final image sent "
             f"from {len(image_paths)} detections"
+        )
+        self.events.put(
+            Event(
+                EventType.ANDROID_IMAGE_TRANSFER_COMPLETE,
+                {"image_path": str(stitched_path)},
+            )
         )

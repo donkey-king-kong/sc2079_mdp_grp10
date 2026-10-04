@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from image_stitcher import stitch_images
+from imaging.stitcher import stitch_images
 
 
 def main():

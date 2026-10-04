@@ -2,7 +2,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from image_tracker import ImageTracker
+from imaging.tracker import ImageTracker
 
 
 def main():

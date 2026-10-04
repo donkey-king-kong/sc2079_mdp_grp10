@@ -1,3 +1,5 @@
+"""Track detection images produced during a legacy Task 1 run."""
+
 from pathlib import Path
 
 

@@ -1,3 +1,5 @@
+"""Compose captured detection images into a single Android-ready JPEG."""
+
 from pathlib import Path
 
 from PIL import Image, ImageOps

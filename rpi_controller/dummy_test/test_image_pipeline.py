@@ -4,9 +4,9 @@ from pathlib import Path
 
 from PIL import Image
 
-from image_tracker import ImageTracker
-from image_stitcher import stitch_images
-from image_sender import AndroidImageSender
+from imaging.tracker import ImageTracker
+from connectors.android import AndroidImageSender
+from imaging.stitcher import stitch_images
 
 
 class FakeBluetooth:

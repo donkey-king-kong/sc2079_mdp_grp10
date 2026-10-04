@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from image_sender import AndroidImageSender
+from connectors.android import AndroidImageSender
 
 
 class FakeBluetooth:

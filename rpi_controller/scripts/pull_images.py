@@ -6,7 +6,7 @@ import subprocess
 from migrate import RPI_HOST, RPI_SSH_PORT, RPI_USER, TARGET_DIR
 
 
-LOCAL_DATA_DIR = Path(__file__).resolve().parent / "imaging" / "data"
+LOCAL_DATA_DIR = Path(__file__).resolve().parent.parent / "imaging" / "data"
 REMOTE_DATA_DIR = f"{TARGET_DIR}/imaging/data/"
 
 

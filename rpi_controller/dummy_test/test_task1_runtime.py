@@ -12,15 +12,24 @@ if "serial" not in sys.modules:
     serial_stub.SerialException = OSError
     sys.modules["serial"] = serial_stub
 
-from task1_events import CameraRequest, Event, EventType, ImageTransferRequest
-from task1_runtime import CameraCVWorker, ImageTransferWorker, MissionState, Task1Kernel, Task1Runtime
+from task1.events import CameraRequest, Event, EventType, ImageTransferRequest
+from task1.runtime import MissionState, Task1Kernel, Task1Runtime
+from task1.workers.camera import CameraCVWorker
+from task1.workers.transfer import ImageTransferWorker
 
 
 class KernelTests(unittest.TestCase):
     def setUp(self):
         self.algo, self.stm = queue.Queue(), queue.Queue()
         self.camera, self.events = queue.Queue(), queue.Queue()
-        self.kernel = Task1Kernel(self.algo, self.stm, self.camera, self.events, threading.Event())
+        self.kernel = Task1Kernel(
+            self.algo,
+            self.stm,
+            self.camera,
+            self.events,
+            threading.Event(),
+            parallel_inference=False,
+        )
         self.kernel.start({"x": 1, "y": 1, "dir": "N"}, [{"id": 1, "x": 5, "y": 13, "dir": "W"}])
 
     def load_route(self, commands):
@@ -108,7 +117,15 @@ class CameraWorkerTests(unittest.TestCase):
             requests, transfers, events = queue.Queue(), queue.Queue(maxsize=1), queue.Queue()
             requests.put(CameraRequest("1"))
             requests.put(None)
-            worker = CameraCVWorker(FakeImaging(), requests, transfers, events, threading.Event(), Path(directory) / "detections")
+            worker = CameraCVWorker(
+                FakeImaging(),
+                requests,
+                transfers,
+                events,
+                threading.Event(),
+                Path(directory) / "detections",
+                parallel_inference=False,
+            )
             worker.start()
             worker.join(1)
             transfer = transfers.get_nowait()
@@ -128,7 +145,15 @@ class CameraWorkerTests(unittest.TestCase):
             requests, transfers, events = queue.Queue(), queue.Queue(maxsize=1), queue.Queue()
             requests.put(CameraRequest("1"))
             requests.put(None)
-            worker = CameraCVWorker(FakeImaging(), requests, transfers, events, threading.Event(), Path(directory))
+            worker = CameraCVWorker(
+                FakeImaging(),
+                requests,
+                transfers,
+                events,
+                threading.Event(),
+                Path(directory),
+                parallel_inference=False,
+            )
             worker.start()
             worker.join(1)
             self.assertEqual(transfers.get_nowait().image_path, str(image_path))

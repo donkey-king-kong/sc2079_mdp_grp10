@@ -3,9 +3,9 @@ import threading
 import unittest
 
 from connectors.android import AndroidConnector
-from task1_android import AndroidRXWorker
-from task1_events import Event,EventType
-from task1_runtime import Task1Kernel
+from task1.workers.android import AndroidRXWorker
+from task1.events import Event, EventType
+from task1.runtime import Task1Kernel
 
 class FakeBluetooth:
     def connect(self):
@@ -269,6 +269,15 @@ class AndroidKernelTests(unittest.TestCase):
                 "/tmp/image1.jpg",
                 "/tmp/image2.jpg",
             ],
+        )
+
+        self.assertEqual(
+            kernel.state.value,
+            "WAITING_FOR_ANDROID_IMAGE_TRANSFER",
+        )
+
+        kernel.handle_event(
+            Event(EventType.ANDROID_IMAGE_TRANSFER_COMPLETE)
         )
 
         self.assertEqual(

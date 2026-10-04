@@ -5,7 +5,7 @@ This package handles one `SNAP` request from the RPi controller:
 1. `camera.py` starts Picamera2 and captures an RGB frame.
 2. `detector.py` lazily loads a local Ultralytics YOLO model and returns the highest-confidence detection.
 3. `service.py` combines capture and inference, returning the controller result shape: obstacle ID, image ID, and confidence.
-4. `connectors/imaging.py` exposes that service to `RPiManager` when it handles a `SNAPx` command.
+4. `connectors/imaging.py` exposes that service to `Task1Runtime` when it handles a `SNAPx` command.
 
 ## Model on the RPi
 

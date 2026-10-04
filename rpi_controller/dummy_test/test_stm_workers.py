@@ -11,8 +11,9 @@ if "serial" not in sys.modules:
     serial_stub.SerialException = OSError
     sys.modules["serial"] = serial_stub
 
-from connectors.stm import STMRXWorker, STMTXWorker, parse_response, validate_command
-from task1_events import EventType, STMCommand
+from connectors.stm import parse_response, validate_command
+from task1.workers.stm import STMRXWorker, STMTXWorker
+from task1.events import EventType, STMCommand
 
 
 class FakeSerial:
