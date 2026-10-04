@@ -105,10 +105,10 @@ public class startTask extends Fragment implements ThemeAware {
                 String time = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
 
                 if(startTraverseMap){
-                    calculateObstacleTimerView.setText(time);
+                    if (calculateObstacleTimerView != null) calculateObstacleTimerView.setText(time);
                 }
                 if(startFastestRound){
-                    fastestTimeTimerView.setText(time);
+                    if (fastestTimeTimerView != null) fastestTimeTimerView.setText(time);
                 }
                 if(resolveGridMap().checkFINStatus()){
                     if(startTraverseMap) {
@@ -209,6 +209,14 @@ public class startTask extends Fragment implements ThemeAware {
         }
 
         return addStartTaskView;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        timerHandler.removeCallbacks(timerRunnable);
+        calculateObstacleTimerView = null;
+        fastestTimeTimerView = null;
     }
 
     private void applyTask1State(TaskState state, Palette p) {
