@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.DialogFragment
@@ -91,7 +92,8 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         tvCoordSummary.setTextColor(palette.textMuted)
         tvCoordSummary.background = box(requireContext(), palette.surface, palette.borderStrong, 24f, 1f)
         tvDirectionLabel.setTextColor(palette.textMuted)
-        (card?.getChildAt(0) as? ViewGroup)?.getChildAt(2)?.setBackgroundColor(palette.borderStrong)
+        val content = ((card?.getChildAt(0) as? ScrollView)?.getChildAt(0) as? ViewGroup)
+        content?.getChildAt(2)?.setBackgroundColor(palette.borderStrong)
 
         setupCoordinateGrids(palette)
 
@@ -279,9 +281,10 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         dialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
         val maxWidthPx = (500 * resources.displayMetrics.density).toInt()
         val desiredWidthPx = (resources.displayMetrics.widthPixels * 0.9).toInt()
+        val maxHeightPx = (resources.displayMetrics.heightPixels * 0.9).toInt()
         dialog?.window?.setLayout(
             minOf(desiredWidthPx, maxWidthPx),
-            ViewGroup.LayoutParams.WRAP_CONTENT
+            maxHeightPx
         )
         Log.d("PlaceDialog", "Dialog width px: ${(resources.displayMetrics.widthPixels * 0.9).toInt()}")
         Log.d("PlaceDialog", "Screen density: ${resources.displayMetrics.density}")
