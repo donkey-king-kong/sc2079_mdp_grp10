@@ -20,6 +20,8 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     companion object {
         private const val ARG_IS_VEHICLE_MODE = "isVehicleMode"
 
+        @JvmStatic
+        @JvmOverloads
         fun newInstance(isVehicleMode: Boolean = false): PlaceObstacleDialogFragment {
             return PlaceObstacleDialogFragment().apply {
                 arguments = Bundle().apply {
