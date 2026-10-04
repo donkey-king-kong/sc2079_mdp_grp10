@@ -41,12 +41,11 @@
                     android:text="X"
                     android:textSize="11sp" />
 
-                <GridLayout
+                <LinearLayout
                     android:id="@+id/grid_x"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:columnCount="5"
-                    android:rowCount="4" />
+                    android:orientation="vertical" />
 
             </LinearLayout>
 
@@ -64,12 +63,11 @@
                     android:text="Y"
                     android:textSize="11sp" />
 
-                <GridLayout
+                <LinearLayout
                     android:id="@+id/grid_y"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:columnCount="5"
-                    android:rowCount="4" />
+                    android:orientation="vertical" />
 
             </LinearLayout>
 
@@ -83,13 +81,13 @@
             android:background="#33000000" />
 
         <TextView
-            android:id="@+id/tv_coord_summary"
+            android:id="@+id/tv_direction_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:gravity="center"
-            android:textSize="13sp"
-            android:layout_marginBottom="10dp" />
+            android:text="Direction"
+            android:textSize="11sp"
+            android:layout_marginBottom="6dp" />
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="180dp"
@@ -117,12 +115,12 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
-            <Button
-                android:id="@+id/btn_go"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:padding="0dp"
-                android:text="Place"
+            <TextView
+                android:id="@+id/tv_coord_summary"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:gravity="center"
+                android:textSize="10sp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -163,6 +161,13 @@
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:text="Cancel" />
+
+            <Button
+                android:id="@+id/btn_go"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="Place" />
 
         </LinearLayout>
 

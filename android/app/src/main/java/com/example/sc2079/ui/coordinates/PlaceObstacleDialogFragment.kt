@@ -1,11 +1,12 @@
 package com.example.sc2079.ui.coordinates
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.GridLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.DialogFragment
@@ -43,12 +44,13 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     private var hasSelectedY = false
     private var hasSelectedDirection = false
 
-    private lateinit var gridX: GridLayout
-    private lateinit var gridY: GridLayout
+    private lateinit var gridX: LinearLayout
+    private lateinit var gridY: LinearLayout
     private lateinit var tvXLabel: TextView
     private lateinit var tvYLabel: TextView
     private lateinit var tvCoordSummary: TextView
     private lateinit var tvPlaceTitle: TextView
+    private lateinit var tvDirectionLabel: TextView
     private lateinit var btnGo: Button
 
     private val xButtons = mutableListOf<Button>()
@@ -72,6 +74,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         tvYLabel = root.findViewById(R.id.tv_y_label)
         tvCoordSummary = root.findViewById(R.id.tv_coord_summary)
         tvPlaceTitle = root.findViewById(R.id.tv_place_title)
+        tvDirectionLabel = root.findViewById(R.id.tv_direction_label)
         btnGo = root.findViewById(R.id.btn_go)
 
         val card = root as? CardView
@@ -82,8 +85,10 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         tvXLabel.setTextColor(palette.textMuted)
         tvYLabel.text = "Y"
         tvYLabel.setTextColor(palette.textMuted)
-        tvCoordSummary.text = "Select X and Y"
+        tvCoordSummary.text = "-"
         tvCoordSummary.setTextColor(palette.textMuted)
+        tvCoordSummary.background = box(requireContext(), palette.surface, palette.borderStrong, 24f, 1f)
+        tvDirectionLabel.setTextColor(palette.textMuted)
         (card?.getChildAt(0) as? ViewGroup)?.getChildAt(2)?.setBackgroundColor(palette.borderStrong)
 
         setupCoordinateGrids(palette)
@@ -137,49 +142,59 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     }
 
     private fun setupCoordinateGrids(palette: Palette) {
-        for (i in 0..19) {
-            val btnX = createGridButton(i, true, palette)
-            xButtons.add(btnX)
-            gridX.addView(btnX)
-
-            val btnY = createGridButton(i, false, palette)
-            yButtons.add(btnY)
-            gridY.addView(btnY)
-        }
-        updateSelectionStyles(palette)
+        buildNumberGrid(gridX, true, palette)
+        buildNumberGrid(gridY, false, palette)
     }
 
-    private fun createGridButton(value: Int, isX: Boolean, palette: Palette): Button {
-        val btn = Button(requireContext())
-        btn.text = value.toString()
-        btn.background = box(requireContext(), palette.surface, palette.borderStrong, 4f, 1f)
-        btn.backgroundTintList = null
-        btn.setTextColor(palette.textMuted)
-        btn.setPadding(0, 0, 0, 0)
-        btn.minWidth = 0
-        btn.minHeight = 0
-        btn.textSize = 11f
-        
-        val params = GridLayout.LayoutParams()
-        params.width = 0
-        params.height = ViewGroup.LayoutParams.WRAP_CONTENT
-        params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-        params.setMargins(2, 2, 2, 2)
-        btn.layoutParams = params
+    private fun buildNumberGrid(container: LinearLayout, isX: Boolean, palette: Palette) {
+        container.removeAllViews()
+        val buttons = if (isX) xButtons else yButtons
+        buttons.clear()
 
-        btn.setOnClickListener {
-            if (isX) {
-                selectedX = value
-                hasSelectedX = true
-            } else {
-                selectedY = value
-                hasSelectedY = true
+        // 4 rows of 5 buttons = 0..19
+        for (row in 0..3) {
+            val rowLayout = LinearLayout(requireContext())
+            rowLayout.orientation = LinearLayout.HORIZONTAL
+            rowLayout.layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+
+            for (col in 0..4) {
+                val value = row * 5 + col
+                val btn = Button(requireContext())
+                btn.text = value.toString()
+                btn.background = box(requireContext(), palette.surface, palette.borderStrong, 6f, 1f)
+                btn.backgroundTintList = null
+                btn.setTextColor(palette.textMuted)
+                btn.setPadding(0, 0, 0, 0)
+                btn.minWidth = 0
+                btn.minHeight = 0
+                btn.textSize = 11f
+                btn.stateListAnimator = null
+
+                val params = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                params.setMargins(2, 2, 2, 2)
+                btn.layoutParams = params
+
+                btn.setOnClickListener {
+                    if (isX) {
+                        selectedX = value
+                        hasSelectedX = true
+                    } else {
+                        selectedY = value
+                        hasSelectedY = true
+                    }
+                    updateSelectionStyles(palette)
+                    updateLabels(palette)
+                    updatePlaceButtonState(palette)
+                }
+
+                buttons.add(btn)
+                rowLayout.addView(btn)
             }
-            updateSelectionStyles(palette)
-            updateLabels(palette)
-            updatePlaceButtonState(palette)
+            container.addView(rowLayout)
         }
-        return btn
     }
 
     private fun updateSelectionStyles(palette: Palette) {
@@ -208,7 +223,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     }
 
     private fun updateLabels(palette: Palette) {
-        tvCoordSummary.text = "($selectedX, $selectedY)"
+        tvCoordSummary.text = "$selectedX,$selectedY"
         tvCoordSummary.setTextColor(palette.text)
     }
 
@@ -257,5 +272,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
             (resources.displayMetrics.widthPixels * 0.9).toInt(),
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
+        Log.d("PlaceDialog", "Dialog width px: ${(resources.displayMetrics.widthPixels * 0.9).toInt()}")
+        Log.d("PlaceDialog", "Screen density: ${resources.displayMetrics.density}")
     }
 }
