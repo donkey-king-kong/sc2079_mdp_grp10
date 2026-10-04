@@ -61,10 +61,11 @@ class MainActivity : AppCompatActivity() {
         SYSTEM
     }
 
-    data class ChatLogEntry(
+    data class ChatLogEntry @JvmOverloads constructor(
         val type: ChatLogType,
         val message: String,
-        val timestamp: Long = System.currentTimeMillis()
+        val timestamp: Long = System.currentTimeMillis(),
+        val imageUri: android.net.Uri? = null
     )
 
     private val base64Data = StringBuilder();
@@ -322,10 +323,16 @@ class MainActivity : AppCompatActivity() {
                             return
                         }
                         logSystem("Ending Stitch, displaying image")
-                        logSystem("Image Received - Tap to view")
                         Log.d("Image Message", "Final length: ${stitchedImageBase64.length}")
                         try {
                             val savedUri = saveStitchedImageToGallery(stitchedImageBase64)
+                            val entry = ChatLogEntry(
+                                type = ChatLogType.SYSTEM,
+                                message = "Image Received - Tap to view",
+                                imageUri = savedUri
+                            )
+                            sharedViewModel.messageLog.add(entry)
+                            messageListener?.onNewMessage(entry)
                             logSystem("Saved stitched image to Gallery")
                             Toast.makeText(
                                 this@MainActivity,
@@ -709,14 +716,15 @@ class MainActivity : AppCompatActivity() {
 
         // Apply persisted theme on startup
         applyTheme(isDayMode)
+
+        // Bind to BluetoothService here so rotation (onStop/onStart) does not unbind it
+        Intent(this, BluetoothService::class.java).also { intent ->
+            bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        }
     }
 
     override fun onStart() {
         super.onStart()
-        Intent(this, BluetoothService::class.java).also { intent ->
-            bindService(intent, connection, Context.BIND_AUTO_CREATE)
-        }
-
         LocalBroadcastManager.getInstance(this).registerReceiver(
             connStateReceiver,
             IntentFilter(BluetoothService.ACTION_CONN_STATE)
@@ -730,12 +738,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Unbind from the service
-        if (isBound) {
-            unbindService(connection)
-            isBound = false
-        }
-
         // Unregister broadcast receivers
         LocalBroadcastManager.getInstance(this).unregisterReceiver(connStateReceiver)
         LocalBroadcastManager.getInstance(this).unregisterReceiver(msgReceiver)
@@ -799,6 +801,14 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(updateTask) // Stop updating when activity is hidden
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isBound) {
+            unbindService(connection)
+            isBound = false
+        }
     }
 
     fun setupGraphAxes(context: Context, isDark: Boolean) {
