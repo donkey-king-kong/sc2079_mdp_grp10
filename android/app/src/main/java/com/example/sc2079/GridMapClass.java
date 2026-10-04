@@ -302,22 +302,23 @@ public class GridMapClass extends View {
     }
 
     public boolean addGridMapSaved(ArrayList<ArrayList<ObstacleData>> loadedData) {
-        for (int y = 0; y < hardLimit; y++) {
-            for (int x = 0; x < hardLimit; x++) {
-                ObstacleData retrievedInfo = loadedData.get(y).get(x);
-                changeObstacleData(x,y,retrievedInfo.getOccupied(),retrievedInfo.getDirection(),retrievedInfo.getObstacleType(),retrievedInfo.getVerified(),retrievedInfo.getObstacleNumber());
-            }
-        }
         gridMapData = loadedData;
+        placedObstacles.clear();
+        obstacleCount = 0;
 
         // placedObstacles
         for (int y = 0; y < hardLimit; y++) {
             for (int x = 0; x < hardLimit; x++) {
                 if(gridMapData.get(y).get(x).getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle){
-                    placedObstacles.add(gridMapData.get(y).get(x));
+                    ObstacleData obstacle = gridMapData.get(y).get(x);
+                    placedObstacles.add(obstacle);
+                    if (obstacle.getObstacleNumber() > obstacleCount) {
+                        obstacleCount = obstacle.getObstacleNumber();
+                    }
                 }
             }
         }
+        invalidate();
         return true;
     }
 
@@ -341,7 +342,25 @@ public class GridMapClass extends View {
     }
 
     public ArrayList<ArrayList<ObstacleData>> returnGridMap(){
-        return gridMapData;
+        ArrayList<ArrayList<ObstacleData>> gridMapCopy = new ArrayList<>();
+        for (int y = 0; y < gridMapData.size(); y++) {
+            ArrayList<ObstacleData> rowCopy = new ArrayList<>();
+            for (int x = 0; x < gridMapData.get(y).size(); x++) {
+                ObstacleData original = gridMapData.get(y).get(x);
+                ObstacleData cellCopy = new ObstacleData(
+                        original.getXCoord(),
+                        original.getYCoord(),
+                        original.getDirection(),
+                        original.getOccupied(),
+                        original.getObstacleType(),
+                        original.getVerified(),
+                        original.getObstacleNumber()
+                );
+                rowCopy.add(cellCopy);
+            }
+            gridMapCopy.add(rowCopy);
+        }
+        return gridMapCopy;
     }
 
     private void calculateDimensions(){
