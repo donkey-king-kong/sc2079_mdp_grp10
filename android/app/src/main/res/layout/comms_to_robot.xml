@@ -7,24 +7,55 @@
     android:background="@color/bg_panel"
     android:padding="10dp">
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/messageLogHeader"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="MESSAGE LOG"
+            android:textColor="#555555"
+            android:textSize="11sp"
+            android:fontFamily="@font/poppins_bold"
+            android:letterSpacing="0.12" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/clearLogButton"
+            android:stateListAnimator="@null"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="Clear"
+            android:textSize="10sp"
+            android:textColor="@color/ds_red"
+            android:background="@drawable/btn_cancel"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textAllCaps="false" />
+
+    </LinearLayout>
+
     <!-- Message log -->
-    <TextView
-        android:id="@+id/messageBlock"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/messageRecycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="10dp"
-        android:gravity="bottom"
-        android:scrollbars="vertical"
-        android:textSize="11sp"
-        android:textColor="@color/ds_text"
-        android:fontFamily="@font/poppins_regular"
+        android:clipToPadding="false"
+        android:padding="6dp"
         android:background="@drawable/btn_input_field"
-        android:isScrollContainer="true"
         android:layout_marginBottom="8dp" />
 
     <!-- Input row -->
     <LinearLayout
+        android:id="@+id/inputRow"
         android:layout_width="match_parent"
         android:layout_height="42dp"
         android:orientation="horizontal"

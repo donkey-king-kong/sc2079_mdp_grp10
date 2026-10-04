@@ -4,11 +4,11 @@ import android.util.Log;
 
 public class ObstacleData{
     public enum Direction{
-        NORTH(1),
-        SOUTH(3),
-        EAST(2),
-        WEST(4),
-        EMPTY(0);
+        NORTH(0),
+        EAST(1),
+        SOUTH(2),
+        WEST(3),
+        EMPTY(-1);
 
         private final int directionCode;
 

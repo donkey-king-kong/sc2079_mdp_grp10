@@ -51,8 +51,15 @@ public class AddObstacle extends Fragment implements ThemeAware {
     public void onAttach(android.content.Context context) {
         super.onAttach(context);
         if (gridMap == null && context instanceof MainActivity) {
-            gridMap = ((MainActivity) context).gridMapObj;
+            gridMap = ((MainActivity) context).currentGridMapOrNull();
         }
+    }
+
+    private GridMapClass resolveGridMap() {
+        if (gridMap == null && getActivity() instanceof MainActivity) {
+            gridMap = ((MainActivity) getActivity()).currentGridMapOrNull();
+        }
+        return gridMap;
     }
 
     @Nullable
@@ -86,22 +93,22 @@ public class AddObstacle extends Fragment implements ThemeAware {
         android.widget.LinearLayout reverseRight = addCoordsView.findViewById(R.id.reverse_right_button);
 
         dpadUp.setOnClickListener(v -> {
-            try { gridMap.moveVehicleStraight(ObstacleData.Direction.NORTH, true); } catch (Exception e) { e.printStackTrace(); }
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.moveVehicleStraight(ObstacleData.Direction.NORTH, true); } catch (Exception e) { e.printStackTrace(); }
         });
         dpadDown.setOnClickListener(v -> {
-            try { gridMap.moveVehicleStraight(ObstacleData.Direction.SOUTH, true); } catch (Exception e) { e.printStackTrace(); }
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.moveVehicleStraight(ObstacleData.Direction.SOUTH, true); } catch (Exception e) { e.printStackTrace(); }
         });
         dpadLeft.setOnClickListener(v -> {
-            try { gridMap.moveVehicleStraight(ObstacleData.Direction.WEST, true); } catch (Exception e) { e.printStackTrace(); }
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.moveVehicleStraight(ObstacleData.Direction.WEST, true); } catch (Exception e) { e.printStackTrace(); }
         });
         dpadRight.setOnClickListener(v -> {
-            try { gridMap.moveVehicleStraight(ObstacleData.Direction.EAST, true); } catch (Exception e) { e.printStackTrace(); }
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.moveVehicleStraight(ObstacleData.Direction.EAST, true); } catch (Exception e) { e.printStackTrace(); }
         });
         reverseLeft.setOnClickListener(v -> {
-            try { gridMap.reverseLeftVehicle(true); } catch (Exception e) { e.printStackTrace(); }
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.reverseLeftVehicle(true); } catch (Exception e) { e.printStackTrace(); }
         });
         reverseRight.setOnClickListener(v -> {
-            try { gridMap.reverseRightVehicle(true); } catch (Exception e) { e.printStackTrace(); }
+            try { GridMapClass activeGridMap = resolveGridMap(); if (activeGridMap != null) activeGridMap.reverseRightVehicle(true); } catch (Exception e) { e.printStackTrace(); }
         });
 
         // Buttons that were in the toggle group
@@ -116,7 +123,8 @@ public class AddObstacle extends Fragment implements ThemeAware {
             public void onClick(View view){
                 Log.d("activity_main","Restarting Map!");
                 Toast.makeText(getContext(), "Resetting Map back to default!", Toast.LENGTH_SHORT).show();
-                gridMap.clearGridMap();
+                GridMapClass activeGridMap = resolveGridMap();
+                if (activeGridMap != null) activeGridMap.clearGridMap();
             }
         });
         /*
@@ -154,6 +162,11 @@ public class AddObstacle extends Fragment implements ThemeAware {
                     Log.d("add_coordinate.xml","No Option Selected");
                     Toast.makeText(getActivity(), "Please select an option first!", Toast.LENGTH_SHORT).show();
                 }else{
+                    GridMapClass activeGridMap = resolveGridMap();
+                    if (activeGridMap == null) {
+                        Toast.makeText(getActivity(), "Grid is not ready yet. Please try again.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     String buttonName = getResources().getResourceEntryName(currentSelectedButtonId);
                     boolean checkXCoords = checkCoordCorrect(addXCoords, "X");
                     boolean checkYCoords = checkCoordCorrect(addYCoords, "Y");
@@ -175,7 +188,7 @@ public class AddObstacle extends Fragment implements ThemeAware {
                     switch(buttonName){
                         case "add_obstacle_button":
                             Log.d("add_coordinate.xml","Clicked add_obstacle_button");
-                            statusReturn = gridMap.addNewObstacleToGrid(x_coord_add, y_coord_add);
+                            statusReturn = activeGridMap.addNewObstacleToGrid(x_coord_add, y_coord_add);
                             switch(statusReturn){
                                 case 0:
                                     Toast.makeText(getContext(), "Invalid Coordinates added! Please reenter input", Toast.LENGTH_SHORT).show();
@@ -194,7 +207,7 @@ public class AddObstacle extends Fragment implements ThemeAware {
 
                         case "remove_obstacle_button":
                             Log.d("add_coordinate.xml","Clicked remove Button");
-                            statusReturn = gridMap.removeFromGrid(x_coord_add, y_coord_add, true);
+                            statusReturn = activeGridMap.removeFromGrid(x_coord_add, y_coord_add, true);
                             switch(statusReturn){
                                 case 0:
                                     Toast.makeText(getContext(), "Invalid Coordinates! Please reenter input", Toast.LENGTH_SHORT).show();
@@ -216,7 +229,7 @@ public class AddObstacle extends Fragment implements ThemeAware {
 
                         case "add_starting_point":
                             Log.d("add_coordinate.xml","Clicked add_starting_point Button");
-                            statusReturn = gridMap.addVehicleToMap(x_coord_add, y_coord_add);
+                            statusReturn = activeGridMap.addVehicleToMap(x_coord_add, y_coord_add);
                             switch(statusReturn){
                                 case 0:
                                     Toast.makeText(getContext(), "Invalid Coordinates to add vehicle! Please reenter input", Toast.LENGTH_SHORT).show();
@@ -267,6 +280,7 @@ public class AddObstacle extends Fragment implements ThemeAware {
         boolean vehicleActive   = addStartingPointButton.getId() == currentSelectedButtonId;
         boolean obstacleActive  = addObstacleToggle.getId()      == currentSelectedButtonId;
         boolean removeActive    = removeButton.getId()            == currentSelectedButtonId;
+        GridMapClass activeGridMap = resolveGridMap();
 
         // MaterialButtonToggleGroup requires children to keep their MaterialShapeDrawable
         // background — setBackground() breaks it. Use tint + strokeColor instead.
@@ -300,14 +314,18 @@ public class AddObstacle extends Fragment implements ThemeAware {
         addObstacleToggle.setIconTint(obstacleIconTint);
         removeButton.setIconTint(removeIconTint);
 
+        if (activeGridMap == null) {
+            return;
+        }
+
         if (vehicleActive) {
-            gridMap.setGridMode(GridMapClass.GridMode.ADD_VEHICLE);
+            activeGridMap.setGridMode(GridMapClass.GridMode.ADD_VEHICLE);
         } else if (obstacleActive) {
-            gridMap.setGridMode(GridMapClass.GridMode.ADD_OBSTACLE);
+            activeGridMap.setGridMode(GridMapClass.GridMode.ADD_OBSTACLE);
         } else if (removeActive) {
-            gridMap.setGridMode(GridMapClass.GridMode.REMOVE);
+            activeGridMap.setGridMode(GridMapClass.GridMode.REMOVE);
         } else {
-            gridMap.setGridMode(GridMapClass.GridMode.NONE);
+            activeGridMap.setGridMode(GridMapClass.GridMode.NONE);
         }
     }
 
@@ -425,6 +443,11 @@ public class AddObstacle extends Fragment implements ThemeAware {
 
     public boolean checkCoordCorrect(EditText inputFromUser, String x_or_y){
         Log.d("checkCoordCorrect Function", "Checking Coordinates for "+x_or_y);
+        GridMapClass activeGridMap = resolveGridMap();
+        if (activeGridMap == null) {
+            Toast.makeText(getActivity(), "Grid is not ready yet. Please try again.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
 
         String input = inputFromUser.getText().toString().trim();
 
@@ -435,7 +458,7 @@ public class AddObstacle extends Fragment implements ThemeAware {
 
         try{
             int value = Integer.parseInt(input);
-            if(value >= gridMap.lowLimit && value <= gridMap.hardLimit-1){
+            if(value >= activeGridMap.lowLimit && value <= activeGridMap.hardLimit-1){
                 return true;
             } else{
                 Toast.makeText(getActivity(), "Value must be between 0 and 19 for input "+x_or_y, Toast.LENGTH_SHORT).show();

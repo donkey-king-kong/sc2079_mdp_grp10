@@ -52,8 +52,16 @@ public class startTask extends Fragment {
     public void onAttach(android.content.Context context) {
         super.onAttach(context);
         if (gridMap == null && context instanceof MainActivity) {
-            gridMap = ((MainActivity) context).gridMapObj;
+            gridMap = ((MainActivity) context).currentGridMapOrNull();
         }
+    }
+
+    private GridMapClass resolveGridMap() {
+        if (getContext() instanceof MainActivity) {
+            GridMapClass current = ((MainActivity) getContext()).currentGridMapOrNull();
+            if (current != null) return current;
+        }
+        return gridMap;
     }
 
     @Nullable
@@ -86,14 +94,14 @@ public class startTask extends Fragment {
                 if(startFastestRound){
                     fastestTimeTimerView.setText(time);
                 }
-                if(gridMap.checkFINStatus()){
+                if(resolveGridMap().checkFINStatus()){
                     if(startTraverseMap) {
                         startTraverseMap = false;
                     }else if(startFastestRound){
                         startFastestRound = false;
                     }
                     timerReflectOnText = 0;
-                    gridMap.updateFINStatus(false);
+                    resolveGridMap().updateFINStatus(false);
                     timerHandler.removeCallbacks(timerRunnable);
                 }
 
@@ -107,7 +115,7 @@ public class startTask extends Fragment {
             @Override
             public void onClick(View view) {
                 if (!startTraverseMap) {
-                    gridMap.sendArenaDataBluetooth();
+                    resolveGridMap().sendArenaDataBluetooth();
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
@@ -122,7 +130,7 @@ public class startTask extends Fragment {
                     startTraverseMap = false;
                     timerReflectOnText = 0;
                     timerHandler.removeCallbacks(timerRunnable);
-                    gridMap.updateFINStatus(false);
+                    resolveGridMap().updateFINStatus(false);
                 }
             }
         });
@@ -132,7 +140,7 @@ public class startTask extends Fragment {
             @Override
             public void onClick(View view){
                 if (!startFastestRound) {
-                    gridMap.sendArenaDataBluetooth();
+                    resolveGridMap().sendArenaDataBluetooth();
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
@@ -147,7 +155,7 @@ public class startTask extends Fragment {
                     startFastestRound = false;
                     timerReflectOnText = 0;
                     timerHandler.removeCallbacks(timerRunnable);
-                    gridMap.updateFINStatus(false);
+                    resolveGridMap().updateFINStatus(false);
                 }
             }
         });
@@ -158,7 +166,7 @@ public class startTask extends Fragment {
             @Override
             public void onClick(View view){
             if (!startSendStich) {
-                gridMap.sendStichSignalBluetooth();
+                resolveGridMap().sendStichSignalBluetooth();
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {

@@ -55,6 +55,18 @@ import com.example.sc2079.ui.box
 import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
+    enum class ChatLogType {
+        INCOMING,
+        OUTGOING,
+        SYSTEM
+    }
+
+    data class ChatLogEntry(
+        val type: ChatLogType,
+        val message: String,
+        val timestamp: Long = System.currentTimeMillis()
+    )
+
     private val base64Data = StringBuilder();
     private var iterationHowMany: Int = -1;
     private var bluetoothService: BluetoothService? = null
@@ -69,11 +81,13 @@ class MainActivity : AppCompatActivity() {
 
     private var isConnected = false
     internal lateinit var gridMapObj: GridMapClass
-    private val messageLog = ArrayList<String>()
     private var messageListener: MessageListener? = null
 
+    fun currentGridMapOrNull(): GridMapClass? =
+        if (::gridMapObj.isInitialized) gridMapObj else null
+
     interface MessageListener {
-        fun onNewMessage(message: String)
+        fun onNewMessage(entry: ChatLogEntry)
         fun onLogCleared()
     }
     private lateinit var givevehicleDirectionNow: TextView
@@ -145,12 +159,30 @@ class MainActivity : AppCompatActivity() {
 
     fun currentPalette(): Palette = if (isDayMode) DAY else NIGHT
 
-    fun getMessageLog(): ArrayList<String> {
-        return messageLog
+    fun getMessageLog(): ArrayList<ChatLogEntry> {
+        return sharedViewModel.messageLog
     }
 
     fun setMessageListener(listener: MessageListener?) {
         this.messageListener = listener
+    }
+
+    fun logIncoming(message: String) {
+        val entry = ChatLogEntry(ChatLogType.INCOMING, message)
+        sharedViewModel.messageLog.add(entry)
+        messageListener?.onNewMessage(entry)
+    }
+
+    fun logOutgoing(message: String) {
+        val entry = ChatLogEntry(ChatLogType.OUTGOING, message)
+        sharedViewModel.messageLog.add(entry)
+        messageListener?.onNewMessage(entry)
+    }
+
+    fun logSystem(message: String) {
+        val entry = ChatLogEntry(ChatLogType.SYSTEM, message)
+        sharedViewModel.messageLog.add(entry)
+        messageListener?.onNewMessage(entry)
     }
 
     private fun saveStitchedImageToGallery(base64Image: String): Uri {
@@ -252,36 +284,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            val line: String
-            /*
-            if (text.contains("stitch-image:")) {
-                // 1. Extract Base64 data (everything after "image-rec:")
-                val base64Data = text.substringAfter("stitch-image:").trim()
-
-                // 2. Launch the image display fragment (pop-up)
-                if (base64Data.isNotEmpty()) {
-                    // Check for isBound before showing fragment
-                    ImageDisplayFragment.newInstance(base64Data)
-                        .show(supportFragmentManager, "ImageDisplayFragment")
-                }
-
-                // 3. Log a simple placeholder message to the chat history
-                line = "Robot: [Image Received - Tap to view]\n"
-
-                // Still notify GridMap for obstacle verification
-                //gridMapObj.receiveVerifiedObstacleBluetooth(text);
-            */
-            //} else {
-            // Regular text message
-            line = "Robot: " + text + "\n"
-            //}
-
             if(iterationHowMany == -1){
-                // Store the message in the persistent log
-                messageLog.add(line)
-
-                // Notify the registered listener (if one exists)
-                messageListener?.onNewMessage(line)
+                logIncoming(text)
             }
 
             if(text.contains("stitch-image")) {
@@ -290,10 +294,10 @@ class MainActivity : AppCompatActivity() {
                     "-1" -> {
                         base64Data.clear()
                         iterationHowMany = -1
-                        messageLog.add("Invalid stitched image message received \n");
+                        logSystem("Invalid stitched image message received")
                     }
                     "2" -> {
-                        messageLog.add("Starting to Stitch \n");
+                        logSystem("Starting to Stitch")
                         iterationHowMany = 0;
                         base64Data.clear()
                     }
@@ -317,12 +321,12 @@ class MainActivity : AppCompatActivity() {
                             Toast.makeText(this@MainActivity, "Invalid stitched image received", Toast.LENGTH_SHORT).show()
                             return
                         }
-                        messageLog.add("Ending Stitch, displaying image \n")
-                        messageLog.add("Robot: [Image Received - Tap to view]\n")
+                        logSystem("Ending Stitch, displaying image")
+                        logSystem("Image Received - Tap to view")
                         Log.d("Image Message", "Final length: ${stitchedImageBase64.length}")
                         try {
                             val savedUri = saveStitchedImageToGallery(stitchedImageBase64)
-                            messageLog.add("Saved stitched image to Gallery \n")
+                            logSystem("Saved stitched image to Gallery")
                             Toast.makeText(
                                 this@MainActivity,
                                 "Stitched image saved to Gallery",
@@ -330,7 +334,7 @@ class MainActivity : AppCompatActivity() {
                             ).show()
                             Log.d("Image Message", "Saved stitched image to $savedUri")
                         } catch (e: Exception) {
-                            messageLog.add("Failed to save stitched image to Gallery \n")
+                            logSystem("Failed to save stitched image to Gallery")
                             Toast.makeText(
                                 this@MainActivity,
                                 "Failed to save stitched image",
@@ -346,7 +350,7 @@ class MainActivity : AppCompatActivity() {
                         if (iterationHowMany < 0) return // Wait for a start marker.
                         base64Data.append(status)  // add chunk
                         iterationHowMany += 1
-                        messageLog.add("Running data compilation iteration $iterationHowMany \n")
+                        logSystem("Running data compilation iteration $iterationHowMany")
                         Log.d("Image Chunk", "Added chunk length=${status.length}, total=${base64Data.length}")
 
                     }
@@ -360,27 +364,27 @@ class MainActivity : AppCompatActivity() {
                 when(status){
                     -3->{
                         //Toast.makeText(context, "Bullseye Detected!", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Bullseye Detected \n");
+                        logSystem("Bullseye Detected")
                     }
                     -2 ->{
                         //Toast.makeText(context, "Unknown Error Occurred", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Unknown Error Occurred at image-rec \n");
+                        logSystem("Unknown Error Occurred at image-rec")
                     }
                     -1 ->{
                         //Toast.makeText(context, "No Image ID Detected", Toast.LENGTH_SHORT).show();
-                        messageLog.add("No Image ID Detected \n");
+                        logSystem("No Image ID Detected")
                     }
                     0 ->{
                         //Toast.makeText(context, "Failed to verify Obstacle", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Failed to verify Obstacle \n");
+                        logSystem("Failed to verify Obstacle")
                     }
                     1->{
                         //Toast.makeText(context, "Successfully Verified Obstacle", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Successfully Verified Obstacle \n");
+                        logSystem("Successfully Verified Obstacle")
                     }
                     2->{
                         //Toast.makeText(context, "Capturing Obstacle Image", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Capturing Obstacle Image \n");
+                        logSystem("Capturing Obstacle Image")
                     }
 
                 }
@@ -391,16 +395,16 @@ class MainActivity : AppCompatActivity() {
                 when (status) {
                     -2 -> {
                         //Toast.makeText(context, "Unknown Error Occurred", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Unknown Error Occurred at location \n");
+                        logSystem("Unknown Error Occurred at location")
                     }
                     0 -> {
                         //Toast.makeText(context, "Failed to verify Location", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Failed to verify Location \n");
+                        logSystem("Failed to verify Location")
                     }
 
                     1 -> {
                         //Toast.makeText(context, "Successfully Verified Location", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Successfully Verified Location \n");
+                        logSystem("Successfully Verified Location")
                     }
                 }
             }
@@ -411,15 +415,15 @@ class MainActivity : AppCompatActivity() {
                 when (status) {
                     -2 -> {
                         //Toast.makeText(context, "Unknown Error Occurred", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Unknown Error Occurred at health \n");
+                        logSystem("Unknown Error Occurred at health")
                     }
                     0 ->{
                         //Toast.makeText(context, "Image Rec API is down", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Image Rec API is down \n");
+                        logSystem("Image Rec API is down")
                     }
                     1 ->{
                         //Toast.makeText(context, "Algo API is down", Toast.LENGTH_SHORT).show();
-                        messageLog.add("Algo API is down \n");
+                        logSystem("Algo API is down")
                     }
                 }
             }
@@ -518,14 +522,6 @@ class MainActivity : AppCompatActivity() {
             checkBluetoothPermissionsAndState()
         }
 
-        sharedViewModel.newCoordinate.observe(this) { coordinate ->
-            gridMapObj.addNewObstacleToGrid(coordinate.first.toInt(), coordinate.second.toInt())
-        }
-
-        sharedViewModel.newObstacleRequest.observe(this) { request ->
-            gridMapObj.addNewObstacleToGridWithDirection(request.x, request.y, request.direction)
-            Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
-        }
 
         var autoActive = false
 
@@ -642,6 +638,31 @@ class MainActivity : AppCompatActivity() {
         gridMapObj.setGridColumns(20)
         gridMapObj.setGridRows(20)
         gridMapView.addView(gridMapObj)
+
+        val gridMapSnapshot = sharedViewModel.gridMapSnapshot
+        if (gridMapSnapshot != null) {
+            if (sharedViewModel.gridRows != null && sharedViewModel.gridCols != null) {
+                gridMapObj.setGridRows(sharedViewModel.gridRows!!)
+                gridMapObj.setGridColumns(sharedViewModel.gridCols!!)
+            }
+            val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
+            val loadedData: ArrayList<ArrayList<ObstacleData>> = Gson().fromJson(gridMapSnapshot, type)
+            gridMapObj.addGridMapSaved(loadedData)
+        }
+
+        gridMapObj.setOnGridChangedListener {
+            snapshotGridToViewModel()
+        }
+
+        sharedViewModel.newCoordinate.observe(this) { coordinate ->
+            gridMapObj.addNewObstacleToGrid(coordinate.first.toInt(), coordinate.second.toInt())
+        }
+
+        sharedViewModel.newObstacleRequest.observe(this) { request ->
+            gridMapObj.addNewObstacleToGridWithDirection(request.x, request.y, request.direction)
+            Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
+        }
+
         setupGraphAxes(this, !isDayMode)
 
         // Grid size +/- buttons (min=5, max=20, square grid so cols==rows)
@@ -765,7 +786,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun clearMessageLog() {
-        messageLog.clear()
+        sharedViewModel.messageLog.clear()
         messageListener?.onLogCleared() // Notify listener to clear the displayed text
         Toast.makeText(this, "Bluetooth message log cleared", Toast.LENGTH_SHORT).show()
     }
@@ -786,12 +807,17 @@ class MainActivity : AppCompatActivity() {
         val axisColor = if (isDark) NIGHT.textMuted else DAY.textMuted
         val rows = gridMapObj.getGridRows()
         val cols = gridMapObj.getGridColumns()
+        val axisTextSizeSp = if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) 8f else 10f
 
         for (i in (rows - 1) downTo 0) {
             val textView = TextView(context)
             textView.text = i.toString()
             textView.setTextColor(axisColor)
+            textView.textSize = axisTextSizeSp
             textView.gravity = Gravity.CENTER
+            textView.includeFontPadding = false
+            textView.maxLines = 1
+            textView.setHorizontallyScrolling(true)
             textView.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0, 1f
@@ -803,7 +829,11 @@ class MainActivity : AppCompatActivity() {
             val textView = TextView(context)
             textView.text = i.toString()
             textView.setTextColor(axisColor)
+            textView.textSize = axisTextSizeSp
             textView.gravity = Gravity.CENTER
+            textView.includeFontPadding = false
+            textView.maxLines = 1
+            textView.setHorizontallyScrolling(true)
             textView.layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.MATCH_PARENT, 1f
@@ -848,6 +878,14 @@ class MainActivity : AppCompatActivity() {
         yAxis.removeAllViews()
         xAxis.removeAllViews()
         setupGraphAxes(this, !isDayMode)
+    }
+
+    private fun snapshotGridToViewModel() {
+        val gson = Gson()
+        val json = gson.toJson(gridMapObj.returnGridMap())
+        sharedViewModel.gridMapSnapshot = json
+        sharedViewModel.gridRows = gridMapObj.getGridRows()
+        sharedViewModel.gridCols = gridMapObj.getGridColumns()
     }
 
     private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {
