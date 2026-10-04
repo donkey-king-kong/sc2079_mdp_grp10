@@ -471,7 +471,9 @@ class CostModel:
         found = hybrid_astar.plan_any(self.arena, self.nodes[source_index].pose,
                                       [self.nodes[j].pose for j in goals],
                                       max_expansions=max_expansions or cfg.HA_MATRIX_EXPANSIONS,
-                                      deadline=deadline)
+                                      deadline=deadline,
+                                      shoot_better_neighbours=not max_expansions
+                                      or max_expansions <= cfg.HA_MATRIX_EXPANSIONS)
         if found is None:
             return False
         target_index, trajectory = goals[found[0]], found[1]

@@ -196,7 +196,8 @@ def plan(arena: Arena, start: Pose, goal: Pose,
 def plan_any(arena: Arena, start: Pose, goals: List[Pose],
              radius: RadiusSpec = None,
              max_expansions: int = cfg.HA_MAX_EXPANSIONS,
-             deadline: Optional[float] = None) -> Optional[Tuple[int, Trajectory]]:
+             deadline: Optional[float] = None,
+             shoot_better_neighbours: bool = False) -> Optional[Tuple[int, Trajectory]]:
     """Shortest drivable path from `start` to whichever of `goals` it reaches first.
 
     Returns `(index into goals, trajectory)`. One search aimed at every photo
@@ -211,6 +212,12 @@ def plan_any(arena: Arena, start: Pose, goals: List[Pose],
     exists so an unreachable capture pose costs a fraction of a second instead
     of hanging the demo. The planner just moves on to the next pose in the menu.
     `deadline` (a `time.monotonic()` reading) is a second, wall-clock bound.
+
+    `goals` is best-first. With `shoot_better_neighbours`, a node right next to
+    the best goal also shoots at it when another goal is nearer: photo poses
+    bunch up against a wall, and the nearest is then often one that does not
+    fit while the straight-on one beside it does. It costs a Dubins call per
+    node that close, so it is for short searches.
     """
     goals = [g for g in goals if arena.is_pose_free(g)]
     if not goals or not arena.is_pose_free(start):
@@ -257,6 +264,10 @@ def plan_any(arena: Arena, start: Pose, goals: List[Pose],
             shot = dubins.plan(node.pose, goals[nearest], radii, arena.is_pose_free)
             if shot is not None:
                 return nearest, _reconstruct(node, shot[1])
+        if shoot_better_neighbours and nearest != 0 and estimates[0] < cfg.HA_NEIGHBOUR_SHOT_RANGE:
+            shot = dubins.plan(node.pose, goals[0], radii, arena.is_pose_free)
+            if shot is not None:
+                return 0, _reconstruct(node, shot[1])
         for index, goal in enumerate(goals):
             # Near the goal but no forward shot fits: try reversing onto it. If
             # that is blocked too, keep searching from here rather than stopping.
