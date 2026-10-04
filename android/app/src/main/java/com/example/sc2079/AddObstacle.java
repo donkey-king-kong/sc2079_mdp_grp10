@@ -308,9 +308,10 @@ public class AddObstacle extends Fragment implements ThemeAware {
         removeButton.setStrokeColor(android.content.res.ColorStateList.valueOf(
             removeActive ? activeRemoveStroke : inactiveStroke));
 
-        int vehicleTextColor  = vehicleActive  ? p.getAccent() : p.getTextMuted();
-        int obstacleTextColor = obstacleActive ? (isF1 ? p.getAccent() : p.getPink()) : p.getTextMuted();
-        int removeTextColor   = removeActive   ? (isF1 ? p.getAccent() : p.getRed())  : p.getTextMuted();
+        boolean isLight = (p.getAccent() == android.graphics.Color.parseColor("#1A3ECF"));
+        int vehicleTextColor  = vehicleActive  ? (isLight ? p.getAccent() : android.graphics.Color.WHITE) : p.getTextMuted();
+        int obstacleTextColor = obstacleActive ? (isLight ? p.getPink()   : android.graphics.Color.WHITE) : p.getTextMuted();
+        int removeTextColor   = removeActive   ? (isLight ? p.getRed()    : android.graphics.Color.WHITE) : p.getTextMuted();
 
         addStartingPointButton.setTextColor(vehicleTextColor);
         addObstacleToggle.setTextColor(obstacleTextColor);
