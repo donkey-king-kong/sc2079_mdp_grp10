@@ -399,10 +399,10 @@ public class GridMapClass extends View {
         invalidate();
     }
 
-    public void setGridTheme(int backgroundColor, int gridLineColor, int obstacleColor) {
+    public void setGridTheme(int backgroundColor, int gridLineColor, int robotBodyColor) {
         gridBackgroundColor = backgroundColor;
         gridLinePaint.setColor(gridLineColor);
-        blackPaint.setColor(obstacleColor);
+        greenPaint.setColor(robotBodyColor);
         invalidate();
     }
 
@@ -546,14 +546,14 @@ public class GridMapClass extends View {
         float right = (x + 3) * cellWidth;
         float top = (gridRows - (y + 3)) * cellHeight;
 
-        // 1. Draw Green Body
+        // 1. Draw body fill (colour set per theme via setGridTheme)
         canvas.drawRect(left, top, right, bottom, greenPaint);
 
-        // 2. Draw Cyan Outline (neutral — direction shown by bar, not border color)
+        // 2. Draw bold white border to show car boundary
         Paint outlinePaint = new Paint();
         outlinePaint.setStyle(Paint.Style.STROKE);
-        outlinePaint.setStrokeWidth(6f);
-        outlinePaint.setColor(Color.parseColor("#26B5CB"));
+        outlinePaint.setStrokeWidth(4f);
+        outlinePaint.setColor(Color.parseColor("#CCFFFFFF"));
         outlinePaint.setAntiAlias(true);
         canvas.drawRect(left, top, right, bottom, outlinePaint);
 

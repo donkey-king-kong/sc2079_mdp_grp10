@@ -609,13 +609,21 @@ class MainActivity : AppCompatActivity() {
             }
             headerDivider?.requestLayout()
             val gridColors = when (mode) {
-                ThemeMode.F1 -> Triple(
+                ThemeMode.F1    -> Triple(
                     android.graphics.Color.parseColor("#080808"),
                     android.graphics.Color.parseColor("#FFFFFF"),
                     android.graphics.Color.parseColor("#2A2A2A")
                 )
-                ThemeMode.DAY -> Triple(p.bg, p.borderStrong, p.surface2)
-                ThemeMode.NIGHT -> Triple(p.bg, p.borderStrong, p.surface2)
+                ThemeMode.DAY   -> Triple(
+                    android.graphics.Color.parseColor("#B8C8B8"),
+                    android.graphics.Color.parseColor("#2E000000"),
+                    android.graphics.Color.parseColor("#7CFC00")
+                )
+                ThemeMode.NIGHT -> Triple(
+                    android.graphics.Color.parseColor("#111A11"),
+                    android.graphics.Color.parseColor("#3DFFFFFF"),
+                    android.graphics.Color.GREEN
+                )
             }
             gridArea.setBackgroundColor(gridColors.first)
             if (::gridMapObj.isInitialized) {
