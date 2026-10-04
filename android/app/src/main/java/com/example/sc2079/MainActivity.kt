@@ -23,13 +23,17 @@ import android.provider.MediaStore
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.widget.Button
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -751,11 +755,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         saveGridMapButton.setOnClickListener {
-            saveGridMapData(gridMapObj.returnGridMap())
+            showSaveMapSlotDialog()
         }
 
         loadGridMapButton.setOnClickListener {
-            loadGridMapData()
+            showLoadMapSlotDialog()
         }
 
         btnReset.setOnClickListener {
@@ -961,34 +965,201 @@ class MainActivity : AppCompatActivity() {
         sharedViewModel.gridCols = gridMapObj.getGridColumns()
     }
 
-    private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {
-        val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
+    private fun gridMapPreferences() = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
 
-        val gson = Gson()
-        val json = gson.toJson(gridMapData) // convert to JSON string
+    private fun gridMapDataKey(slotIndex: Int) = "gridMapData_$slotIndex"
 
-        editor.putString("gridMapData", json)
-        editor.apply()
-        Toast.makeText(this, "Map was successfully saved!", Toast.LENGTH_SHORT).show()
+    private fun gridMapNameKey(slotIndex: Int) = "gridMapName_$slotIndex"
+
+    private fun migrateLegacyGridMapSave() {
+        val sharedPreferences = gridMapPreferences()
+        val legacyJson = sharedPreferences.getString("gridMapData", null)
+
+        if (legacyJson != null && !sharedPreferences.contains(gridMapDataKey(0))) {
+            sharedPreferences.edit()
+                .putString(gridMapDataKey(0), legacyJson)
+                .remove("gridMapData")
+                .apply()
+        } else if (legacyJson != null) {
+            sharedPreferences.edit()
+                .remove("gridMapData")
+                .apply()
+        }
     }
 
-    private fun loadGridMapData() {
-        val sharedPreferences = getSharedPreferences("grid_map_prefs", MODE_PRIVATE)
-        val gson = Gson()
-        val json = sharedPreferences.getString("gridMapData", null)
+    private fun showSaveMapSlotDialog() {
+        migrateLegacyGridMapSave()
+
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(this)
+            .setTitle("Save Map")
+            .setView(createSlotSelectionView(isLoadDialog = false) { slotIndex ->
+                dialog.dismiss()
+                handleSaveSlotSelected(slotIndex)
+            })
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.show()
+    }
+
+    private fun showLoadMapSlotDialog() {
+        migrateLegacyGridMapSave()
+
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(this)
+            .setTitle("Load Map")
+            .setView(createSlotSelectionView(isLoadDialog = true) { slotIndex ->
+                dialog.dismiss()
+                loadGridMapData(slotIndex)
+            })
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.show()
+    }
+
+    private fun createSlotSelectionView(
+        isLoadDialog: Boolean,
+        onSlotSelected: (Int) -> Unit
+    ): ScrollView {
+        val sharedPreferences = gridMapPreferences()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+        }
+
+        for (slotIndex in 0 until 5) {
+            val hasData = sharedPreferences.contains(gridMapDataKey(slotIndex))
+            val slotName = getSlotDisplayName(slotIndex)
+            val isEnabled = !isLoadDialog || hasData
+
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                alpha = if (isEnabled) 1f else 0.45f
+                setPadding(0, dpToPx(6), 0, dpToPx(6))
+            }
+
+            val label = TextView(this).apply {
+                text = "Slot ${slotIndex + 1}: $slotName"
+                textSize = 16f
+                setTextColor(if (isEnabled) Color.BLACK else Color.GRAY)
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            }
+
+            val actionButton = Button(this).apply {
+                text = if (isLoadDialog) "Load" else "Save"
+                this.isEnabled = isEnabled
+                alpha = if (isEnabled) 1f else 0.5f
+                setOnClickListener {
+                    if (isEnabled) {
+                        onSlotSelected(slotIndex)
+                    }
+                }
+            }
+
+            row.addView(label)
+            row.addView(actionButton)
+            container.addView(row)
+        }
+
+        return ScrollView(this).apply {
+            addView(container)
+        }
+    }
+
+    private fun handleSaveSlotSelected(slotIndex: Int) {
+        val sharedPreferences = gridMapPreferences()
+
+        if (sharedPreferences.contains(gridMapDataKey(slotIndex))) {
+            val slotName = getSlotDisplayName(slotIndex)
+            AlertDialog.Builder(this)
+                .setTitle("Overwrite $slotName?")
+                .setPositiveButton("Yes") { _, _ ->
+                    showSaveNameDialog(slotIndex)
+                }
+                .setNegativeButton("No", null)
+                .show()
+        } else {
+            showSaveNameDialog(slotIndex)
+        }
+    }
+
+    private fun showSaveNameDialog(slotIndex: Int) {
+        val sharedPreferences = gridMapPreferences()
+        val defaultName = sharedPreferences.getString(gridMapNameKey(slotIndex), null)
+            ?: "Map ${slotIndex + 1}"
+        val nameInput = EditText(this).apply {
+            setText(defaultName)
+            selectAll()
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Name Save Slot ${slotIndex + 1}")
+            .setView(nameInput)
+            .setPositiveButton("Save") { _, _ ->
+                val enteredName = nameInput.text.toString().trim()
+                val slotName = enteredName.ifEmpty { "Map ${slotIndex + 1}" }
+                saveGridMapData(slotIndex, slotName, gridMapObj.returnGridMap())
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun saveGridMapData(
+        slotIndex: Int,
+        slotName: String,
+        gridMapData: ArrayList<ArrayList<ObstacleData>>
+    ) {
+        val json = Gson().toJson(gridMapData)
+
+        gridMapPreferences().edit()
+            .putString(gridMapDataKey(slotIndex), json)
+            .putString(gridMapNameKey(slotIndex), slotName)
+            .apply()
+
+        Toast.makeText(this, "Saved to $slotName", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun loadGridMapData(slotIndex: Int) {
+        val json = gridMapPreferences().getString(gridMapDataKey(slotIndex), null)
 
         if (json != null) {
             val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
-            val loadedData: ArrayList<ArrayList<ObstacleData>> = gson.fromJson(json, type)
+            val loadedData: ArrayList<ArrayList<ObstacleData>> = Gson().fromJson(json, type)
+            val slotName = getSlotDisplayName(slotIndex)
+
             gridMapObj.clearGridMap()
             gridMapObj.addGridMapSaved(loadedData)
             gridMapObj.sendArenaDataBluetooth()
-        }else{
-            Toast.makeText(this, "No Map was saved!", Toast.LENGTH_SHORT).show()
 
+            Toast.makeText(this, "Loaded $slotName", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Slot ${slotIndex + 1} is empty", Toast.LENGTH_SHORT).show()
         }
     }
+
+    private fun getSlotDisplayName(slotIndex: Int): String {
+        val sharedPreferences = gridMapPreferences()
+        val hasData = sharedPreferences.contains(gridMapDataKey(slotIndex))
+        val savedName = sharedPreferences.getString(gridMapNameKey(slotIndex), null)
+
+        return when {
+            !hasData -> "Empty"
+            !savedName.isNullOrBlank() -> savedName
+            else -> "Map ${slotIndex + 1}"
+        }
+    }
+
+    private fun dpToPx(dp: Int): Int =
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
 
 
 }
