@@ -739,6 +739,18 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
         }
 
+        sharedViewModel.newVehicleRequest.observe(this) { request ->
+            val result = gridMapObj.addVehicleToMap(request.x, request.y)
+            if (result == 1) {
+                if (request.direction != ObstacleData.Direction.NORTH) {
+                    gridMapObj.changeDirectionOfObstacleFlexible(request.x, request.y, request.direction)
+                }
+                Toast.makeText(this, "Vehicle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Vehicle could not be added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         setupGraphAxes(this, !isDayMode)
 
         // Grid size +/- buttons (min=5, max=20, square grid so cols==rows)
@@ -842,8 +854,8 @@ class MainActivity : AppCompatActivity() {
         BluetoothFragment().show(supportFragmentManager, "BluetoothFragment")
     }
 
-    private fun showAddCoordinatesFragment() {
-        PlaceObstacleDialogFragment().show(supportFragmentManager, "PlaceObstacleDialog")
+    private fun showAddCoordinatesFragment(isVehicleMode: Boolean = false) {
+        PlaceObstacleDialogFragment.newInstance(isVehicleMode).show(supportFragmentManager, "PlaceObstacleDialog")
     }
 
     private fun updateBluetoothStatus() {

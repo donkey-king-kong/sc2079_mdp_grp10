@@ -10,6 +10,7 @@ data class ObstacleAddition(val x: Int, val y: Int, val direction: ObstacleData.
 class SharedViewModel : ViewModel() {
     val newCoordinate = MutableLiveData<Pair<Float, Float>>()
     val newObstacleRequest = MutableLiveData<ObstacleAddition>()
+    val newVehicleRequest = MutableLiveData<ObstacleAddition>()
     val messageLog = ArrayList<MainActivity.ChatLogEntry>()
     var gridMapSnapshot: String? = null
     var gridRows: Int? = null

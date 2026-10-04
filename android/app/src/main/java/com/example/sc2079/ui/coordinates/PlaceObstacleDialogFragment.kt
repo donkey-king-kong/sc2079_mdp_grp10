@@ -17,8 +17,21 @@ import com.example.sc2079.R
 
 class PlaceObstacleDialogFragment : DialogFragment() {
 
+    companion object {
+        private const val ARG_IS_VEHICLE_MODE = "isVehicleMode"
+
+        fun newInstance(isVehicleMode: Boolean = false): PlaceObstacleDialogFragment {
+            return PlaceObstacleDialogFragment().apply {
+                arguments = Bundle().apply {
+                    putBoolean(ARG_IS_VEHICLE_MODE, isVehicleMode)
+                }
+            }
+        }
+    }
+
     private val sharedViewModel: SharedViewModel by activityViewModels()
 
+    private var isVehicleMode = false
     private var selectedX = 0
     private var selectedY = 0
     private var selectedDirection: ObstacleData.Direction = ObstacleData.Direction.NORTH
@@ -31,6 +44,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     private lateinit var tvXLabel: TextView
     private lateinit var tvYLabel: TextView
     private lateinit var tvCoordSummary: TextView
+    private lateinit var tvPlaceTitle: TextView
     private lateinit var tvDirectionTitle: TextView
 
     private val xButtons = mutableListOf<Button>()
@@ -42,6 +56,8 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         savedInstanceState: Bundle?
     ): View {
         val root = inflater.inflate(R.layout.dialog_place_obstacle, container, false)
+        isVehicleMode = arguments?.getBoolean(ARG_IS_VEHICLE_MODE) ?: false
+        val placementLabel = if (isVehicleMode) "Vehicle" else "Obstacle"
 
         layoutCoordSelection = root.findViewById(R.id.layout_coord_selection)
         layoutDirectionSelection = root.findViewById(R.id.layout_direction_selection)
@@ -51,8 +67,10 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         tvXLabel = root.findViewById(R.id.tv_x_label)
         tvYLabel = root.findViewById(R.id.tv_y_label)
         tvCoordSummary = root.findViewById(R.id.tv_coord_summary)
+        tvPlaceTitle = root.findViewById(R.id.tv_place_title)
         tvDirectionTitle = root.findViewById(R.id.tv_direction_title)
 
+        tvPlaceTitle.text = "Place $placementLabel"
         setupCoordinateGrids()
 
         root.findViewById<Button>(R.id.btn_cancel_coord).setOnClickListener { dismiss() }
@@ -61,7 +79,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         root.findViewById<Button>(R.id.btn_next).setOnClickListener {
             layoutCoordSelection.visibility = View.GONE
             layoutDirectionSelection.visibility = View.VISIBLE
-            tvDirectionTitle.text = "Add Obstacle at ($selectedX, $selectedY)"
+            tvDirectionTitle.text = "Add $placementLabel at ($selectedX, $selectedY)"
         }
 
         root.findViewById<Button>(R.id.btn_north).setOnClickListener { selectedDirection = ObstacleData.Direction.NORTH; updateDirectionButtons(root) }
@@ -70,7 +88,12 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         root.findViewById<Button>(R.id.btn_west).setOnClickListener { selectedDirection = ObstacleData.Direction.WEST; updateDirectionButtons(root) }
 
         root.findViewById<Button>(R.id.btn_go).setOnClickListener {
-            sharedViewModel.newObstacleRequest.postValue(ObstacleAddition(selectedX, selectedY, selectedDirection))
+            val request = ObstacleAddition(selectedX, selectedY, selectedDirection)
+            if (isVehicleMode) {
+                sharedViewModel.newVehicleRequest.postValue(request)
+            } else {
+                sharedViewModel.newObstacleRequest.postValue(request)
+            }
             dismiss()
         }
 
