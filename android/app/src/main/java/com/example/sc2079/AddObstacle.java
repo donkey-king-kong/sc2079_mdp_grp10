@@ -10,6 +10,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.util.Log;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
 
@@ -18,6 +19,7 @@ import android.widget.Toast;
 import androidx.fragment.app.Fragment;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
+import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment;
 import com.example.sc2079.ui.Palette;
 import com.example.sc2079.ui.ThemePaletteKt;
 import com.example.sc2079.ui.ThemeAware;
@@ -115,6 +117,25 @@ public class AddObstacle extends Fragment implements ThemeAware {
         addStartingPointButton = addCoordsView.findViewById(R.id.add_starting_point);
         addObstacleToggle = addCoordsView.findViewById(R.id.add_obstacle_button);
         removeButton = addCoordsView.findViewById(R.id.remove_obstacle_button);
+        ImageButton btnQuickAdd = addCoordsView.findViewById(R.id.btn_quick_add);
+        btnQuickAdd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (currentSelectedButtonId == addStartingPointButton.getId()) {
+                    PlaceObstacleDialogFragment.newInstance(true)
+                        .show(getParentFragmentManager(), "PlaceObstacleDialog");
+                } else if (currentSelectedButtonId == addObstacleToggle.getId()) {
+                    PlaceObstacleDialogFragment.newInstance(false)
+                        .show(getParentFragmentManager(), "PlaceObstacleDialog");
+                } else {
+                    Toast.makeText(
+                        getActivity(),
+                        "Select Vehicle or Obstacle mode first",
+                        Toast.LENGTH_SHORT
+                    ).show();
+                }
+            }
+        });
         resetMapButton = getActivity().findViewById(R.id.reset_map_button);
         saveMapButton = getActivity().findViewById(R.id.save_map_button);
 
