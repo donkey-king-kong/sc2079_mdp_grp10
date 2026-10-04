@@ -257,7 +257,8 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
             input.setHintTextColor(p.getTextDim());
         }
         if (clearLogButton != null) {
-            clearLogButton.setTextColor(p.getRed());
+            boolean isF1 = (p.getAccent() == android.graphics.Color.parseColor("#E8002D"));
+            clearLogButton.setTextColor(isF1 ? android.graphics.Color.WHITE : p.getRed());
             clearLogButton.setBackground(
                 ThemePaletteKt.box(ctx, p.getRedDim(), p.getRedBorder(), 8f, 1f));
         }
