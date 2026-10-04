@@ -617,12 +617,12 @@ class MainActivity : AppCompatActivity() {
                 ThemeMode.DAY   -> Triple(
                     android.graphics.Color.parseColor("#B8C8B8"),
                     android.graphics.Color.parseColor("#2E000000"),
-                    android.graphics.Color.parseColor("#7CFC00")
+                    android.graphics.Color.parseColor("#7A9A7A")
                 )
                 ThemeMode.NIGHT -> Triple(
                     android.graphics.Color.parseColor("#111A11"),
                     android.graphics.Color.parseColor("#3DFFFFFF"),
-                    android.graphics.Color.GREEN
+                    android.graphics.Color.parseColor("#1E3A1E")
                 )
             }
             gridArea.setBackgroundColor(gridColors.first)
