@@ -64,6 +64,12 @@ public class AddObstacle extends Fragment implements ThemeAware {
         return gridMap;
     }
 
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt("selectedButtonId", currentSelectedButtonId);
+    }
+
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState){
@@ -286,7 +292,11 @@ public class AddObstacle extends Fragment implements ThemeAware {
             }
         });
 
-        currentSelectedButtonId = View.NO_ID;
+        if (savedInstanceState != null) {
+            currentSelectedButtonId = savedInstanceState.getInt("selectedButtonId", View.NO_ID);
+        } else {
+            currentSelectedButtonId = View.NO_ID;
+        }
         updateButtonState();
 
         // Apply current theme
