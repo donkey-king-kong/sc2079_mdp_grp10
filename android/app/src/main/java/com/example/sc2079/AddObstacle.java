@@ -10,6 +10,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.util.Log;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
 
@@ -18,6 +19,7 @@ import android.widget.Toast;
 import androidx.fragment.app.Fragment;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
+import com.example.sc2079.ui.coordinates.PlaceObstacleDialogFragment;
 import com.example.sc2079.ui.Palette;
 import com.example.sc2079.ui.ThemePaletteKt;
 import com.example.sc2079.ui.ThemeAware;
@@ -115,6 +117,25 @@ public class AddObstacle extends Fragment implements ThemeAware {
         addStartingPointButton = addCoordsView.findViewById(R.id.add_starting_point);
         addObstacleToggle = addCoordsView.findViewById(R.id.add_obstacle_button);
         removeButton = addCoordsView.findViewById(R.id.remove_obstacle_button);
+        ImageButton btnQuickAdd = addCoordsView.findViewById(R.id.btn_quick_add);
+        btnQuickAdd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (currentSelectedButtonId == addStartingPointButton.getId()) {
+                    PlaceObstacleDialogFragment.newInstance(true)
+                        .show(getParentFragmentManager(), "PlaceObstacleDialog");
+                } else if (currentSelectedButtonId == addObstacleToggle.getId()) {
+                    PlaceObstacleDialogFragment.newInstance(false)
+                        .show(getParentFragmentManager(), "PlaceObstacleDialog");
+                } else {
+                    Toast.makeText(
+                        getActivity(),
+                        "Select Vehicle or Obstacle mode first",
+                        Toast.LENGTH_SHORT
+                    ).show();
+                }
+            }
+        });
         resetMapButton = getActivity().findViewById(R.id.reset_map_button);
         saveMapButton = getActivity().findViewById(R.id.save_map_button);
 
@@ -391,21 +412,23 @@ public class AddObstacle extends Fragment implements ThemeAware {
             addYCoords.setHintTextColor(p.getTextDim());
         }
 
+        boolean isF1 = (p.getAccent() == android.graphics.Color.parseColor("#E8002D"));
         // Dpad buttons
+        int dpadStroke = isF1 ? p.getAccentBorder() : p.getBorderStrong();
+        int dpadIconColor = isF1 ? p.getAccent() : p.getText();
         android.widget.Button dUp = addCoordsView.findViewById(R.id.dpad_up);
         android.widget.Button dDown = addCoordsView.findViewById(R.id.dpad_down);
         android.widget.Button dLeft = addCoordsView.findViewById(R.id.dpad_left);
         android.widget.Button dRight = addCoordsView.findViewById(R.id.dpad_right);
-        android.graphics.drawable.GradientDrawable dpadBg = ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f);
-        if (dUp != null)    { dUp.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f)); dUp.setTextColor(p.getText()); }
-        if (dDown != null)  { dDown.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f)); dDown.setTextColor(p.getText()); }
-        if (dLeft != null)  { dLeft.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f)); dLeft.setTextColor(p.getText()); }
-        if (dRight != null) { dRight.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f)); dRight.setTextColor(p.getText()); }
+        if (dUp != null)    { dUp.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), dpadStroke, 10f, 2f)); dUp.setTextColor(dpadIconColor); }
+        if (dDown != null)  { dDown.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), dpadStroke, 10f, 2f)); dDown.setTextColor(dpadIconColor); }
+        if (dLeft != null)  { dLeft.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), dpadStroke, 10f, 2f)); dLeft.setTextColor(dpadIconColor); }
+        if (dRight != null) { dRight.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), dpadStroke, 10f, 2f)); dRight.setTextColor(dpadIconColor); }
 
         // DpadCenterSquare
         android.widget.TextView dpadCenter = addCoordsView.findViewById(R.id.dpadCenterSquare);
         if (dpadCenter != null) {
-            dpadCenter.setBackground(ThemePaletteKt.box(ctx, p.getSurface(), p.getBorderStrong(), 10f, 2f));
+            dpadCenter.setBackground(ThemePaletteKt.box(ctx, p.getSurface(), dpadStroke, 10f, 2f));
             dpadCenter.setTextColor(p.getTextMuted());
         }
 
@@ -413,28 +436,54 @@ public class AddObstacle extends Fragment implements ThemeAware {
         android.widget.LinearLayout revLeft = addCoordsView.findViewById(R.id.reverse_left_button);
         android.widget.LinearLayout revRight = addCoordsView.findViewById(R.id.reverse_right_button);
         if (revLeft != null) {
-            revLeft.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f));
+            revLeft.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), dpadStroke, 10f, 2f));
             android.widget.ImageView revLeftIcon = addCoordsView.findViewById(R.id.revLeftIcon);
             android.widget.TextView revLeftLabel = addCoordsView.findViewById(R.id.revLeftLabel);
             if (revLeftIcon != null) {
-                revLeftIcon.setImageTintList(android.content.res.ColorStateList.valueOf(p.getText()));
-                revLeftIcon.setColorFilter(p.getText(), android.graphics.PorterDuff.Mode.SRC_IN);
+                revLeftIcon.setImageTintList(android.content.res.ColorStateList.valueOf(dpadIconColor));
+                revLeftIcon.setColorFilter(dpadIconColor, android.graphics.PorterDuff.Mode.SRC_IN);
             }
-            if (revLeftLabel != null) revLeftLabel.setTextColor(p.getText());
+            if (revLeftLabel != null) revLeftLabel.setTextColor(dpadIconColor);
         }
         if (revRight != null) {
-            revRight.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), p.getBorderStrong(), 10f, 2f));
+            revRight.setBackground(ThemePaletteKt.box(ctx, p.getSurface2(), dpadStroke, 10f, 2f));
             android.widget.ImageView revRightIcon = addCoordsView.findViewById(R.id.revRightIcon);
             android.widget.TextView revRightLabel = addCoordsView.findViewById(R.id.revRightLabel);
             if (revRightIcon != null) {
-                revRightIcon.setImageTintList(android.content.res.ColorStateList.valueOf(p.getText()));
-                revRightIcon.setColorFilter(p.getText(), android.graphics.PorterDuff.Mode.SRC_IN);
+                revRightIcon.setImageTintList(android.content.res.ColorStateList.valueOf(dpadIconColor));
+                revRightIcon.setColorFilter(dpadIconColor, android.graphics.PorterDuff.Mode.SRC_IN);
             }
-            if (revRightLabel != null) revRightLabel.setTextColor(p.getText());
+            if (revRightLabel != null) revRightLabel.setTextColor(dpadIconColor);
+        }
+
+        // F1 knobs
+        com.example.sc2079.ui.KnobView knob1 = addCoordsView.findViewById(R.id.knob_1);
+        com.example.sc2079.ui.KnobView knob2 = addCoordsView.findViewById(R.id.knob_2);
+        com.example.sc2079.ui.KnobView knob3 = addCoordsView.findViewById(R.id.knob_3);
+        android.widget.TextView knob1Label = addCoordsView.findViewById(R.id.knob_1_label);
+        android.widget.TextView knob2Label = addCoordsView.findViewById(R.id.knob_2_label);
+        android.widget.TextView knob3Label = addCoordsView.findViewById(R.id.knob_3_label);
+        android.view.View knobDivider = addCoordsView.findViewById(R.id.knob_divider);
+
+        if (isF1) {
+            if (knob1 != null) { knob1.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent(), 0xFFFFFFFF); knob1.setNotchAngle(-45f); knob1.setVisibility(android.view.View.VISIBLE); }
+            if (knob2 != null) { knob2.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent(), 0xFFFFFFFF); knob2.setNotchAngle(10f);  knob2.setVisibility(android.view.View.VISIBLE); }
+            if (knob3 != null) { knob3.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent(), 0xFFFFFFFF); knob3.setNotchAngle(-60f); knob3.setVisibility(android.view.View.VISIBLE); }
+            if (knob1Label != null) { knob1Label.setTextColor(p.getTextMuted()); knob1Label.setVisibility(android.view.View.VISIBLE); }
+            if (knob2Label != null) { knob2Label.setTextColor(p.getTextMuted()); knob2Label.setVisibility(android.view.View.VISIBLE); }
+            if (knob3Label != null) { knob3Label.setTextColor(p.getTextMuted()); knob3Label.setVisibility(android.view.View.VISIBLE); }
+            if (knobDivider != null) { knobDivider.setBackgroundColor(p.getAccentBorder()); knobDivider.setVisibility(android.view.View.VISIBLE); }
+        } else {
+            if (knob1 != null) { knob1.setColors(p.getSurface(), p.getBorderStrong(), p.getSurface2(), p.getText()); knob1.setNotchAngle(-45f); knob1.setVisibility(android.view.View.VISIBLE); }
+            if (knob2 != null) { knob2.setColors(p.getSurface(), p.getBorderStrong(), p.getSurface2(), p.getText()); knob2.setNotchAngle(10f);  knob2.setVisibility(android.view.View.VISIBLE); }
+            if (knob3 != null) { knob3.setColors(p.getSurface(), p.getBorderStrong(), p.getSurface2(), p.getText()); knob3.setNotchAngle(-60f); knob3.setVisibility(android.view.View.VISIBLE); }
+            if (knob1Label != null) { knob1Label.setTextColor(p.getTextMuted()); knob1Label.setVisibility(android.view.View.VISIBLE); }
+            if (knob2Label != null) { knob2Label.setTextColor(p.getTextMuted()); knob2Label.setVisibility(android.view.View.VISIBLE); }
+            if (knob3Label != null) { knob3Label.setTextColor(p.getTextMuted()); knob3Label.setVisibility(android.view.View.VISIBLE); }
+            if (knobDivider != null) { knobDivider.setBackgroundColor(p.getBorderStrong()); knobDivider.setVisibility(android.view.View.VISIBLE); }
         }
 
         // Action buttons
-        boolean isF1 = (p.getAccent() == android.graphics.Color.parseColor("#E8002D"));
         if (cancelButton != null) {
             cancelButton.setBackground(ThemePaletteKt.box(ctx,
                 isF1 ? p.getBg() : p.getRedDim(),
