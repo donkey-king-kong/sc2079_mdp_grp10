@@ -45,8 +45,10 @@ public class GridMapClass extends View {
     private Paint redPaint = new Paint();   // direction
     private Paint bluePaint = new Paint();  // robot center arrow
     private Paint textPaint = new Paint(); // Text color in box
+    private Paint gridLinePaint = new Paint(); // grid lines
     private Paint verifiedPaint = new Paint(); // Verified Status
     private Paint paintObstacleVerified = new Paint();
+    private int gridBackgroundColor = Color.parseColor("#7CFC00");
     private android.graphics.Bitmap f1CarBitmap;
     private GestureDetector gestureDetector;
     private ArrayList<ArrayList<ObstacleData>> gridMapData = new ArrayList<>();
@@ -111,6 +113,9 @@ public class GridMapClass extends View {
         super(context, attrs);
         // Initalize painting data
         blackPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        blackPaint.setColor(Color.BLACK);
+        gridLinePaint.setStyle(Paint.Style.STROKE);
+        gridLinePaint.setColor(Color.BLACK);
         redPaint.setStyle(Paint.Style.STROKE);
         redPaint.setColor(Color.RED);
         redPaint.setStrokeWidth(6f);
@@ -394,6 +399,13 @@ public class GridMapClass extends View {
         invalidate();
     }
 
+    public void setGridTheme(int backgroundColor, int gridLineColor, int obstacleColor) {
+        gridBackgroundColor = backgroundColor;
+        gridLinePaint.setColor(gridLineColor);
+        blackPaint.setColor(obstacleColor);
+        invalidate();
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh){
         super.onSizeChanged(w, h, oldw, oldh);
@@ -402,17 +414,17 @@ public class GridMapClass extends View {
 
     @Override
     protected void onDraw(Canvas canvas){
-        canvas.drawColor(Color.parseColor("#7CFC00"));
+        canvas.drawColor(gridBackgroundColor);
         if (gridColumns == 0 || gridRows == 0) {
             return;
         }
 
         // Draw grid first
         for (int i = 0; i <= gridColumns; i++) {
-            canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), blackPaint);
+            canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), gridLinePaint);
         }
         for (int j = 0; j <= gridRows; j++) {
-            canvas.drawLine(0, j * cellHeight, getWidth(), j * cellHeight, blackPaint);
+            canvas.drawLine(0, j * cellHeight, getWidth(), j * cellHeight, gridLinePaint);
         }
 
         for (int y = 0; y < gridRows; y++) {

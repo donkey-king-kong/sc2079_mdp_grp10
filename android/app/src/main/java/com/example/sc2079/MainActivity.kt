@@ -618,6 +618,9 @@ class MainActivity : AppCompatActivity() {
                 ThemeMode.NIGHT -> Triple(p.bg, p.borderStrong, p.surface2)
             }
             gridArea.setBackgroundColor(gridColors.first)
+            if (::gridMapObj.isInitialized) {
+                gridMapObj.setGridTheme(gridColors.first, gridColors.second, gridColors.third)
+            }
             // coordCard as rounded box
             coordCard.background = box(this, p.surface2, p.borderStrong, 6f)
             coordCard.backgroundTintList = null
