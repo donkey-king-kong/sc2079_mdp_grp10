@@ -800,6 +800,7 @@ class MainActivity : AppCompatActivity() {
 
         // Bind to BluetoothService here so rotation (onStop/onStart) does not unbind it
         Intent(this, BluetoothService::class.java).also { intent ->
+            startService(intent)
             bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }
     }
@@ -889,6 +890,9 @@ class MainActivity : AppCompatActivity() {
         if (isBound) {
             unbindService(connection)
             isBound = false
+        }
+        if (isFinishing) {
+            stopService(Intent(this, BluetoothService::class.java))
         }
     }
 
