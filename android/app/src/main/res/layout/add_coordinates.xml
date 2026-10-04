@@ -142,11 +142,12 @@
 
                 <ImageButton
                     android:id="@+id/btn_quick_add"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:src="@android:drawable/ic_input_add"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/ic_add_circle_outline"
+                    android:tint="@color/ds_text_muted"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="0dp"
+                    android:padding="4dp"
                     android:contentDescription="Quick add" />
 
             </LinearLayout>
