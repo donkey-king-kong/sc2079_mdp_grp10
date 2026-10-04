@@ -38,13 +38,13 @@ public class KnobView extends View {
 
         notchPaint.setStyle(Paint.Style.STROKE);
         notchPaint.setStrokeCap(Paint.Cap.ROUND);
-        notchPaint.setColor(0xFFFFFFFF);
     }
 
-    public void setColors(int bg, int ring, int inner) {
+    public void setColors(int bg, int ring, int inner, int notch) {
         bgColor    = bg;
         ringColor  = ring;
         innerColor = inner;
+        notchPaint.setColor(notch);
         invalidate();
     }
 

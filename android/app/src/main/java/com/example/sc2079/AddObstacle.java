@@ -466,21 +466,21 @@ public class AddObstacle extends Fragment implements ThemeAware {
         android.view.View knobDivider = addCoordsView.findViewById(R.id.knob_divider);
 
         if (isF1) {
-            if (knob1 != null) { knob1.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent()); knob1.setNotchAngle(-45f); knob1.setVisibility(android.view.View.VISIBLE); }
-            if (knob2 != null) { knob2.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent()); knob2.setNotchAngle(10f);  knob2.setVisibility(android.view.View.VISIBLE); }
-            if (knob3 != null) { knob3.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent()); knob3.setNotchAngle(-60f); knob3.setVisibility(android.view.View.VISIBLE); }
+            if (knob1 != null) { knob1.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent(), 0xFFFFFFFF); knob1.setNotchAngle(-45f); knob1.setVisibility(android.view.View.VISIBLE); }
+            if (knob2 != null) { knob2.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent(), 0xFFFFFFFF); knob2.setNotchAngle(10f);  knob2.setVisibility(android.view.View.VISIBLE); }
+            if (knob3 != null) { knob3.setColors(p.getSurface2(), p.getAccentBorder(), p.getAccent(), 0xFFFFFFFF); knob3.setNotchAngle(-60f); knob3.setVisibility(android.view.View.VISIBLE); }
             if (knob1Label != null) { knob1Label.setTextColor(p.getTextMuted()); knob1Label.setVisibility(android.view.View.VISIBLE); }
             if (knob2Label != null) { knob2Label.setTextColor(p.getTextMuted()); knob2Label.setVisibility(android.view.View.VISIBLE); }
             if (knob3Label != null) { knob3Label.setTextColor(p.getTextMuted()); knob3Label.setVisibility(android.view.View.VISIBLE); }
             if (knobDivider != null) { knobDivider.setBackgroundColor(p.getAccentBorder()); knobDivider.setVisibility(android.view.View.VISIBLE); }
         } else {
-            if (knob1 != null) knob1.setVisibility(android.view.View.GONE);
-            if (knob2 != null) knob2.setVisibility(android.view.View.GONE);
-            if (knob3 != null) knob3.setVisibility(android.view.View.GONE);
-            if (knob1Label != null) knob1Label.setVisibility(android.view.View.GONE);
-            if (knob2Label != null) knob2Label.setVisibility(android.view.View.GONE);
-            if (knob3Label != null) knob3Label.setVisibility(android.view.View.GONE);
-            if (knobDivider != null) knobDivider.setVisibility(android.view.View.GONE);
+            if (knob1 != null) { knob1.setColors(p.getSurface(), p.getBorderStrong(), p.getSurface2(), p.getText()); knob1.setNotchAngle(-45f); knob1.setVisibility(android.view.View.VISIBLE); }
+            if (knob2 != null) { knob2.setColors(p.getSurface(), p.getBorderStrong(), p.getSurface2(), p.getText()); knob2.setNotchAngle(10f);  knob2.setVisibility(android.view.View.VISIBLE); }
+            if (knob3 != null) { knob3.setColors(p.getSurface(), p.getBorderStrong(), p.getSurface2(), p.getText()); knob3.setNotchAngle(-60f); knob3.setVisibility(android.view.View.VISIBLE); }
+            if (knob1Label != null) { knob1Label.setTextColor(p.getTextMuted()); knob1Label.setVisibility(android.view.View.VISIBLE); }
+            if (knob2Label != null) { knob2Label.setTextColor(p.getTextMuted()); knob2Label.setVisibility(android.view.View.VISIBLE); }
+            if (knob3Label != null) { knob3Label.setTextColor(p.getTextMuted()); knob3Label.setVisibility(android.view.View.VISIBLE); }
+            if (knobDivider != null) { knobDivider.setBackgroundColor(p.getBorderStrong()); knobDivider.setVisibility(android.view.View.VISIBLE); }
         }
 
         // Action buttons
