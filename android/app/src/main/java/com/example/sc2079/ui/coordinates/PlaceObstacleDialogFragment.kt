@@ -43,6 +43,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     private var hasSelectedX = false
     private var hasSelectedY = false
     private var hasSelectedDirection = false
+    private var isF1 = false
 
     private lateinit var gridX: LinearLayout
     private lateinit var gridY: LinearLayout
@@ -65,6 +66,7 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         dialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
         val palette = (activity as? MainActivity)?.currentPalette() ?: NIGHT
+        isF1 = palette.accent == android.graphics.Color.parseColor("#E8002D")
         isVehicleMode = arguments?.getBoolean(ARG_IS_VEHICLE_MODE) ?: false
         val placementLabel = if (isVehicleMode) "Vehicle" else "Obstacle"
 
@@ -200,22 +202,22 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     private fun updateSelectionStyles(palette: Palette) {
         xButtons.forEachIndexed { index, button ->
             if (hasSelectedX && index == selectedX) {
-                button.background = box(requireContext(), palette.accent, palette.accent, 4f, 1f)
+                button.background = box(requireContext(), if (isF1) palette.surface else palette.accent, if (isF1) palette.accentBorder else palette.accent, 6f, 1f)
                 button.backgroundTintList = null
-                button.setTextColor(palette.surface2)
+                button.setTextColor(if (isF1) palette.accent else palette.surface2)
             } else {
-                button.background = box(requireContext(), palette.surface, palette.borderStrong, 4f, 1f)
+                button.background = box(requireContext(), palette.surface, palette.borderStrong, 6f, 1f)
                 button.backgroundTintList = null
                 button.setTextColor(palette.textMuted)
             }
         }
         yButtons.forEachIndexed { index, button ->
             if (hasSelectedY && index == selectedY) {
-                button.background = box(requireContext(), palette.accent, palette.accent, 4f, 1f)
+                button.background = box(requireContext(), if (isF1) palette.surface else palette.accent, if (isF1) palette.accentBorder else palette.accent, 6f, 1f)
                 button.backgroundTintList = null
-                button.setTextColor(palette.surface2)
+                button.setTextColor(if (isF1) palette.accent else palette.surface2)
             } else {
-                button.background = box(requireContext(), palette.surface, palette.borderStrong, 4f, 1f)
+                button.background = box(requireContext(), palette.surface, palette.borderStrong, 6f, 1f)
                 button.backgroundTintList = null
                 button.setTextColor(palette.textMuted)
             }
@@ -241,9 +243,9 @@ class PlaceObstacleDialogFragment : DialogFragment() {
 
     private fun updateDirectionButton(button: Button, direction: ObstacleData.Direction, palette: Palette) {
         if (hasSelectedDirection && selectedDirection == direction) {
-            button.background = box(requireContext(), palette.accent, palette.accent, 8f, 0f)
+            button.background = box(requireContext(), if (isF1) palette.surface else palette.accent, if (isF1) palette.accentBorder else palette.accent, 8f, 1f)
             button.backgroundTintList = null
-            button.setTextColor(palette.surface2)
+            button.setTextColor(if (isF1) palette.accent else palette.surface2)
         } else {
             button.background = box(requireContext(), palette.surface, palette.borderStrong, 8f, 1f)
             button.backgroundTintList = null
@@ -253,11 +255,18 @@ class PlaceObstacleDialogFragment : DialogFragment() {
 
     private fun updatePlaceButtonState(palette: Palette) {
         val canPlace = hasSelectedDirection && hasSelectedX && hasSelectedY
+        val isF1 = palette.accent == android.graphics.Color.parseColor("#E8002D")
         btnGo.isEnabled = canPlace
         if (canPlace) {
-            btnGo.background = box(requireContext(), palette.accent, palette.accent, 8f, 0f)
-            btnGo.backgroundTintList = null
-            btnGo.setTextColor(palette.surface2)
+            if (isF1) {
+                btnGo.background = box(requireContext(), palette.surface, palette.accentBorder, 8f, 1f)
+                btnGo.backgroundTintList = null
+                btnGo.setTextColor(palette.accent)
+            } else {
+                btnGo.background = box(requireContext(), palette.accent, palette.accent, 8f, 0f)
+                btnGo.backgroundTintList = null
+                btnGo.setTextColor(palette.surface2)
+            }
         } else {
             btnGo.background = box(requireContext(), palette.surface, palette.borderStrong, 8f, 1f)
             btnGo.backgroundTintList = null
