@@ -268,8 +268,10 @@ class PlaceObstacleDialogFragment : DialogFragment() {
     override fun onStart() {
         super.onStart()
         dialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        val maxWidthPx = (500 * resources.displayMetrics.density).toInt()
+        val desiredWidthPx = (resources.displayMetrics.widthPixels * 0.9).toInt()
         dialog?.window?.setLayout(
-            (resources.displayMetrics.widthPixels * 0.9).toInt(),
+            minOf(desiredWidthPx, maxWidthPx),
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
         Log.d("PlaceDialog", "Dialog width px: ${(resources.displayMetrics.widthPixels * 0.9).toInt()}")
