@@ -651,6 +651,10 @@ class MainActivity : AppCompatActivity() {
             gridMapObj.addGridMapSaved(loadedData)
         }
 
+        gridMapObj.setOnGridChangedListener {
+            snapshotGridToViewModel()
+        }
+
         sharedViewModel.newCoordinate.observe(this) { coordinate ->
             gridMapObj.addNewObstacleToGrid(coordinate.first.toInt(), coordinate.second.toInt())
         }
