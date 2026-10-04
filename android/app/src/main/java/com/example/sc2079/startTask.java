@@ -29,8 +29,8 @@ import com.example.sc2079.ui.ThemeAware;
 import com.example.sc2079.ui.ThemePaletteKt;
 
 public class startTask extends Fragment implements ThemeAware {
-    private ToggleButton startExplorationButton;
-    private ToggleButton startFastestButton;
+    private Button startExplorationButton;
+    private Button startFastestButton;
     private ToggleButton startStichButton;
     private Button viewSavedImagesButton;
     View addStartTaskView;
@@ -44,6 +44,9 @@ public class startTask extends Fragment implements ThemeAware {
     private int timerReflectOnText = 0;
     private Runnable timerRunnable;
     private View rootView;
+    private enum TaskState { IDLE, RUNNING, STOPPED }
+    private TaskState task1State = TaskState.IDLE;
+    private TaskState task2State = TaskState.IDLE;
 
 
     public startTask() {}
@@ -114,43 +117,57 @@ public class startTask extends Fragment implements ThemeAware {
                 timerHandler.postDelayed(this, 1000);
             }
         };
-        startExplorationButton.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View view) {
-                if (!startTraverseMap) {
+        startExplorationButton.setOnClickListener(v -> {
+            Palette p = (getActivity() instanceof MainActivity)
+                ? ((MainActivity) getActivity()).currentPalette()
+                : com.example.sc2079.ui.ThemePaletteKt.getNIGHT();
+            switch (task1State) {
+                case IDLE:
                     resolveGridMap().sendArenaDataBluetooth();
-                    // gridMap.sendBeginExplorationBluetooth();
                     startTraverseMap = true;
                     timerHandler.removeCallbacks(timerRunnable);
                     timerReflectOnText = 0;
                     timerHandler.postDelayed(timerRunnable, 1000);
-                } else {
+                    applyTask1State(TaskState.RUNNING, p);
+                    break;
+                case RUNNING:
                     startTraverseMap = false;
-                    timerReflectOnText = 0;
                     timerHandler.removeCallbacks(timerRunnable);
                     resolveGridMap().updateFINStatus(false);
-                }
+                    applyTask1State(TaskState.STOPPED, p);
+                    break;
+                case STOPPED:
+                    timerReflectOnText = 0;
+                    calculateObstacleTimerView.setText("00:00");
+                    applyTask1State(TaskState.IDLE, p);
+                    break;
             }
         });
 
-        startFastestButton.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View view){
-                if (!startFastestRound) {
+        startFastestButton.setOnClickListener(v -> {
+            Palette p = (getActivity() instanceof MainActivity)
+                ? ((MainActivity) getActivity()).currentPalette()
+                : com.example.sc2079.ui.ThemePaletteKt.getNIGHT();
+            switch (task2State) {
+                case IDLE:
                     resolveGridMap().sendArenaDataBluetooth();
-                    // gridMap.sendBeginExplorationBluetooth();
                     startFastestRound = true;
                     timerHandler.removeCallbacks(timerRunnable);
                     timerReflectOnText = 0;
                     timerHandler.postDelayed(timerRunnable, 1000);
-                } else{
+                    applyTask2State(TaskState.RUNNING, p);
+                    break;
+                case RUNNING:
                     startFastestRound = false;
-                    timerReflectOnText = 0;
                     timerHandler.removeCallbacks(timerRunnable);
                     resolveGridMap().updateFINStatus(false);
-                }
+                    applyTask2State(TaskState.STOPPED, p);
+                    break;
+                case STOPPED:
+                    timerReflectOnText = 0;
+                    fastestTimeTimerView.setText("00:00");
+                    applyTask2State(TaskState.IDLE, p);
+                    break;
             }
         });
 
@@ -185,6 +202,50 @@ public class startTask extends Fragment implements ThemeAware {
         return addStartTaskView;
     }
 
+    private void applyTask1State(TaskState state, Palette p) {
+        task1State = state;
+        Context ctx = rootView.getContext();
+        switch (state) {
+            case IDLE:
+                startExplorationButton.setText("TASK 1 START");
+                startExplorationButton.setBackground(ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
+                startExplorationButton.setTextColor(p.getAccent());
+                break;
+            case RUNNING:
+                startExplorationButton.setText("STOP");
+                startExplorationButton.setBackground(ThemePaletteKt.box(ctx, p.getRedDim(), p.getRedBorder(), 8f, 1f));
+                startExplorationButton.setTextColor(p.getRed());
+                break;
+            case STOPPED:
+                startExplorationButton.setText("RESET");
+                startExplorationButton.setBackground(ThemePaletteKt.box(ctx, p.getBorderStrong(), p.getBorderStrong(), 8f, 1f));
+                startExplorationButton.setTextColor(p.getTextMuted());
+                break;
+        }
+    }
+
+    private void applyTask2State(TaskState state, Palette p) {
+        task2State = state;
+        Context ctx = rootView.getContext();
+        switch (state) {
+            case IDLE:
+                startFastestButton.setText("TASK 2 START");
+                startFastestButton.setBackground(ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
+                startFastestButton.setTextColor(p.getAccent());
+                break;
+            case RUNNING:
+                startFastestButton.setText("STOP");
+                startFastestButton.setBackground(ThemePaletteKt.box(ctx, p.getRedDim(), p.getRedBorder(), 8f, 1f));
+                startFastestButton.setTextColor(p.getRed());
+                break;
+            case STOPPED:
+                startFastestButton.setText("RESET");
+                startFastestButton.setBackground(ThemePaletteKt.box(ctx, p.getBorderStrong(), p.getBorderStrong(), 8f, 1f));
+                startFastestButton.setTextColor(p.getTextMuted());
+                break;
+        }
+    }
+
     @Override
     public void applyTheme(Palette p) {
         if (rootView == null) return;
@@ -213,16 +274,8 @@ public class startTask extends Fragment implements ThemeAware {
             fastestTimeTimerView.setTextColor(p.getText());
         }
 
-        // Task 1 START/STOP toggle — accent colour
-        if (startExplorationButton != null) {
-            startExplorationButton.setBackground(ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
-            startExplorationButton.setTextColor(p.getAccent());
-        }
-        // Task 2 START/STOP toggle — accent colour
-        if (startFastestButton != null) {
-            startFastestButton.setBackground(ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
-            startFastestButton.setTextColor(p.getAccent());
-        }
+        if (startExplorationButton != null) applyTask1State(task1State, p);
+        if (startFastestButton != null) applyTask2State(task2State, p);
         // Stitch START/STOP toggle — pink colour
         if (startStichButton != null) {
             startStichButton.setBackground(ThemePaletteKt.box(ctx, p.getPinkDim(), p.getPinkBorder(), 8f, 1f));

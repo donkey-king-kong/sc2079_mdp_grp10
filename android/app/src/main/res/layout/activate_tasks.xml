@@ -40,13 +40,12 @@
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
-            <ToggleButton
+            <Button
                 android:id="@+id/beginExplorationButton"
                 android:layout_width="match_parent"
                 android:layout_height="36dp"
                 android:layout_marginTop="6dp"
-                android:textOff="TASK 1 START"
-                android:textOn="RESET"
+                android:text="TASK 1 START"
                 android:textSize="11sp"
                 android:fontFamily="@font/poppins_bold"
                 android:background="@drawable/rounded_status_background" />
@@ -83,13 +82,12 @@
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
-            <ToggleButton
+            <Button
                 android:id="@+id/beginFastestButton"
                 android:layout_width="match_parent"
                 android:layout_height="36dp"
                 android:layout_marginTop="6dp"
-                android:textOff="TASK 2 START"
-                android:textOn="RESET"
+                android:text="TASK 2 START"
                 android:textSize="11sp"
                 android:fontFamily="@font/poppins_bold"
                 android:background="@drawable/rounded_status_background" />
