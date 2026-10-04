@@ -18,16 +18,19 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 import java.util.ArrayList;
-import java.lang.Thread;
 import java.util.Locale;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
-public class startTask extends Fragment {
-    private ToggleButton startExplorationButton;
-    private ToggleButton startFastestButton;
+import com.example.sc2079.ui.Palette;
+import com.example.sc2079.ui.ThemeAware;
+import com.example.sc2079.ui.ThemePaletteKt;
+
+public class startTask extends Fragment implements ThemeAware {
+    private Button startExplorationButton;
+    private Button startFastestButton;
     private ToggleButton startStichButton;
     private Button viewSavedImagesButton;
     View addStartTaskView;
@@ -40,6 +43,10 @@ public class startTask extends Fragment {
     public static Handler timerHandler = new Handler(Looper.getMainLooper());
     private int timerReflectOnText = 0;
     private Runnable timerRunnable;
+    private View rootView;
+    private enum TaskState { IDLE, RUNNING, STOPPED }
+    private TaskState task1State = TaskState.IDLE;
+    private TaskState task2State = TaskState.IDLE;
 
 
     public startTask() {}
@@ -110,53 +117,57 @@ public class startTask extends Fragment {
                 timerHandler.postDelayed(this, 1000);
             }
         };
-        startExplorationButton.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View view) {
-                if (!startTraverseMap) {
+        startExplorationButton.setOnClickListener(v -> {
+            Palette p = (getActivity() instanceof MainActivity)
+                ? ((MainActivity) getActivity()).currentPalette()
+                : com.example.sc2079.ui.ThemePaletteKt.getNIGHT();
+            switch (task1State) {
+                case IDLE:
                     resolveGridMap().sendArenaDataBluetooth();
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    // gridMap.sendBeginExplorationBluetooth();
                     startTraverseMap = true;
                     timerHandler.removeCallbacks(timerRunnable);
                     timerReflectOnText = 0;
                     timerHandler.postDelayed(timerRunnable, 1000);
-                } else {
+                    applyTask1State(TaskState.RUNNING, p);
+                    break;
+                case RUNNING:
                     startTraverseMap = false;
-                    timerReflectOnText = 0;
                     timerHandler.removeCallbacks(timerRunnable);
                     resolveGridMap().updateFINStatus(false);
-                }
+                    applyTask1State(TaskState.STOPPED, p);
+                    break;
+                case STOPPED:
+                    timerReflectOnText = 0;
+                    calculateObstacleTimerView.setText("00:00");
+                    applyTask1State(TaskState.IDLE, p);
+                    break;
             }
         });
 
-        startFastestButton.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View view){
-                if (!startFastestRound) {
+        startFastestButton.setOnClickListener(v -> {
+            Palette p = (getActivity() instanceof MainActivity)
+                ? ((MainActivity) getActivity()).currentPalette()
+                : com.example.sc2079.ui.ThemePaletteKt.getNIGHT();
+            switch (task2State) {
+                case IDLE:
                     resolveGridMap().sendArenaDataBluetooth();
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    // gridMap.sendBeginExplorationBluetooth();
                     startFastestRound = true;
                     timerHandler.removeCallbacks(timerRunnable);
                     timerReflectOnText = 0;
                     timerHandler.postDelayed(timerRunnable, 1000);
-                } else{
+                    applyTask2State(TaskState.RUNNING, p);
+                    break;
+                case RUNNING:
                     startFastestRound = false;
-                    timerReflectOnText = 0;
                     timerHandler.removeCallbacks(timerRunnable);
                     resolveGridMap().updateFINStatus(false);
-                }
+                    applyTask2State(TaskState.STOPPED, p);
+                    break;
+                case STOPPED:
+                    timerReflectOnText = 0;
+                    fastestTimeTimerView.setText("00:00");
+                    applyTask2State(TaskState.IDLE, p);
+                    break;
             }
         });
 
@@ -167,11 +178,6 @@ public class startTask extends Fragment {
             public void onClick(View view){
             if (!startSendStich) {
                 resolveGridMap().sendStichSignalBluetooth();
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
                 // gridMap.sendBeginExplorationBluetooth();
                 startSendStich = true;
             }else{
@@ -188,7 +194,109 @@ public class startTask extends Fragment {
             }
         });
 
-            return addStartTaskView;
+        rootView = addStartTaskView;
+        if (getActivity() instanceof MainActivity) {
+            applyTheme(((MainActivity) getActivity()).currentPalette());
+        }
+
+        return addStartTaskView;
+    }
+
+    private void applyTask1State(TaskState state, Palette p) {
+        task1State = state;
+        Context ctx = rootView.getContext();
+        switch (state) {
+            case IDLE:
+                startExplorationButton.setText("TASK 1 START");
+                startExplorationButton.setBackground(ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
+                startExplorationButton.setTextColor(p.getAccent());
+                break;
+            case RUNNING:
+                startExplorationButton.setText("STOP");
+                startExplorationButton.setBackground(ThemePaletteKt.box(ctx, p.getRedDim(), p.getRedBorder(), 8f, 1f));
+                startExplorationButton.setTextColor(p.getRed());
+                break;
+            case STOPPED:
+                startExplorationButton.setText("RESET");
+                startExplorationButton.setBackground(ThemePaletteKt.box(ctx, p.getBorderStrong(), p.getBorderStrong(), 8f, 1f));
+                startExplorationButton.setTextColor(p.getTextMuted());
+                break;
+        }
+    }
+
+    private void applyTask2State(TaskState state, Palette p) {
+        task2State = state;
+        Context ctx = rootView.getContext();
+        switch (state) {
+            case IDLE:
+                startFastestButton.setText("TASK 2 START");
+                startFastestButton.setBackground(ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
+                startFastestButton.setTextColor(p.getAccent());
+                break;
+            case RUNNING:
+                startFastestButton.setText("STOP");
+                startFastestButton.setBackground(ThemePaletteKt.box(ctx, p.getRedDim(), p.getRedBorder(), 8f, 1f));
+                startFastestButton.setTextColor(p.getRed());
+                break;
+            case STOPPED:
+                startFastestButton.setText("RESET");
+                startFastestButton.setBackground(ThemePaletteKt.box(ctx, p.getBorderStrong(), p.getBorderStrong(), 8f, 1f));
+                startFastestButton.setTextColor(p.getTextMuted());
+                break;
+        }
+    }
+
+    @Override
+    public void applyTheme(Palette p) {
+        if (rootView == null) return;
+        Context ctx = rootView.getContext();
+
+        // Card backgrounds
+        android.view.View card1 = rootView.findViewById(R.id.card_task1);
+        android.view.View card2 = rootView.findViewById(R.id.card_task2);
+        android.view.View card3 = rootView.findViewById(R.id.card_stitch);
+        if (card1 != null) card1.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+        if (card2 != null) card2.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+        if (card3 != null) card3.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+
+        // Section label TextViews
+        android.widget.TextView lbl1 = rootView.findViewWithTag("lbl_task1");
+        android.widget.TextView lbl2 = rootView.findViewWithTag("lbl_task2");
+        android.widget.TextView lbl3 = rootView.findViewWithTag("lbl_stitch");
+
+        // Timer display boxes
+        if (calculateObstacleTimerView != null) {
+            calculateObstacleTimerView.setBackground(ThemePaletteKt.box(ctx, p.getBg(), p.getBorderStrong(), 8f, 1f));
+            calculateObstacleTimerView.setTextColor(p.getText());
+        }
+        if (fastestTimeTimerView != null) {
+            fastestTimeTimerView.setBackground(ThemePaletteKt.box(ctx, p.getBg(), p.getBorderStrong(), 8f, 1f));
+            fastestTimeTimerView.setTextColor(p.getText());
+        }
+
+        if (startExplorationButton != null) applyTask1State(task1State, p);
+        if (startFastestButton != null) applyTask2State(task2State, p);
+        // Stitch START/STOP toggle — pink colour
+        if (startStichButton != null) {
+            startStichButton.setBackground(ThemePaletteKt.box(ctx, p.getPinkDim(), p.getPinkBorder(), 8f, 1f));
+            startStichButton.setTextColor(p.getPink());
+        }
+        // View Saved Images button — green colour
+        if (viewSavedImagesButton != null) {
+            viewSavedImagesButton.setBackground(ThemePaletteKt.box(ctx, p.getGreenDim(), p.getGreenBorder(), 8f, 1f));
+            viewSavedImagesButton.setTextColor(p.getGreen());
+        }
+
+        // Section label TextViews — find by id after we add them in the XML change below
+        android.widget.TextView lblTask1 = rootView.findViewById(R.id.lbl_task1);
+        android.widget.TextView lblTask2 = rootView.findViewById(R.id.lbl_task2);
+        android.widget.TextView lblStitch = rootView.findViewById(R.id.lbl_stitch);
+        if (lblTask1 != null) lblTask1.setTextColor(p.getTextMuted());
+        if (lblTask2 != null) lblTask2.setTextColor(p.getTextMuted());
+        if (lblStitch != null) lblStitch.setTextColor(p.getTextMuted());
+
+        // ScrollView / root background
+        rootView.setBackgroundColor(p.getBg());
     }
 
     private void showSavedImagesDialog() {

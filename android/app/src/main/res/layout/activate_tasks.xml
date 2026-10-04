@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -12,19 +11,19 @@
 
         <!-- Task 1 card -->
         <LinearLayout
+            android:id="@+id/card_task1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_700"
             android:padding="10dp"
             android:layout_marginBottom="8dp">
 
             <TextView
+                android:id="@+id/lbl_task1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="TASK 1: Traverse Map"
-                android:textColor="#5A8AAA"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -36,42 +35,37 @@
                 android:layout_height="40dp"
                 android:layout_marginTop="4dp"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
                 android:gravity="center"
                 android:text="00:00"
-                android:textColor="@color/white"
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
-            <ToggleButton
+            <Button
                 android:id="@+id/beginExplorationButton"
                 android:layout_width="match_parent"
                 android:layout_height="36dp"
                 android:layout_marginTop="6dp"
-                android:textOff="TASK 1 START"
-                android:textOn="STOP"
+                android:text="TASK 1 START"
                 android:textSize="11sp"
-                android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#2563A8" />
+                android:background="@drawable/rounded_status_background" />
         </LinearLayout>
 
         <!-- Task 2 card -->
         <LinearLayout
+            android:id="@+id/card_task2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_700"
             android:padding="10dp"
             android:layout_marginBottom="8dp">
 
             <TextView
+                android:id="@+id/lbl_task2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="TASK 2: Fastest Round"
-                android:textColor="#5A8AAA"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -83,41 +77,36 @@
                 android:layout_height="40dp"
                 android:layout_marginTop="4dp"
                 android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#1A3A5C"
                 android:gravity="center"
                 android:text="00:00"
-                android:textColor="@color/white"
                 android:textSize="22sp"
                 android:fontFamily="@font/poppins_bold" />
 
-            <ToggleButton
+            <Button
                 android:id="@+id/beginFastestButton"
                 android:layout_width="match_parent"
                 android:layout_height="36dp"
                 android:layout_marginTop="6dp"
-                android:textOff="TASK 2 START"
-                android:textOn="STOP"
+                android:text="TASK 2 START"
                 android:textSize="11sp"
-                android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#2563A8" />
+                android:background="@drawable/rounded_status_background" />
         </LinearLayout>
 
         <!-- Stitch card -->
         <LinearLayout
+            android:id="@+id/card_stitch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/rounded_status_background"
-            android:backgroundTint="@color/dark_blue_700"
             android:padding="10dp">
 
             <TextView
+                android:id="@+id/lbl_stitch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="RETRIEVE STITCHED IMAGES"
-                android:textColor="#5A8AAA"
                 android:textSize="9sp"
                 android:letterSpacing="0.10"
                 android:fontFamily="@font/poppins_bold"
@@ -131,10 +120,8 @@
                 android:textOff="STITCH START"
                 android:textOn="STOP"
                 android:textSize="11sp"
-                android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#5A2D8A" />
+                android:background="@drawable/rounded_status_background" />
 
             <Button
                 android:id="@+id/viewSavedImagesButton"
@@ -143,10 +130,8 @@
                 android:layout_marginTop="6dp"
                 android:text="VIEW SAVED IMAGES"
                 android:textSize="11sp"
-                android:textColor="@color/white"
                 android:fontFamily="@font/poppins_bold"
-                android:background="@drawable/rounded_status_background"
-                android:backgroundTint="#2563A8" />
+                android:background="@drawable/rounded_status_background" />
         </LinearLayout>
 
     </LinearLayout>
