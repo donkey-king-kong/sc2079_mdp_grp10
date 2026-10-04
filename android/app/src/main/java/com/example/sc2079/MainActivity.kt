@@ -523,14 +523,6 @@ class MainActivity : AppCompatActivity() {
             checkBluetoothPermissionsAndState()
         }
 
-        sharedViewModel.newCoordinate.observe(this) { coordinate ->
-            gridMapObj.addNewObstacleToGrid(coordinate.first.toInt(), coordinate.second.toInt())
-        }
-
-        sharedViewModel.newObstacleRequest.observe(this) { request ->
-            gridMapObj.addNewObstacleToGridWithDirection(request.x, request.y, request.direction)
-            Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
-        }
 
         var autoActive = false
 
@@ -647,6 +639,27 @@ class MainActivity : AppCompatActivity() {
         gridMapObj.setGridColumns(20)
         gridMapObj.setGridRows(20)
         gridMapView.addView(gridMapObj)
+
+        val gridMapSnapshot = sharedViewModel.gridMapSnapshot
+        if (gridMapSnapshot != null) {
+            if (sharedViewModel.gridRows != null && sharedViewModel.gridCols != null) {
+                gridMapObj.setGridRows(sharedViewModel.gridRows!!)
+                gridMapObj.setGridColumns(sharedViewModel.gridCols!!)
+            }
+            val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
+            val loadedData: ArrayList<ArrayList<ObstacleData>> = Gson().fromJson(gridMapSnapshot, type)
+            gridMapObj.addGridMapSaved(loadedData)
+        }
+
+        sharedViewModel.newCoordinate.observe(this) { coordinate ->
+            gridMapObj.addNewObstacleToGrid(coordinate.first.toInt(), coordinate.second.toInt())
+        }
+
+        sharedViewModel.newObstacleRequest.observe(this) { request ->
+            gridMapObj.addNewObstacleToGridWithDirection(request.x, request.y, request.direction)
+            Toast.makeText(this, "Obstacle added at (${request.x}, ${request.y})", Toast.LENGTH_SHORT).show()
+        }
+
         setupGraphAxes(this, !isDayMode)
 
         // Grid size +/- buttons (min=5, max=20, square grid so cols==rows)
@@ -862,6 +875,14 @@ class MainActivity : AppCompatActivity() {
         yAxis.removeAllViews()
         xAxis.removeAllViews()
         setupGraphAxes(this, !isDayMode)
+    }
+
+    private fun snapshotGridToViewModel() {
+        val gson = Gson()
+        val json = gson.toJson(gridMapObj.returnGridMap())
+        sharedViewModel.gridMapSnapshot = json
+        sharedViewModel.gridRows = gridMapObj.getGridRows()
+        sharedViewModel.gridCols = gridMapObj.getGridColumns()
     }
 
     private fun saveGridMapData(gridMapData : ArrayList<ArrayList<ObstacleData>>) {

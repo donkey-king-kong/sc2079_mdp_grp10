@@ -9,4 +9,7 @@ data class ObstacleAddition(val x: Int, val y: Int, val direction: ObstacleData.
 class SharedViewModel : ViewModel() {
     val newCoordinate = MutableLiveData<Pair<Float, Float>>()
     val newObstacleRequest = MutableLiveData<ObstacleAddition>()
+    var gridMapSnapshot: String? = null
+    var gridRows: Int? = null
+    var gridCols: Int? = null
 }
