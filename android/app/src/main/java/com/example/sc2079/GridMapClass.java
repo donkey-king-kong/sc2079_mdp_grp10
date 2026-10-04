@@ -45,8 +45,11 @@ public class GridMapClass extends View {
     private Paint redPaint = new Paint();   // direction
     private Paint bluePaint = new Paint();  // robot center arrow
     private Paint textPaint = new Paint(); // Text color in box
+    private Paint gridLinePaint = new Paint(); // grid lines
     private Paint verifiedPaint = new Paint(); // Verified Status
     private Paint paintObstacleVerified = new Paint();
+    private int gridBackgroundColor = Color.parseColor("#7CFC00");
+    private android.graphics.Bitmap f1CarBitmap;
     private GestureDetector gestureDetector;
     private ArrayList<ArrayList<ObstacleData>> gridMapData = new ArrayList<>();
     private MaterialButton add_obstacle_button;
@@ -110,6 +113,9 @@ public class GridMapClass extends View {
         super(context, attrs);
         // Initalize painting data
         blackPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        blackPaint.setColor(Color.BLACK);
+        gridLinePaint.setStyle(Paint.Style.STROKE);
+        gridLinePaint.setColor(Color.BLACK);
         redPaint.setStyle(Paint.Style.STROKE);
         redPaint.setColor(Color.RED);
         redPaint.setStrokeWidth(6f);
@@ -127,6 +133,7 @@ public class GridMapClass extends View {
         verifiedPaint.setColor(Color.parseColor("#FFA500")); // Distinguishing Orange
         verifiedPaint.setStrokeWidth(15f); // Thick line
         paintObstacleVerified.setColor(Color.rgb(255, 165, 0));
+        f1CarBitmap = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.ic_f1_car);
         gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener(){
             @Override
             public boolean onDown(MotionEvent event){
@@ -392,6 +399,13 @@ public class GridMapClass extends View {
         invalidate();
     }
 
+    public void setGridTheme(int backgroundColor, int gridLineColor, int robotBodyColor) {
+        gridBackgroundColor = backgroundColor;
+        gridLinePaint.setColor(gridLineColor);
+        greenPaint.setColor(robotBodyColor);
+        invalidate();
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh){
         super.onSizeChanged(w, h, oldw, oldh);
@@ -400,17 +414,17 @@ public class GridMapClass extends View {
 
     @Override
     protected void onDraw(Canvas canvas){
-        canvas.drawColor(Color.parseColor("#7CFC00"));
+        canvas.drawColor(gridBackgroundColor);
         if (gridColumns == 0 || gridRows == 0) {
             return;
         }
 
         // Draw grid first
         for (int i = 0; i <= gridColumns; i++) {
-            canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), blackPaint);
+            canvas.drawLine(i * cellWidth, 0, i * cellWidth, getHeight(), gridLinePaint);
         }
         for (int j = 0; j <= gridRows; j++) {
-            canvas.drawLine(0, j * cellHeight, getWidth(), j * cellHeight, blackPaint);
+            canvas.drawLine(0, j * cellHeight, getWidth(), j * cellHeight, gridLinePaint);
         }
 
         for (int y = 0; y < gridRows; y++) {
@@ -532,14 +546,14 @@ public class GridMapClass extends View {
         float right = (x + 3) * cellWidth;
         float top = (gridRows - (y + 3)) * cellHeight;
 
-        // 1. Draw Green Body
+        // 1. Draw body fill (colour set per theme via setGridTheme)
         canvas.drawRect(left, top, right, bottom, greenPaint);
 
-        // 2. Draw Cyan Outline (neutral — direction shown by bar, not border color)
+        // 2. Draw bold white border to show car boundary
         Paint outlinePaint = new Paint();
         outlinePaint.setStyle(Paint.Style.STROKE);
-        outlinePaint.setStrokeWidth(6f);
-        outlinePaint.setColor(Color.parseColor("#26B5CB"));
+        outlinePaint.setStrokeWidth(4f);
+        outlinePaint.setColor(Color.parseColor("#CCFFFFFF"));
         outlinePaint.setAntiAlias(true);
         canvas.drawRect(left, top, right, bottom, outlinePaint);
 
@@ -562,12 +576,33 @@ public class GridMapClass extends View {
         // 4. Draw White Arrow in the center cell
         float centerX = left + 1.5f * cellWidth;
         float centerY = top + 1.5f * cellHeight;
-        float arrowSize = Math.min(cellWidth, cellHeight) * 0.8f;
 
-        Paint arrowPaint = new Paint();
-        arrowPaint.setColor(Color.WHITE);
-        arrowPaint.setAntiAlias(true);
-        drawArrow(canvas, centerX, centerY, arrowSize, robotData.getDirection(), arrowPaint);
+        if (f1CarBitmap != null) {
+            float carSize = Math.min(cellWidth, cellHeight) * 2.4f;
+            float carLeft = centerX - carSize / 2f;
+            float carTop = centerY - carSize / 2f;
+            android.graphics.RectF destRect = new android.graphics.RectF(carLeft, carTop, carLeft + carSize, carTop + carSize);
+
+            float degrees;
+            switch (robotData.getDirection()) {
+                case NORTH: degrees = 0f;   break;
+                case EAST:  degrees = 90f;  break;
+                case SOUTH: degrees = 180f; break;
+                case WEST:  degrees = 270f; break;
+                default:    degrees = 0f;   break;
+            }
+
+            canvas.save();
+            canvas.rotate(degrees, centerX, centerY);
+            canvas.drawBitmap(f1CarBitmap, null, destRect, null);
+            canvas.restore();
+        } else {
+            float arrowSize = Math.min(cellWidth, cellHeight) * 0.8f;
+            Paint arrowPaint = new Paint();
+            arrowPaint.setColor(Color.WHITE);
+            arrowPaint.setAntiAlias(true);
+            drawArrow(canvas, centerX, centerY, arrowSize, robotData.getDirection(), arrowPaint);
+        }
     }
 
     private void drawArrow(Canvas canvas, float cx, float cy, float size, ObstacleData.Direction direction, Paint paint) {
@@ -2281,4 +2316,3 @@ public class GridMapClass extends View {
         notifyGridChanged();
     }
 }
-

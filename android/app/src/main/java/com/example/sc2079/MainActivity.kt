@@ -48,9 +48,11 @@ import com.example.sc2079.ui.coordinates.SharedViewModel
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.sc2079.ui.DAY
+import com.example.sc2079.ui.F1
 import com.example.sc2079.ui.NIGHT
 import com.example.sc2079.ui.Palette
 import com.example.sc2079.ui.ThemeAware
+import com.example.sc2079.ui.ThemeMode
 import com.example.sc2079.ui.box
 import java.io.IOException
 
@@ -77,6 +79,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bluetoothStatus: ImageView
     private var activateJoyStickBool = false
     private var isDayMode = false
+    private var themeMode = ThemeMode.NIGHT
 
     private val sharedViewModel: SharedViewModel by viewModels()
 
@@ -158,7 +161,11 @@ class MainActivity : AppCompatActivity() {
         return isConnected
     }
 
-    fun currentPalette(): Palette = if (isDayMode) DAY else NIGHT
+    fun currentPalette(): Palette = when (themeMode) {
+        ThemeMode.DAY -> DAY
+        ThemeMode.NIGHT -> NIGHT
+        ThemeMode.F1 -> F1
+    }
 
     fun getMessageLog(): ArrayList<ChatLogEntry> {
         return sharedViewModel.messageLog
@@ -565,12 +572,24 @@ class MainActivity : AppCompatActivity() {
 
         // Load persisted theme preference (default: day mode)
         val uiPrefs = getSharedPreferences("ui_prefs", MODE_PRIVATE)
-        isDayMode = uiPrefs.getBoolean("day_mode", true)
+        themeMode = uiPrefs.getString("theme_mode", null)
+            ?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
+            ?: if (uiPrefs.getBoolean("day_mode", true)) ThemeMode.DAY else ThemeMode.NIGHT
+        isDayMode = themeMode == ThemeMode.DAY
 
-        fun applyTheme(day: Boolean) {
-            val p = if (day) DAY else NIGHT
-            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = day
-            btnThemeToggle.text = if (day) "🌙" else "☀"
+        fun applyTheme(mode: ThemeMode) {
+            val p = when (mode) {
+                ThemeMode.DAY -> DAY
+                ThemeMode.NIGHT -> NIGHT
+                ThemeMode.F1 -> F1
+            }
+            isDayMode = mode == ThemeMode.DAY
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = mode == ThemeMode.DAY
+            btnThemeToggle.text = when (mode) {
+                ThemeMode.DAY -> "🌙"
+                ThemeMode.NIGHT -> "F1"
+                ThemeMode.F1 -> "☀"
+            }
             // Container backgrounds
             rootContainer.setBackgroundColor(p.panel)
             headerRow.setBackgroundColor(p.panel)
@@ -578,6 +597,38 @@ class MainActivity : AppCompatActivity() {
             rightPanel.setBackgroundColor(p.panel)
             subNavContainer.setBackgroundColor(p.panel)
             gridArea.setBackgroundColor(p.bg)
+            val headerDivider = findViewById<android.view.View>(R.id.divider_header)
+            if (mode == ThemeMode.F1) {
+                headerDivider?.setBackgroundColor(android.graphics.Color.parseColor("#E8002D"))
+                headerDivider?.layoutParams?.height = android.util.TypedValue.applyDimension(
+                    android.util.TypedValue.COMPLEX_UNIT_DIP, 2f, resources.displayMetrics).toInt()
+            } else {
+                headerDivider?.setBackgroundColor(if (mode == ThemeMode.DAY) android.graphics.Color.parseColor("#33000000") else android.graphics.Color.parseColor("#1FFFFFFF"))
+                headerDivider?.layoutParams?.height = android.util.TypedValue.applyDimension(
+                    android.util.TypedValue.COMPLEX_UNIT_DIP, 1f, resources.displayMetrics).toInt()
+            }
+            headerDivider?.requestLayout()
+            val gridColors = when (mode) {
+                ThemeMode.F1    -> Triple(
+                    android.graphics.Color.parseColor("#080808"),
+                    android.graphics.Color.parseColor("#FFFFFF"),
+                    android.graphics.Color.parseColor("#2A2A2A")
+                )
+                ThemeMode.DAY   -> Triple(
+                    android.graphics.Color.parseColor("#B8C8B8"),
+                    android.graphics.Color.parseColor("#80000000"),
+                    android.graphics.Color.parseColor("#7A9A7A")
+                )
+                ThemeMode.NIGHT -> Triple(
+                    android.graphics.Color.parseColor("#111A11"),
+                    android.graphics.Color.parseColor("#3DFFFFFF"),
+                    android.graphics.Color.parseColor("#1E3A1E")
+                )
+            }
+            gridArea.setBackgroundColor(gridColors.first)
+            if (::gridMapObj.isInitialized) {
+                gridMapObj.setGridTheme(gridColors.first, gridColors.second, gridColors.third)
+            }
             // coordCard as rounded box
             coordCard.background = box(this, p.surface2, p.borderStrong, 6f)
             coordCard.backgroundTintList = null
@@ -595,24 +646,28 @@ class MainActivity : AppCompatActivity() {
             btnBluetooth.background = box(this, p.surface2, p.borderStrong, 8f)
             btnBluetooth.backgroundTintList = null
             // Grid size controls
-            btnGridMinus.background = box(this, p.surface2, p.borderStrong, 8f)
+            val btnRadius = if (mode == ThemeMode.F1) 4f else 8f
+            val btnFill = if (mode == ThemeMode.F1) p.bg else p.surface2
+            val btnStroke = if (mode == ThemeMode.F1) p.accentBorder else p.borderStrong
+            val btnTextColor = if (mode == ThemeMode.F1) p.text else p.text
+            btnGridMinus.background = box(this, btnFill, btnStroke, btnRadius)
             btnGridMinus.backgroundTintList = null
-            btnGridMinus.setTextColor(p.text)
-            btnGridPlus.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnGridMinus.setTextColor(btnTextColor)
+            btnGridPlus.background = box(this, btnFill, btnStroke, btnRadius)
             btnGridPlus.backgroundTintList = null
-            btnGridPlus.setTextColor(p.text)
-            txtGridSize.setTextColor(p.text)
+            btnGridPlus.setTextColor(btnTextColor)
+            txtGridSize.setTextColor(btnTextColor)
             txtGridSizeLabel.setTextColor(p.textMuted)
             // Map action buttons
-            btnReset.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnReset.background = box(this, btnFill, btnStroke, btnRadius)
             btnReset.backgroundTintList = null
-            btnReset.setTextColor(p.text)
-            saveGridMapButton.background = box(this, p.surface2, p.borderStrong, 8f)
+            btnReset.setTextColor(btnTextColor)
+            saveGridMapButton.background = box(this, btnFill, btnStroke, btnRadius)
             saveGridMapButton.backgroundTintList = null
-            saveGridMapButton.setTextColor(p.text)
-            loadGridMapButton.background = box(this, p.surface2, p.borderStrong, 8f)
+            saveGridMapButton.setTextColor(btnTextColor)
+            loadGridMapButton.background = box(this, btnFill, btnStroke, btnRadius)
             loadGridMapButton.backgroundTintList = null
-            loadGridMapButton.setTextColor(p.text)
+            loadGridMapButton.setTextColor(btnTextColor)
             // Tabs
             tabs.setBackgroundColor(p.panel)
             tabs.setSelectedTabIndicatorColor(p.accent)
@@ -626,7 +681,7 @@ class MainActivity : AppCompatActivity() {
             )
             tabs.setTabIconTint(tabIconTint)
             // Axis numbers
-            updateAxisTextColor(!day)
+            updateAxisTextColor(mode != ThemeMode.DAY)
             // Dispatch to ThemeAware fragments
             supportFragmentManager.fragments.forEach { frag ->
                 if (frag is ThemeAware) frag.applyTheme(p)
@@ -634,9 +689,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnThemeToggle.setOnClickListener {
-            isDayMode = !isDayMode
-            uiPrefs.edit().putBoolean("day_mode", isDayMode).apply()
-            applyTheme(isDayMode)
+            themeMode = when (themeMode) {
+                ThemeMode.DAY -> ThemeMode.NIGHT
+                ThemeMode.NIGHT -> ThemeMode.F1
+                ThemeMode.F1 -> ThemeMode.DAY
+            }
+            isDayMode = themeMode == ThemeMode.DAY
+            uiPrefs.edit()
+                .putString("theme_mode", themeMode.name)
+                .putBoolean("day_mode", isDayMode)
+                .apply()
+            applyTheme(themeMode)
         }
 
         // Initializes gridmap
@@ -715,7 +778,7 @@ class MainActivity : AppCompatActivity() {
         tabs.getTabAt(2)?.setIcon(R.drawable.ic_dashboard_black_24dp)
 
         // Apply persisted theme on startup
-        applyTheme(isDayMode)
+        applyTheme(themeMode)
 
         // Bind to BluetoothService here so rotation (onStop/onStart) does not unbind it
         Intent(this, BluetoothService::class.java).also { intent ->

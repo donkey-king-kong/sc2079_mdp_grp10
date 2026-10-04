@@ -4,6 +4,15 @@ import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -246,6 +255,61 @@ public class startTask extends Fragment implements ThemeAware {
         }
     }
 
+    private Drawable f1CardDrawable(Context ctx, Palette p) {
+        float radius = android.util.TypedValue.applyDimension(
+            android.util.TypedValue.COMPLEX_UNIT_DIP, 8f, ctx.getResources().getDisplayMetrics());
+        float barWidth = android.util.TypedValue.applyDimension(
+            android.util.TypedValue.COMPLEX_UNIT_DIP, 3f, ctx.getResources().getDisplayMetrics());
+        int accent = Color.parseColor("#E8002D");
+
+        return new Drawable() {
+            private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint barPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Path clipPath = new Path();
+            private final RectF rect = new RectF();
+
+            {
+                bgPaint.setStyle(Paint.Style.FILL);
+                bgPaint.setColor(p.getPanel());
+                barPaint.setStyle(Paint.Style.FILL);
+                barPaint.setColor(accent);
+            }
+
+            @Override
+            public void draw(Canvas canvas) {
+                Rect bounds = getBounds();
+                rect.set(bounds);
+                clipPath.reset();
+                clipPath.addRoundRect(rect, radius, radius, Path.Direction.CW);
+
+                int save = canvas.save();
+                canvas.clipPath(clipPath);
+                canvas.drawRoundRect(rect, radius, radius, bgPaint);
+                canvas.drawRect(bounds.left, bounds.top, bounds.left + barWidth, bounds.bottom, barPaint);
+                canvas.restoreToCount(save);
+            }
+
+            @Override
+            public void setAlpha(int alpha) {
+                bgPaint.setAlpha(alpha);
+                barPaint.setAlpha(alpha);
+                invalidateSelf();
+            }
+
+            @Override
+            public void setColorFilter(@Nullable ColorFilter colorFilter) {
+                bgPaint.setColorFilter(colorFilter);
+                barPaint.setColorFilter(colorFilter);
+                invalidateSelf();
+            }
+
+            @Override
+            public int getOpacity() {
+                return PixelFormat.TRANSLUCENT;
+            }
+        };
+    }
+
     @Override
     public void applyTheme(Palette p) {
         if (rootView == null) return;
@@ -255,9 +319,28 @@ public class startTask extends Fragment implements ThemeAware {
         android.view.View card1 = rootView.findViewById(R.id.card_task1);
         android.view.View card2 = rootView.findViewById(R.id.card_task2);
         android.view.View card3 = rootView.findViewById(R.id.card_stitch);
-        if (card1 != null) card1.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
-        if (card2 != null) card2.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
-        if (card3 != null) card3.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+        boolean isF1 = (p.getAccent() == Color.parseColor("#E8002D"));
+        if (card1 != null) {
+            if (isF1) {
+                card1.setBackground(f1CardDrawable(ctx, p));
+            } else {
+                card1.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+            }
+        }
+        if (card2 != null) {
+            if (isF1) {
+                card2.setBackground(f1CardDrawable(ctx, p));
+            } else {
+                card2.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+            }
+        }
+        if (card3 != null) {
+            if (isF1) {
+                card3.setBackground(f1CardDrawable(ctx, p));
+            } else {
+                card3.setBackground(ThemePaletteKt.box(ctx, p.getPanel(), p.getBorderStrong(), 12f, 1f));
+            }
+        }
 
         // Section label TextViews
         android.widget.TextView lbl1 = rootView.findViewWithTag("lbl_task1");

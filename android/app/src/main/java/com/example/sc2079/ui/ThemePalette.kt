@@ -29,6 +29,12 @@ data class Palette(
     val greenBorder: Int
 )
 
+enum class ThemeMode {
+    DAY,
+    NIGHT,
+    F1
+}
+
 val DAY = Palette(
     bg           = Color.parseColor("#C8CDD4"),
     panel        = Color.parseColor("#E8EAED"),
@@ -72,6 +78,30 @@ val NIGHT = Palette(
     red          = Color.parseColor("#E05252"),
     redDim       = Color.parseColor("#26E05252"),
     redBorder    = Color.parseColor("#80E05252"),
+    green        = Color.parseColor("#3DBA6E"),
+    greenDim     = Color.parseColor("#263DBA6E"),
+    greenBorder  = Color.parseColor("#803DBA6E")
+)
+
+val F1 = Palette(
+    bg           = Color.parseColor("#060606"),
+    panel        = Color.parseColor("#0E0E0E"),
+    surface      = Color.parseColor("#161616"),
+    surface2     = Color.parseColor("#1E1E1E"),
+    text         = Color.parseColor("#F4F4F4"),
+    textMuted    = Color.parseColor("#B8B8B8"),
+    textDim      = Color.parseColor("#777777"),
+    border       = Color.parseColor("#2A2A2A"),
+    borderStrong = Color.parseColor("#3A3A3A"),
+    accent       = Color.parseColor("#E8002D"),
+    accentDim    = Color.parseColor("#26E8002D"),
+    accentBorder = Color.parseColor("#80E8002D"),
+    pink         = Color.parseColor("#E8002D"),
+    pinkDim      = Color.parseColor("#26E8002D"),
+    pinkBorder   = Color.parseColor("#80E8002D"),
+    red          = Color.parseColor("#E8002D"),
+    redDim       = Color.parseColor("#26E8002D"),
+    redBorder    = Color.parseColor("#80E8002D"),
     green        = Color.parseColor("#3DBA6E"),
     greenDim     = Color.parseColor("#263DBA6E"),
     greenBorder  = Color.parseColor("#803DBA6E")

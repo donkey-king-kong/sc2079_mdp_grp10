@@ -277,31 +277,41 @@ public class AddObstacle extends Fragment implements ThemeAware {
 
     private void updateButtonState(){
         Palette p = currentPalette;
+        if (p == null) return;
+        boolean isF1 = (p.getAccent() == android.graphics.Color.parseColor("#E8002D"));
         boolean vehicleActive   = addStartingPointButton.getId() == currentSelectedButtonId;
         boolean obstacleActive  = addObstacleToggle.getId()      == currentSelectedButtonId;
         boolean removeActive    = removeButton.getId()            == currentSelectedButtonId;
         GridMapClass activeGridMap = resolveGridMap();
 
-        // MaterialButtonToggleGroup requires children to keep their MaterialShapeDrawable
-        // background — setBackground() breaks it. Use tint + strokeColor instead.
+        int inactiveBg     = isF1 ? p.getBg()          : p.getSurface2();
+        int inactiveStroke = isF1 ? p.getBorderStrong() : p.getBorderStrong();
+        int activeVehicleBg     = isF1 ? p.getAccentDim() : p.getAccentDim();
+        int activeVehicleStroke = isF1 ? p.getAccentBorder() : p.getAccentBorder();
+        int activeObstacleBg     = isF1 ? p.getAccentDim() : p.getPinkDim();
+        int activeObstacleStroke = isF1 ? p.getAccentBorder() : p.getPinkBorder();
+        int activeRemoveBg     = isF1 ? p.getAccentDim() : p.getRedDim();
+        int activeRemoveStroke = isF1 ? p.getAccentBorder() : p.getRedBorder();
+
         addStartingPointButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-            vehicleActive ? p.getAccentDim() : p.getSurface2()));
+            vehicleActive ? activeVehicleBg : inactiveBg));
         addStartingPointButton.setStrokeColor(android.content.res.ColorStateList.valueOf(
-            vehicleActive ? p.getAccentBorder() : p.getBorderStrong()));
+            vehicleActive ? activeVehicleStroke : inactiveStroke));
 
         addObstacleToggle.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-            obstacleActive ? p.getPinkDim() : p.getSurface2()));
+            obstacleActive ? activeObstacleBg : inactiveBg));
         addObstacleToggle.setStrokeColor(android.content.res.ColorStateList.valueOf(
-            obstacleActive ? p.getPinkBorder() : p.getBorderStrong()));
+            obstacleActive ? activeObstacleStroke : inactiveStroke));
 
         removeButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-            removeActive ? p.getRedDim() : p.getSurface2()));
+            removeActive ? activeRemoveBg : inactiveBg));
         removeButton.setStrokeColor(android.content.res.ColorStateList.valueOf(
-            removeActive ? p.getRedBorder() : p.getBorderStrong()));
+            removeActive ? activeRemoveStroke : inactiveStroke));
 
-        int vehicleTextColor  = vehicleActive  ? p.getAccent()    : p.getTextMuted();
-        int obstacleTextColor = obstacleActive ? p.getPink()      : p.getTextMuted();
-        int removeTextColor   = removeActive   ? p.getRed()       : p.getTextMuted();
+        boolean isLight = (p.getAccent() == android.graphics.Color.parseColor("#1A3ECF"));
+        int vehicleTextColor  = vehicleActive  ? (isLight ? p.getAccent() : android.graphics.Color.WHITE) : p.getTextMuted();
+        int obstacleTextColor = obstacleActive ? (isLight ? p.getPink()   : android.graphics.Color.WHITE) : p.getTextMuted();
+        int removeTextColor   = removeActive   ? (isLight ? p.getRed()    : android.graphics.Color.WHITE) : p.getTextMuted();
 
         addStartingPointButton.setTextColor(vehicleTextColor);
         addObstacleToggle.setTextColor(obstacleTextColor);
@@ -314,10 +324,7 @@ public class AddObstacle extends Fragment implements ThemeAware {
         addObstacleToggle.setIconTint(obstacleIconTint);
         removeButton.setIconTint(removeIconTint);
 
-        if (activeGridMap == null) {
-            return;
-        }
-
+        if (activeGridMap == null) return;
         if (vehicleActive) {
             activeGridMap.setGridMode(GridMapClass.GridMode.ADD_VEHICLE);
         } else if (obstacleActive) {
@@ -427,12 +434,17 @@ public class AddObstacle extends Fragment implements ThemeAware {
         }
 
         // Action buttons
+        boolean isF1 = (p.getAccent() == android.graphics.Color.parseColor("#E8002D"));
         if (cancelButton != null) {
-            cancelButton.setBackground(ThemePaletteKt.box(ctx, p.getRedDim(), p.getRedBorder(), 8f, 2f));
+            cancelButton.setBackground(ThemePaletteKt.box(ctx,
+                isF1 ? p.getBg() : p.getRedDim(),
+                p.getRedBorder(), 8f, 2f));
             cancelButton.setTextColor(p.getRed());
         }
         if (addObstacleButton != null) {
-            addObstacleButton.setBackground(ThemePaletteKt.box(ctx, p.getGreenDim(), p.getGreenBorder(), 8f, 2f));
+            addObstacleButton.setBackground(ThemePaletteKt.box(ctx,
+                isF1 ? p.getBg() : p.getGreenDim(),
+                p.getGreenBorder(), 8f, 2f));
             addObstacleButton.setTextColor(p.getGreen());
         }
 
