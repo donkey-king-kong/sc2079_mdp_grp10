@@ -204,6 +204,27 @@ public class startTask extends Fragment implements ThemeAware {
         });
 
         rootView = addStartTaskView;
+
+        if (savedInstanceState != null) {
+            task1State = TaskState.valueOf(savedInstanceState.getString("task1State", TaskState.IDLE.name()));
+            task2State = TaskState.valueOf(savedInstanceState.getString("task2State", TaskState.IDLE.name()));
+            timerReflectOnText = savedInstanceState.getInt("timerReflectOnText", 0);
+            startTraverseMap = savedInstanceState.getBoolean("startTraverseMap", false);
+            startFastestRound = savedInstanceState.getBoolean("startFastestRound", false);
+
+            if (startTraverseMap || startFastestRound) {
+                timerHandler.removeCallbacks(timerRunnable);
+                timerHandler.postDelayed(timerRunnable, 1000);
+            }
+
+            // Restore timer display text
+            int minutes = timerReflectOnText / 60;
+            int seconds = timerReflectOnText % 60;
+            String time = String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds);
+            if (calculateObstacleTimerView != null) calculateObstacleTimerView.setText(time);
+            if (fastestTimeTimerView != null) fastestTimeTimerView.setText(time);
+        }
+
         if (getActivity() instanceof MainActivity) {
             applyTheme(((MainActivity) getActivity()).currentPalette());
         }
@@ -217,6 +238,16 @@ public class startTask extends Fragment implements ThemeAware {
         timerHandler.removeCallbacks(timerRunnable);
         calculateObstacleTimerView = null;
         fastestTimeTimerView = null;
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString("task1State", task1State.name());
+        outState.putString("task2State", task2State.name());
+        outState.putInt("timerReflectOnText", timerReflectOnText);
+        outState.putBoolean("startTraverseMap", startTraverseMap);
+        outState.putBoolean("startFastestRound", startFastestRound);
     }
 
     private void applyTask1State(TaskState state, Palette p) {

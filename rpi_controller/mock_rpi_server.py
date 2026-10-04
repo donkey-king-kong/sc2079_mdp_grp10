@@ -200,6 +200,8 @@ def show_menu_and_handle_choice(
         send_stitched_image(conn, lock, image_dir)
     elif choice == "4":
         message = input("Raw string to send: ")
+        if not message.endswith("\n"):
+            message += "\n"
         send(conn, lock, message)
     elif choice == "5":
         return

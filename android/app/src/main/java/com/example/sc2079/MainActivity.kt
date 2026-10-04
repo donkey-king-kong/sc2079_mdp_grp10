@@ -298,10 +298,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            if(iterationHowMany == -1){
-                logIncoming(text)
-            }
-
             if(text.contains("stitch-image")) {
                 val status = gridMapObj.receiveStichImageMessageBluetooth(text);
                 when (status) {
@@ -370,12 +366,13 @@ class MainActivity : AppCompatActivity() {
                         if (iterationHowMany < 0) return // Wait for a start marker.
                         base64Data.append(status)  // add chunk
                         iterationHowMany += 1
-                        logSystem("Running data compilation iteration $iterationHowMany")
                         Log.d("Image Chunk", "Added chunk length=${status.length}, total=${base64Data.length}")
 
                     }
                 }
                 return
+            } else if(iterationHowMany == -1){
+                logIncoming(text)
             }
 
 
