@@ -15,6 +15,7 @@
         android:layout_marginBottom="8dp">
 
         <TextView
+            android:id="@+id/messageLogHeader"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -42,23 +43,19 @@
     </LinearLayout>
 
     <!-- Message log -->
-    <TextView
-        android:id="@+id/messageBlock"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/messageRecycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="10dp"
-        android:gravity="bottom"
-        android:scrollbars="vertical"
-        android:textSize="11sp"
-        android:textColor="@color/ds_text"
-        android:fontFamily="@font/poppins_regular"
+        android:clipToPadding="false"
+        android:padding="6dp"
         android:background="@drawable/btn_input_field"
-        android:isScrollContainer="true"
         android:layout_marginBottom="8dp" />
 
     <!-- Input row -->
     <LinearLayout
+        android:id="@+id/inputRow"
         android:layout_width="match_parent"
         android:layout_height="42dp"
         android:orientation="horizontal"

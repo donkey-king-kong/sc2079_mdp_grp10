@@ -1,18 +1,7 @@
 package com.example.sc2079;
 
-import android.content.BroadcastReceiver;
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.ServiceConnection;
 import android.os.Bundle;
-import android.os.IBinder;
-import android.graphics.Color;
-import android.text.method.ScrollingMovementMethod;
-import android.text.SpannableStringBuilder;
-import android.text.Spannable;
-import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,17 +9,21 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
-import android.widget.TextView;
+import android.widget.LinearLayout;
 
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.sc2079.service.BluetoothService;
+import com.example.sc2079.ui.Palette;
+import com.example.sc2079.ui.ThemeAware;
+import com.example.sc2079.ui.ThemePaletteKt;
 
 import java.nio.charset.StandardCharsets;
 
-public class commsToRobot extends Fragment implements MainActivity.MessageListener {
+public class commsToRobot extends Fragment implements MainActivity.MessageListener, ThemeAware {
     View addCommsView;
 
     //private BluetoothService btService;
@@ -39,7 +32,11 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
     private EditText input;
     private ImageButton sendBtn;
     private Button clearLogButton;
-    private TextView chatView;
+    private RecyclerView messageRecycler;
+    private ChatAdapter chatAdapter;
+    private View rootView;
+    private android.widget.TextView headerText;
+    private LinearLayout inputRow;
     private GridMapClass gridMap;
 
     // Moved bluetooth logic to MainActivity, no need to bound bluetooth to this fragment
@@ -125,14 +122,12 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
     public void onResume() {
         super.onResume();
         //lbm.registerReceiver(msgReceiver, new IntentFilter(BluetoothService.ACTION_MESSAGE));
-        super.onResume();
         MainActivity activity = (MainActivity) requireActivity();
         if (activity != null) {
             // First, get the entire message history and display it
-            chatView.setText(""); // Clear existing messages
-            for (MainActivity.ChatLogEntry entry : activity.getMessageLog()) {
-                appendEntry(entry);
-            }
+            chatAdapter.clearEntries();
+            chatAdapter.setEntries(activity.getMessageLog());
+            scrollToBottom();
             // Second, register this Fragment as the listener for new messages
             activity.setMessageListener(this);
         }
@@ -142,7 +137,6 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
     public void onPause() {
         super.onPause();
         //LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(msgReceiver);
-        super.onPause();
         MainActivity activity = (MainActivity) requireActivity();
         if (activity != null) {
             // Unregister the listener to prevent memory leaks and unnecessary updates
@@ -153,68 +147,25 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
     @Override
     public void onNewMessage(MainActivity.ChatLogEntry entry) {
         if (isAdded()) {
-            requireActivity().runOnUiThread(() -> appendEntry(entry));
-        }
-    }
-
-    private void appendEntry(MainActivity.ChatLogEntry entry) {
-        String timeStr = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
-                .format(new java.util.Date(entry.getTimestamp()));
-
-        SpannableStringBuilder sb = new SpannableStringBuilder();
-
-        // Timestamp prefix
-        String tsStr = "[" + timeStr + "] ";
-        sb.append(tsStr);
-        sb.setSpan(
-                new ForegroundColorSpan(Color.parseColor("#888888")),
-                0, tsStr.length(),
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-        );
-
-        // Message body
-        String body;
-        int bodyColor;
-
-        switch (entry.getType()) {
-            case OUTGOING:
-                body = "Me: " + entry.getMessage() + "\n";
-                bodyColor = Color.parseColor("#378ADD");
-                break;
-            case SYSTEM:
-                body = "• " + entry.getMessage() + "\n";
-                bodyColor = Color.parseColor("#BA7517");
-                break;
-            default: // INCOMING
-                body = "Robot: " + entry.getMessage() + "\n";
-                bodyColor = Color.parseColor("#3B6D11");
-                break;
-        }
-
-        int start = sb.length();
-        sb.append(body);
-        sb.setSpan(
-                new ForegroundColorSpan(bodyColor),
-                start, sb.length(),
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-        );
-
-        chatView.append(sb);
-
-        // Auto-scroll
-        final android.text.Layout layout = chatView.getLayout();
-        if (layout != null) {
-            int scrollDelta = layout.getLineBottom(chatView.getLineCount() - 1)
-                    - chatView.getScrollY() - chatView.getHeight();
-            if (scrollDelta > 0) chatView.scrollBy(0, scrollDelta);
+            requireActivity().runOnUiThread(() -> {
+                chatAdapter.addEntry(entry);
+                scrollToBottom();
+            });
         }
     }
 
     public void onLogCleared() {
         if (isAdded()) {
             requireActivity().runOnUiThread(() -> {
-                chatView.setText("");
+                chatAdapter.clearEntries();
             });
+        }
+    }
+
+    private void scrollToBottom() {
+        int lastPosition = chatAdapter.getItemCount() - 1;
+        if (lastPosition >= 0) {
+            messageRecycler.scrollToPosition(lastPosition);
         }
     }
 
@@ -223,12 +174,19 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         Log.d("onCreateView Function in AddObstacle", "Entering onCreateView");
         addCommsView = inflater.inflate(R.layout.comms_to_robot, container, false);
+        rootView = addCommsView;
+        headerText = addCommsView.findViewById(R.id.messageLogHeader);
+        inputRow = addCommsView.findViewById(R.id.inputRow);
 
         input = addCommsView.findViewById(R.id.typeBoxEditText);
         sendBtn = addCommsView.findViewById(R.id.messageButton);
         clearLogButton = addCommsView.findViewById(R.id.clearLogButton);
-        chatView = addCommsView.findViewById(R.id.messageBlock);
-        chatView.setMovementMethod(new ScrollingMovementMethod());
+        messageRecycler = addCommsView.findViewById(R.id.messageRecycler);
+        chatAdapter = new ChatAdapter();
+        LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext());
+        layoutManager.setStackFromEnd(true);
+        messageRecycler.setLayoutManager(layoutManager);
+        messageRecycler.setAdapter(chatAdapter);
 
         clearLogButton.setOnClickListener(v -> {
             MainActivity activity = (MainActivity) requireActivity();
@@ -273,8 +231,40 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
                 }
             });
 
+        if (getActivity() instanceof MainActivity) {
+            applyTheme(((MainActivity) getActivity()).currentPalette());
+        }
+
         return addCommsView;
     }
 
-}
+    @Override
+    public void applyTheme(Palette p) {
+        if (rootView == null) return;
+        Context ctx = rootView.getContext();
 
+        rootView.setBackgroundColor(p.getPanel());
+        if (headerText != null)
+            headerText.setTextColor(p.getTextMuted());
+        if (messageRecycler != null)
+            messageRecycler.setBackground(
+                ThemePaletteKt.box(ctx, p.getBg(), p.getBorderStrong(), 8f, 1f));
+        if (inputRow != null)
+            inputRow.setBackground(
+                ThemePaletteKt.box(ctx, p.getBg(), p.getBorderStrong(), 8f, 1f));
+        if (input != null) {
+            input.setTextColor(p.getText());
+            input.setHintTextColor(p.getTextDim());
+        }
+        if (clearLogButton != null) {
+            clearLogButton.setTextColor(p.getRed());
+            clearLogButton.setBackground(
+                ThemePaletteKt.box(ctx, p.getRedDim(), p.getRedBorder(), 8f, 1f));
+        }
+        if (sendBtn != null) {
+            sendBtn.setBackground(
+                ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
+        }
+    }
+
+}
