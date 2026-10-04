@@ -8,7 +8,11 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.graphics.Color;
 import android.text.method.ScrollingMovementMethod;
+import android.text.SpannableStringBuilder;
+import android.text.Spannable;
+import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -126,8 +130,8 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
         if (activity != null) {
             // First, get the entire message history and display it
             chatView.setText(""); // Clear existing messages
-            for (String message : activity.getMessageLog()) {
-                chatView.append(message);
+            for (MainActivity.ChatLogEntry entry : activity.getMessageLog()) {
+                appendEntry(entry);
             }
             // Second, register this Fragment as the listener for new messages
             activity.setMessageListener(this);
@@ -147,14 +151,62 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
     }
 
     @Override
-    public void onNewMessage(String message) {
-        if (isAdded()) { // Check if the fragment is currently attached to the activity
-            // Use runOnUiThread to ensure UI updates are on the main thread
-            requireActivity().runOnUiThread(() -> {
-                chatView.append(message);
-                // Optional: Auto-scroll to the bottom of the chat view
-                // chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-            });
+    public void onNewMessage(MainActivity.ChatLogEntry entry) {
+        if (isAdded()) {
+            requireActivity().runOnUiThread(() -> appendEntry(entry));
+        }
+    }
+
+    private void appendEntry(MainActivity.ChatLogEntry entry) {
+        String timeStr = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                .format(new java.util.Date(entry.getTimestamp()));
+
+        SpannableStringBuilder sb = new SpannableStringBuilder();
+
+        // Timestamp prefix
+        String tsStr = "[" + timeStr + "] ";
+        sb.append(tsStr);
+        sb.setSpan(
+                new ForegroundColorSpan(Color.parseColor("#888888")),
+                0, tsStr.length(),
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+
+        // Message body
+        String body;
+        int bodyColor;
+
+        switch (entry.getType()) {
+            case OUTGOING:
+                body = "Me: " + entry.getMessage() + "\n";
+                bodyColor = Color.parseColor("#378ADD");
+                break;
+            case SYSTEM:
+                body = "• " + entry.getMessage() + "\n";
+                bodyColor = Color.parseColor("#BA7517");
+                break;
+            default: // INCOMING
+                body = "Robot: " + entry.getMessage() + "\n";
+                bodyColor = Color.parseColor("#3B6D11");
+                break;
+        }
+
+        int start = sb.length();
+        sb.append(body);
+        sb.setSpan(
+                new ForegroundColorSpan(bodyColor),
+                start, sb.length(),
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+
+        chatView.append(sb);
+
+        // Auto-scroll
+        final android.text.Layout layout = chatView.getLayout();
+        if (layout != null) {
+            int scrollDelta = layout.getLineBottom(chatView.getLineCount() - 1)
+                    - chatView.getScrollY() - chatView.getHeight();
+            if (scrollDelta > 0) chatView.scrollBy(0, scrollDelta);
         }
     }
 
@@ -202,8 +254,6 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
                 String msg = input.getText().toString();
                 if (!msg.isEmpty()) {
                     btService.write(msg.getBytes(StandardCharsets.UTF_8));
-                    chatView.append("Me: " + msg + "\n");
-                    //chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
                     input.setText("");
                 }
             }
@@ -216,8 +266,7 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
                         String msg = input.getText().toString();
                         if (!msg.isEmpty()) {
                             btService.write(msg.getBytes(StandardCharsets.UTF_8));
-                            chatView.append("Me: " + msg + "\n");
-                            //chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+                            activity.logOutgoing(msg);
                             input.setText("");
                         }
                     }
