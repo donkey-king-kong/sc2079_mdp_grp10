@@ -115,6 +115,21 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
         void bind(MainActivity.ChatLogEntry entry) {
             systemText.setText("• " + entry.getMessage());
+            android.net.Uri uri = entry.getImageUri();
+            if (uri != null) {
+                systemText.setOnClickListener(v -> {
+                    try {
+                        android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                        intent.setDataAndType(uri, "image/*");
+                        intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        v.getContext().startActivity(intent);
+                    } catch (android.content.ActivityNotFoundException e) {
+                        android.util.Log.w("ChatAdapter", "No app to open image");
+                    }
+                });
+            } else {
+                systemText.setOnClickListener(null);
+            }
         }
     }
 

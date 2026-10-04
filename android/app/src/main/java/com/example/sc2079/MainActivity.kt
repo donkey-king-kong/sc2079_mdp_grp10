@@ -323,10 +323,16 @@ class MainActivity : AppCompatActivity() {
                             return
                         }
                         logSystem("Ending Stitch, displaying image")
-                        logSystem("Image Received - Tap to view")
                         Log.d("Image Message", "Final length: ${stitchedImageBase64.length}")
                         try {
                             val savedUri = saveStitchedImageToGallery(stitchedImageBase64)
+                            val entry = ChatLogEntry(
+                                type = ChatLogType.SYSTEM,
+                                message = "Image Received - Tap to view",
+                                imageUri = savedUri
+                            )
+                            sharedViewModel.messageLog.add(entry)
+                            messageListener?.onNewMessage(entry)
                             logSystem("Saved stitched image to Gallery")
                             Toast.makeText(
                                 this@MainActivity,
