@@ -1922,10 +1922,10 @@ public class GridMapClass extends View {
         }
         if(stichValue.equals("starting stitch")){
             vehicleText = "starting stitch";
-            FINDetected = true;
             return "2";
         }else if(stichValue.equals("ending stitch")){
             vehicleText = "ending stitch";
+            FINDetected = true;
             return "3";
         }else{
 
