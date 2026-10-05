@@ -221,8 +221,12 @@ public class startTask extends Fragment implements ThemeAware {
             int minutes = timerReflectOnText / 60;
             int seconds = timerReflectOnText % 60;
             String time = String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds);
-            if (calculateObstacleTimerView != null) calculateObstacleTimerView.setText(time);
-            if (fastestTimeTimerView != null) fastestTimeTimerView.setText(time);
+            if (calculateObstacleTimerView != null) {
+                calculateObstacleTimerView.setText(task1State == TaskState.RUNNING || task1State == TaskState.STOPPED ? time : "00:00");
+            }
+            if (fastestTimeTimerView != null) {
+                fastestTimeTimerView.setText(task2State == TaskState.RUNNING || task2State == TaskState.STOPPED ? time : "00:00");
+            }
         }
 
         if (getActivity() instanceof MainActivity) {
