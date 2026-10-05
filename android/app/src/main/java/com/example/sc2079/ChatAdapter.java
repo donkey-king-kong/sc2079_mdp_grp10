@@ -23,6 +23,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int VIEW_TYPE_SYSTEM = 2;
 
     private final List<MainActivity.ChatLogEntry> entries = new ArrayList<>();
+    private int timestampColor = android.graphics.Color.parseColor("#555555");
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
     @Override
@@ -57,7 +58,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         MainActivity.ChatLogEntry entry = entries.get(position);
         if (holder instanceof MessageViewHolder) {
-            ((MessageViewHolder) holder).bind(entry, timeFormat.format(new Date(entry.getTimestamp())));
+            ((MessageViewHolder) holder).bind(entry, timeFormat.format(new Date(entry.getTimestamp())), timestampColor);
         } else if (holder instanceof SystemViewHolder) {
             ((SystemViewHolder) holder).bind(entry);
         }
@@ -87,6 +88,11 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
     }
 
+    public void setTimestampColor(int color) {
+        timestampColor = color;
+        notifyDataSetChanged();
+    }
+
     private static class MessageViewHolder extends RecyclerView.ViewHolder {
         private final TextView messageText;
         private final TextView timestampText;
@@ -98,9 +104,10 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             messageText.setBackground(outgoing ? outgoingBubble(itemView) : incomingBubble(itemView));
         }
 
-        void bind(MainActivity.ChatLogEntry entry, String timestamp) {
+        void bind(MainActivity.ChatLogEntry entry, String timestamp, int timestampColor) {
             messageText.setText(entry.getMessage());
             timestampText.setText(timestamp);
+            timestampText.setTextColor(timestampColor);
         }
     }
 

@@ -139,60 +139,46 @@ something different.
 
 ## Android App
 
-The Android application serves as the main remote controller and monitoring interface for the MDP robot. It handles Bluetooth communication with the Raspberry Pi, visualizes the 20x20 arena map, and issues commands for tasks like exploration and image recognition.
+### Update from `main`
 
-### Getting Started
+If this is a fresh setup:
 
-1. **Prerequisites**: Download and install [Android Studio](https://developer.android.com/studio).
-2. **Open Project**: Launch Android Studio, click **Open**, and select the `android/` folder from this repository.
-3. **Sync Gradle**: Allow Android Studio to download the necessary dependencies and sync the project.
-4. **Testing UI**: You can run the app on the built-in Android Emulator to test the Grid Map, layouts, and navigation.
-5. **Testing Bluetooth (Important)**: The Android Emulator **does not support Bluetooth**. To test the actual connection to the Raspberry Pi/robot, you must connect a physical Android device and deploy the app via USB Debugging.
+```bash
+git clone <repo-url>
+cd sc2079_mdp_grp10
+```
 
-### Build & Run
+If the repository is already cloned:
 
-1. In Android Studio, wait for the indexing and Gradle sync to finish (indicated by the progress bar at the bottom).
-2. Select your target device from the device dropdown menu in the top toolbar (either your connected physical device or a created Virtual Device).
-3. Click the **Run** button (green play icon ▶️) or press `Control + R` (Mac).
-4. Android Studio will compile the app (APK) and automatically launch it on your selected device.
+```bash
+cd sc2079_mdp_grp10
+git checkout main
+git pull origin main
+```
 
-Or via command line (tablet connected via USB with USB debugging enabled):
+### Install or reinstall on the tablet
+
+1. Install [Android Studio](https://developer.android.com/studio).
+2. Open Android Studio and select the `android/` folder from this repository.
+3. Wait for Gradle sync to finish.
+4. Enable **Developer Options** and **USB debugging** on the tablet.
+5. Connect the tablet by USB and accept the USB debugging prompt.
+6. Select the tablet in Android Studio, then click **Run**.
+
+Or install from the command line:
 
 ```bash
 cd android
-./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+./gradlew installDebug
 ```
 
-### AMD Tool Setup (Windows)
+If reinstalling fails because an older app is already installed, uninstall it
+first and then install again:
 
-The app is designed to work with the **Android Module Debugger (AMD)** tool running on a Windows laptop. The AMD tool sends arena and robot position data to the tablet over Bluetooth.
-
-**Required one-time setup:**
-
-1. Copy `android/scripts/defaultJson.cs` to the AMD tool's `scripts/` folder on the Windows laptop.
-2. In AMD: **Settings → Custom Scripts** → select `defaultJson.cs`.
-3. In AMD: **Settings → Default Arena Settings** → set arena to **20×20**.
-4. Pair the tablet's Bluetooth to the Windows laptop before launching the app.
-
-> `defaultJson.cs` sends obstacle grid and robot position in the JSON format the tablet expects. Without it, the tablet will not receive robot position updates.
-
-### Manual & Auto Buttons
-
-| Button | Behaviour |
-|--------|-----------|
-| **Manual** | Sends a single `sendArena` request to AMD — tablet receives current obstacle grid and robot position immediately. |
-| **Auto** | Polls `sendArena` every 2 seconds automatically. Button turns green when active. Stops when toggled off or when the app backgrounds. |
-
-### Bluetooth Message Formats
-
-| Keyword | Handler | Format |
-|---------|---------|--------|
-| `location` | Move vehicle on grid | `{"location":"update","value":{"x":"5","y":"3","d":"N"}}` |
-| `"grid"` | Place obstacles on grid | `{"grid":"<hex string>"}` |
-| `image-rec` | Mark obstacle as verified | contains `image-rec` |
-| `status` | Update robot status text | contains `status` |
-| `health` | API health check | contains `health` |
+```bash
+adb uninstall com.example.sc2079
+./gradlew installDebug
+```
 
 ## STM32 Firmware
  
