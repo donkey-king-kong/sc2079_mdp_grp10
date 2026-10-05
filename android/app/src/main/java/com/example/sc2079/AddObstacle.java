@@ -173,6 +173,10 @@ public class AddObstacle extends Fragment implements ThemeAware {
                     currentSelectedButtonId = v.getId();
                 }
                 updateButtonState();
+                requireContext().getSharedPreferences("ui_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt("selected_mode_button_id_name", currentSelectedButtonId == addStartingPointButton.getId() ? 0 : currentSelectedButtonId == addObstacleToggle.getId() ? 1 : currentSelectedButtonId == removeButton.getId() ? 2 : -1)
+                    .apply();
             }
         };
 
@@ -288,6 +292,10 @@ public class AddObstacle extends Fragment implements ThemeAware {
                 addXCoords.getText().clear();
                 addYCoords.getText().clear();
                 currentSelectedButtonId = View.NO_ID;
+                requireContext().getSharedPreferences("ui_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt("selected_mode_button_id_name", -1)
+                    .apply();
                 updateButtonState();
             }
         });
@@ -295,7 +303,12 @@ public class AddObstacle extends Fragment implements ThemeAware {
         if (savedInstanceState != null) {
             currentSelectedButtonId = savedInstanceState.getInt("selectedButtonId", View.NO_ID);
         } else {
-            currentSelectedButtonId = View.NO_ID;
+            int savedMode = requireContext().getSharedPreferences("ui_prefs", Context.MODE_PRIVATE)
+                .getInt("selected_mode_button_id_name", -1);
+            if (savedMode == 0) currentSelectedButtonId = addStartingPointButton.getId();
+            else if (savedMode == 1) currentSelectedButtonId = addObstacleToggle.getId();
+            else if (savedMode == 2) currentSelectedButtonId = removeButton.getId();
+            else currentSelectedButtonId = View.NO_ID;
         }
         updateButtonState();
 

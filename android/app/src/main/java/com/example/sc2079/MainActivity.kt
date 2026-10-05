@@ -721,6 +721,13 @@ class MainActivity : AppCompatActivity() {
             val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
             val loadedData: ArrayList<ArrayList<ObstacleData>> = Gson().fromJson(gridMapSnapshot, type)
             gridMapObj.addGridMapSaved(loadedData)
+        } else if (gridMapPreferences().contains("autosave")) {
+            val json = gridMapPreferences().getString("autosave", null)
+            if (json != null) {
+                val type = object : TypeToken<ArrayList<ArrayList<ObstacleData>>>() {}.type
+                val loadedData: ArrayList<ArrayList<ObstacleData>> = Gson().fromJson(json, type)
+                gridMapObj.addGridMapSaved(loadedData)
+            }
         }
 
         gridMapObj.setOnGridChangedListener {
@@ -775,6 +782,7 @@ class MainActivity : AppCompatActivity() {
 
         btnReset.setOnClickListener {
             gridMapObj.clearGridMap()
+            gridMapPreferences().edit().remove("autosave").apply()
         }
 
         // Initalize navigation tabz
@@ -817,9 +825,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Unregister broadcast receivers
         LocalBroadcastManager.getInstance(this).unregisterReceiver(connStateReceiver)
         LocalBroadcastManager.getInstance(this).unregisterReceiver(msgReceiver)
+        if (::gridMapObj.isInitialized) {
+            val json = Gson().toJson(gridMapObj.returnGridMap())
+            gridMapPreferences().edit().putString("autosave", json).apply()
+        }
         autoHandler.removeCallbacks(autoRunnable)
     }
 
