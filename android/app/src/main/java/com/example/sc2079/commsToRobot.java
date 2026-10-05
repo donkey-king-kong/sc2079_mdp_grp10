@@ -266,6 +266,7 @@ public class commsToRobot extends Fragment implements MainActivity.MessageListen
             sendBtn.setBackground(
                 ThemePaletteKt.box(ctx, p.getAccentDim(), p.getAccentBorder(), 8f, 1f));
         }
+        if (chatAdapter != null) chatAdapter.setTimestampColor(p.getTextMuted());
     }
 
 }

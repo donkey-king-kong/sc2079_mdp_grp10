@@ -2067,7 +2067,13 @@ public class GridMapClass extends View {
                 stringBuilder.append("\"robot_y\": "+robotY+",");
                 stringBuilder.append("\"robot_direction\": "+robotDir+"}");
                 utilitiesClass.arenaData = stringBuilder.toString();
-                btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
+                String arenaJson = utilitiesClass.getJsonCraftSendArena();
+                btService.write(arenaJson.getBytes(StandardCharsets.UTF_8));
+                try {
+                    ((MainActivity) getContext()).logOutgoing(arenaJson);
+                } catch (ClassCastException e) {
+                    Log.e("GridMapClass.java", "Unable to log outgoing arena data", e);
+                }
                 return;
             }
             reformatObstacleDataArray();
@@ -2087,7 +2093,13 @@ public class GridMapClass extends View {
             stringBuilder.append("\"robot_direction\": "+robotDir+"}");
 
             utilitiesClass.arenaData = stringBuilder.toString();
-            btService.write(utilitiesClass.getJsonCraftSendArena().getBytes(StandardCharsets.UTF_8));
+            String arenaJson = utilitiesClass.getJsonCraftSendArena();
+            btService.write(arenaJson.getBytes(StandardCharsets.UTF_8));
+            try {
+                ((MainActivity) getContext()).logOutgoing(arenaJson);
+            } catch (ClassCastException e) {
+                Log.e("GridMapClass.java", "Unable to log outgoing arena data", e);
+            }
         } else {
             Log.d("Sending Message", "Unable to send Message to send Arena Data to Bluetooth!");
         }
