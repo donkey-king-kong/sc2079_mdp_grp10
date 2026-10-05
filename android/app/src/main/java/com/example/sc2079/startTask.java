@@ -50,13 +50,14 @@ public class startTask extends Fragment implements ThemeAware {
     private TextView calculateObstacleTimerView;
     private TextView fastestTimeTimerView;
     public static Handler timerHandler = new Handler(Looper.getMainLooper());
-    private int timerReflectOnText = 0;
-    private Runnable timerRunnable;
+    private int timer1Seconds = 0;
+    private int timer2Seconds = 0;
+    private Runnable timer1Runnable;
+    private Runnable timer2Runnable;
     private View rootView;
     private enum TaskState { IDLE, RUNNING, STOPPED }
     private TaskState task1State = TaskState.IDLE;
     private TaskState task2State = TaskState.IDLE;
-
 
     public startTask() {}
 
@@ -92,40 +93,55 @@ public class startTask extends Fragment implements ThemeAware {
         viewSavedImagesButton = addStartTaskView.findViewById(R.id.viewSavedImagesButton);
         calculateObstacleTimerView = addStartTaskView.findViewById(R.id.calculateObstacleTimer);
         fastestTimeTimerView = addStartTaskView.findViewById(R.id.fastestTimeTimer);
-        timerRunnable = new Runnable() {
+
+        timer1Runnable = new Runnable() {
             @Override
             public void run() {
-                Log.d("Timer", "This runs every 1 second");
-                timerReflectOnText += 1;
-                // Calculate minutes and seconds
-                int minutes = timerReflectOnText / 60;
-                int seconds = timerReflectOnText % 60;
-
-                // Format as MM:SS (e.g., 01:05)
+                timer1Seconds += 1;
+                int minutes = timer1Seconds / 60;
+                int seconds = timer1Seconds % 60;
                 String time = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
-
-                if(startTraverseMap){
-                    if (calculateObstacleTimerView != null) calculateObstacleTimerView.setText(time);
-                }
-                if(startFastestRound){
-                    if (fastestTimeTimerView != null) fastestTimeTimerView.setText(time);
-                }
-                if(resolveGridMap().checkFINStatus()){
-                    if(startTraverseMap) {
-                        startTraverseMap = false;
-                    }else if(startFastestRound){
-                        startFastestRound = false;
-                    }
-                    timerReflectOnText = 0;
+                if (calculateObstacleTimerView != null) calculateObstacleTimerView.setText(time);
+                if (resolveGridMap().checkFINStatus()) {
+                    startTraverseMap = false;
+                    timer1Seconds = 0;
+                    if (calculateObstacleTimerView != null) calculateObstacleTimerView.setText("00:00");
                     resolveGridMap().updateFINStatus(false);
-                    timerHandler.removeCallbacks(timerRunnable);
+                    timerHandler.removeCallbacks(timer1Runnable);
+                    Palette p = (getActivity() instanceof MainActivity)
+                        ? ((MainActivity) getActivity()).currentPalette()
+                        : com.example.sc2079.ui.ThemePaletteKt.getNIGHT();
+                    applyTask1State(TaskState.STOPPED, p);
+                    return;
                 }
-
-
-                // Re-post with delay for repeating
                 timerHandler.postDelayed(this, 1000);
             }
         };
+
+        timer2Runnable = new Runnable() {
+            @Override
+            public void run() {
+                timer2Seconds += 1;
+                int minutes = timer2Seconds / 60;
+                int seconds = timer2Seconds % 60;
+                String time = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
+                if (fastestTimeTimerView != null) fastestTimeTimerView.setText(time);
+                if (resolveGridMap().checkFINStatus()) {
+                    startFastestRound = false;
+                    timer2Seconds = 0;
+                    if (fastestTimeTimerView != null) fastestTimeTimerView.setText("00:00");
+                    resolveGridMap().updateFINStatus(false);
+                    timerHandler.removeCallbacks(timer2Runnable);
+                    Palette p = (getActivity() instanceof MainActivity)
+                        ? ((MainActivity) getActivity()).currentPalette()
+                        : com.example.sc2079.ui.ThemePaletteKt.getNIGHT();
+                    applyTask2State(TaskState.STOPPED, p);
+                    return;
+                }
+                timerHandler.postDelayed(this, 1000);
+            }
+        };
+
         startExplorationButton.setOnClickListener(v -> {
             Palette p = (getActivity() instanceof MainActivity)
                 ? ((MainActivity) getActivity()).currentPalette()
@@ -134,19 +150,19 @@ public class startTask extends Fragment implements ThemeAware {
                 case IDLE:
                     resolveGridMap().sendArenaDataBluetooth();
                     startTraverseMap = true;
-                    timerHandler.removeCallbacks(timerRunnable);
-                    timerReflectOnText = 0;
-                    timerHandler.postDelayed(timerRunnable, 1000);
+                    timerHandler.removeCallbacks(timer1Runnable);
+                    timer1Seconds = 0;
+                    timerHandler.postDelayed(timer1Runnable, 1000);
                     applyTask1State(TaskState.RUNNING, p);
                     break;
                 case RUNNING:
                     startTraverseMap = false;
-                    timerHandler.removeCallbacks(timerRunnable);
+                    timerHandler.removeCallbacks(timer1Runnable);
                     resolveGridMap().updateFINStatus(false);
                     applyTask1State(TaskState.STOPPED, p);
                     break;
                 case STOPPED:
-                    timerReflectOnText = 0;
+                    timer1Seconds = 0;
                     calculateObstacleTimerView.setText("00:00");
                     applyTask1State(TaskState.IDLE, p);
                     break;
@@ -161,44 +177,40 @@ public class startTask extends Fragment implements ThemeAware {
                 case IDLE:
                     resolveGridMap().sendArenaDataBluetooth();
                     startFastestRound = true;
-                    timerHandler.removeCallbacks(timerRunnable);
-                    timerReflectOnText = 0;
-                    timerHandler.postDelayed(timerRunnable, 1000);
+                    timerHandler.removeCallbacks(timer2Runnable);
+                    timer2Seconds = 0;
+                    timerHandler.postDelayed(timer2Runnable, 1000);
                     applyTask2State(TaskState.RUNNING, p);
                     break;
                 case RUNNING:
                     startFastestRound = false;
-                    timerHandler.removeCallbacks(timerRunnable);
+                    timerHandler.removeCallbacks(timer2Runnable);
                     resolveGridMap().updateFINStatus(false);
                     applyTask2State(TaskState.STOPPED, p);
                     break;
                 case STOPPED:
-                    timerReflectOnText = 0;
+                    timer2Seconds = 0;
                     fastestTimeTimerView.setText("00:00");
                     applyTask2State(TaskState.IDLE, p);
                     break;
             }
         });
 
-
-        startStichButton.setOnClickListener(new View.OnClickListener()
-        {
+        startStichButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view){
-            if (!startSendStich) {
-                resolveGridMap().sendStichSignalBluetooth();
-                // gridMap.sendBeginExplorationBluetooth();
-                startSendStich = true;
-            }else{
-                startSendStich = false;
+            public void onClick(View view) {
+                if (!startSendStich) {
+                    resolveGridMap().sendStichSignalBluetooth();
+                    startSendStich = true;
+                } else {
+                    startSendStich = false;
+                }
             }
-        }
         });
 
-        viewSavedImagesButton.setOnClickListener(new View.OnClickListener()
-        {
+        viewSavedImagesButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view){
+            public void onClick(View view) {
                 showSavedImagesDialog();
             }
         });
@@ -208,24 +220,29 @@ public class startTask extends Fragment implements ThemeAware {
         if (savedInstanceState != null) {
             task1State = TaskState.valueOf(savedInstanceState.getString("task1State", TaskState.IDLE.name()));
             task2State = TaskState.valueOf(savedInstanceState.getString("task2State", TaskState.IDLE.name()));
-            timerReflectOnText = savedInstanceState.getInt("timerReflectOnText", 0);
+            timer1Seconds = savedInstanceState.getInt("timer1Seconds", 0);
+            timer2Seconds = savedInstanceState.getInt("timer2Seconds", 0);
             startTraverseMap = savedInstanceState.getBoolean("startTraverseMap", false);
             startFastestRound = savedInstanceState.getBoolean("startFastestRound", false);
 
-            if (startTraverseMap || startFastestRound) {
-                timerHandler.removeCallbacks(timerRunnable);
-                timerHandler.postDelayed(timerRunnable, 1000);
+            if (startTraverseMap) {
+                timerHandler.removeCallbacks(timer1Runnable);
+                timerHandler.postDelayed(timer1Runnable, 1000);
+            }
+            if (startFastestRound) {
+                timerHandler.removeCallbacks(timer2Runnable);
+                timerHandler.postDelayed(timer2Runnable, 1000);
             }
 
-            // Restore timer display text
-            int minutes = timerReflectOnText / 60;
-            int seconds = timerReflectOnText % 60;
-            String time = String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds);
+            int min1 = timer1Seconds / 60, sec1 = timer1Seconds % 60;
+            int min2 = timer2Seconds / 60, sec2 = timer2Seconds % 60;
             if (calculateObstacleTimerView != null) {
-                calculateObstacleTimerView.setText(task1State == TaskState.RUNNING || task1State == TaskState.STOPPED ? time : "00:00");
+                calculateObstacleTimerView.setText(task1State == TaskState.RUNNING || task1State == TaskState.STOPPED
+                    ? String.format(java.util.Locale.getDefault(), "%02d:%02d", min1, sec1) : "00:00");
             }
             if (fastestTimeTimerView != null) {
-                fastestTimeTimerView.setText(task2State == TaskState.RUNNING || task2State == TaskState.STOPPED ? time : "00:00");
+                fastestTimeTimerView.setText(task2State == TaskState.RUNNING || task2State == TaskState.STOPPED
+                    ? String.format(java.util.Locale.getDefault(), "%02d:%02d", min2, sec2) : "00:00");
             }
         }
 
@@ -239,7 +256,8 @@ public class startTask extends Fragment implements ThemeAware {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        timerHandler.removeCallbacks(timerRunnable);
+        timerHandler.removeCallbacks(timer1Runnable);
+        timerHandler.removeCallbacks(timer2Runnable);
         calculateObstacleTimerView = null;
         fastestTimeTimerView = null;
     }
@@ -249,7 +267,8 @@ public class startTask extends Fragment implements ThemeAware {
         super.onSaveInstanceState(outState);
         outState.putString("task1State", task1State.name());
         outState.putString("task2State", task2State.name());
-        outState.putInt("timerReflectOnText", timerReflectOnText);
+        outState.putInt("timer1Seconds", timer1Seconds);
+        outState.putInt("timer2Seconds", timer2Seconds);
         outState.putBoolean("startTraverseMap", startTraverseMap);
         outState.putBoolean("startFastestRound", startFastestRound);
     }
