@@ -284,8 +284,13 @@ class PlaceObstacleDialogFragment : DialogFragment() {
         val maxHeightPx = (resources.displayMetrics.heightPixels * 0.9).toInt()
         dialog?.window?.setLayout(
             minOf(desiredWidthPx, maxWidthPx),
-            maxHeightPx
+            ViewGroup.LayoutParams.WRAP_CONTENT
         )
+        dialog?.window?.decorView?.apply {
+            val lp = layoutParams
+            lp.height = maxHeightPx
+            layoutParams = lp
+        }
         Log.d("PlaceDialog", "Dialog width px: ${(resources.displayMetrics.widthPixels * 0.9).toInt()}")
         Log.d("PlaceDialog", "Screen density: ${resources.displayMetrics.density}")
     }
