@@ -1377,13 +1377,17 @@ void StartGyroTask(void *argument)
 	// 3. Subtract baseline drift offset from angular velocity
 	double gz_raw = (double)IMU_Data.z_gyro;
 	double gz_corrected;
+	double dev = gz_raw - offset;
 
-	if (robotStill) {
-		// The wheels haven't turned for 0.5 s, so the robot isn't rotating.
-		// Hold the heading and use the reading to track the gyro's
-		// zero-rate offset, which drifts as the sensor warms up.
-		offset += 0.002 * (gz_raw - offset);
+	if (robotStill && dev > -GYRO_STILL_BAND && dev < GYRO_STILL_BAND) {
+		// Wheels still and the gyro reads close to zero: the robot really is
+		// at rest. Track the zero-rate offset, which drifts as the sensor warms up.
+		offset += 0.002 * dev;
 		gz_corrected = 0.0;
+	} else if (robotStill) {
+		// Wheels still but the gyro reads a real rotation: the robot is being
+		// turned by hand. Count it as rotation and leave the offset alone.
+		gz_corrected = dev;
 	} else {
 		// No deadband: even slow drifts must be seen by the heading hold.
 		gz_corrected = gz_raw - offset;

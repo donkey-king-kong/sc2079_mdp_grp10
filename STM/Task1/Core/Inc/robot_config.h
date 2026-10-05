@@ -27,7 +27,7 @@
 
 /* Replies to the RPi. 0 = short ("A d=99.9 e=+0.4"), 1 = full diagnostics.
  * The TD log always has the full diagnostics either way.                   */
-#define DEBUG_REPLIES       0
+#define DEBUG_REPLIES       1
 
 
 /* ==========================================================================
@@ -149,6 +149,7 @@
 #define STRAIGHT_KY         0.9f    // Line holding: degrees of correction per cm of sideways drift
 #define STRAIGHT_KY_FADE    25.0f   // Line holding fades out over the last this-many cm
 #define TURN_W_ALPHA        0.4f    // Yaw-rate smoothing for the turn stop decision (1 = none)
+#define GYRO_STILL_BAND     1.0     // deg/s. Below this, a still robot's gyro reading is treated as zero drift
 
 
 /* ==========================================================================
