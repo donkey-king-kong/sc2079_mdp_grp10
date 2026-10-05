@@ -93,6 +93,10 @@ class Leg:
     obstacle_id: int
     trajectory: Trajectory
     method: str                  # the Dubins word, "via" for a multi-hop, or "hybrid_astar"
+    # What the leg's whole-number commands really drive, from where the legs
+    # before it leave the robot (set by `anchor_legs`). It ends a little off
+    # `trajectory`'s capture pose, and it is the path the simulator draws.
+    driven: Optional[Trajectory] = None
 
     @property
     def distance(self) -> float:
@@ -745,8 +749,9 @@ def anchor_legs(arena: Arena, route: Route, start: Pose) -> None:
     The re-plan rejoins the original leg at one of its segment ends (the
     capture pose itself, or a transit pose on a multi-hop leg), with the same
     analytic moves `_plan_leg` uses and the same collision check; the cheapest
-    rejoin wins. If none fits, the leg is driven as planned from where the
-    robot is -- no worse than before.
+    rejoin wins. If none fits (in a cramped start zone, say), short Hybrid A*
+    searches back onto the leg are tried; only if those fail too is the leg
+    driven as planned from where the robot is, and its error carries on.
     """
     heading = commands_module.HeadingTracker()
     pose = start
@@ -756,11 +761,14 @@ def anchor_legs(arena: Arena, route: Route, start: Pose) -> None:
                 or abs(normalise_angle(pose.theta - begin.theta)) > 1e-9):
             rejoined = _rejoin(arena, pose, leg.trajectory, route.metric,
                                allow_backoff=index > 0)
+            if rejoined is None:
+                rejoined = _search_rejoin(arena, pose, leg.trajectory, allow_backoff=index > 0)
             if rejoined is not None:
                 leg.method, leg.trajectory = rejoined
         driven = commands_module.leg_commands(leg.trajectory, heading, start.theta)
         if driven:
-            pose = commands_module.commands_to_trajectory(driven, pose).end_pose()
+            leg.driven = commands_module.commands_to_trajectory(driven, pose)
+            pose = leg.driven.end_pose()
 
 
 def _rejoin(arena: Arena, pose: Pose, trajectory: Trajectory, metric: str,
@@ -779,6 +787,24 @@ def _rejoin(arena: Arena, pose: Pose, trajectory: Trajectory, metric: str,
         if cost < best_cost:
             best, best_cost = ("rejoin-" + result[0], joined), cost
     return best
+
+
+def _search_rejoin(arena: Arena, pose: Pose, trajectory: Trajectory,
+                   allow_backoff: bool) -> Optional[Tuple[str, Trajectory]]:
+    """`_rejoin`'s fallback: short Hybrid A* searches, onto the capture pose
+    first (after the usual back-out tries), then onto any segment end."""
+    direct = _plan_leg(arena, pose, trajectory.end_pose(), allow_search=True,
+                       max_expansions=cfg.HA_MATRIX_EXPANSIONS, allow_backoff=allow_backoff)
+    if direct is not None:
+        return ("rejoin-" + direct[0], direct[1])
+    segments = trajectory.segments
+    ends = list(range(len(segments) - 1, -1, -1))        # the capture pose first
+    found = hybrid_astar.plan_any(arena, pose, [segments[k].end for k in ends],
+                                  max_expansions=cfg.HA_MATRIX_EXPANSIONS)
+    if found is None:
+        return None
+    k = ends[found[0]]
+    return ("rejoin-hybrid_astar", Trajectory(merge_segments(found[1].segments + segments[k + 1:])))
 
 
 def compare_strategies(arena: Arena, start: Optional[Pose] = None,

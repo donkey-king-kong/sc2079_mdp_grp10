@@ -105,8 +105,15 @@ def _leg_dict(leg: planner.Leg, start_time: float, commands: List[str]) -> Dict[
 
     `commands` come from `commands.route_leg_commands`: turns are rounded
     against the heading of the whole run, so a leg cannot be converted alone.
+
+    The poses are the path those commands really drive (`leg.driven`), so the
+    drawing joins up and shows where the robot will actually stop; the clock is
+    stretched onto the planned duration so the totals still agree.
     """
-    timed = leg.trajectory.sample_with_time(ANIMATION_STEP, start_time)
+    shown = leg.driven or leg.trajectory
+    timed = shown.sample_with_time(ANIMATION_STEP, start_time)
+    scale = leg.duration / shown.duration() if shown.duration() > 0 else 1.0
+    timed = [(p, start_time + (t - start_time) * scale) for p, t in timed]
     return {
         "obstacle_id": leg.obstacle_id,
         "method": leg.method,
@@ -114,7 +121,8 @@ def _leg_dict(leg: planner.Leg, start_time: float, commands: List[str]) -> Dict[
         "duration": round(leg.duration, 3),
         "starts_at": round(start_time, 3),
         "commands": commands,
-        "end": _pose_dict(leg.trajectory.end_pose(), start_time + leg.duration),
+        "end": _pose_dict(shown.end_pose(), start_time + leg.duration),
+        "planned_end": _pose_dict(leg.trajectory.end_pose()),
         # Drop the first pose of each leg after the first: it is the previous
         # leg's last pose, and duplicating it makes the animation stall.
         "trajectory": [_pose_dict(p, t) for p, t in (timed[1:] if start_time else timed)],
@@ -133,7 +141,7 @@ def _plan_response(route: planner.Route, layout: arena_module.Arena,
 
     poses = [start]
     for leg in route.legs:
-        poses.extend(leg.trajectory.sample(ANIMATION_STEP))
+        poses.extend((leg.driven or leg.trajectory).sample(ANIMATION_STEP))
 
     return {
         "strategy": route.strategy,
