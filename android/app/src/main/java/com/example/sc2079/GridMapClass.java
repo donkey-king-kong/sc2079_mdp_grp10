@@ -781,6 +781,7 @@ public class GridMapClass extends View {
                     if (draggedObstacleSnapshot != null &&
                             draggedObstacleSnapshot.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle) {
                         removeFromGrid(oldXCoordDrag, oldYCoordDrag, false);
+                        placedObstacles.remove(gridMapData.get(oldYCoordDrag).get(oldXCoordDrag));
                     }
                 }
 
