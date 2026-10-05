@@ -647,21 +647,116 @@ def _exhaustive_order(model: CostModel, obstacle_ids: Sequence[int]) -> List[int
     If no complete tour exists -- one obstacle wedged where the robot can get in
     but not back out -- we drop to subsets of four, then three, and so on,
     rather than returning nothing. Checklist B.2 scores the images actually
-    recognised, so four out of five beats giving up. Even at the worst size that
-    is 325 permutations in total, which costs nothing.
+    recognised, so four out of five beats giving up.
+
+    With eight obstacles that is 8! = 40,320 orderings, and up to 8 x 7! more
+    when no complete tour exists -- most of a slow plan's time. So two dynamic
+    programmes over subsets come first: the cheapest way to have visited each
+    set of obstacles, which gives the best cost at each size exactly, and the
+    cheapest way to visit the rest of a set from each pose, which bounds any
+    partial ordering from below. The orderings are then walked in the very same
+    sequence as before, skipping every set and every prefix that cannot come
+    within `_ORDER_SLACK` of the best cost. The first ordering at the best cost
+    -- the one the plain search keeps -- is never skipped, so the answer is the
+    same ordering, found from a few dozen candidates instead of thousands.
     """
     ids = list(obstacle_ids)
-    for size in range(len(ids), 0, -1):
+    count = len(ids)
+    if not count:
+        return []
+    poses = [model.nodes_by_obstacle[oid] for oid in ids]
+    cost = model._cost
+    full = 1 << count
+
+    def layer(current: Dict[int, float], k: int) -> Dict[int, float]:
+        """One step of `evaluate_order`'s DP, done the same way."""
+        nxt: Dict[int, float] = {}
+        for j in poses[k]:
+            best = INF
+            for i, so_far in current.items():
+                if so_far >= INF:
+                    continue
+                total = so_far + cost[i][j]
+                if total < best:
+                    best = total
+            nxt[j] = best
+        return nxt
+
+    # arrive[mask][j]: cheapest cost of visiting exactly `mask`, ending on pose j.
+    arrive: List[Dict[int, float]] = [{} for _ in range(full)]
+    for mask in range(1, full):
+        for k in range(count):
+            bit = 1 << k
+            if not mask & bit:
+                continue
+            rest_mask = mask ^ bit
+            if not rest_mask:
+                arrive[mask].update({j: cost[0][j] for j in poses[k]})
+            else:
+                arrive[mask].update(layer(arrive[rest_mask], k))
+
+    # finish[mask][j]: cheapest cost of visiting exactly `mask` from pose j.
+    finish: List[Dict[int, float]] = [{} for _ in range(full)]
+    for mask in range(full):
+        for owner in range(count):
+            if mask & (1 << owner):
+                continue
+            for j in poses[owner]:
+                if not mask:
+                    finish[mask][j] = 0.0
+                    continue
+                best = INF
+                for k in range(count):
+                    bit = 1 << k
+                    if mask & bit:
+                        for nxt in poses[k]:
+                            total = cost[j][nxt] + finish[mask ^ bit][nxt]
+                            if total < best:
+                                best = total
+                finish[mask][j] = best
+
+    def subset_best(mask: int) -> float:
+        return min(arrive[mask].values(), default=INF)
+
+    for size in range(count, 0, -1):
+        masks = [sum(1 << k for k in combo) for combo in itertools.combinations(range(count), size)]
+        floor = min(subset_best(mask) for mask in masks)
+        if floor >= INF:
+            continue
+        limit = floor + _ORDER_SLACK
         best_order: List[int] = []
         best_cost = INF
-        for subset in itertools.combinations(ids, size):
-            for candidate in itertools.permutations(subset):
-                cost, _ = model.evaluate_order(candidate)
-                if cost < best_cost:
-                    best_cost, best_order = cost, list(candidate)
+
+        def walk(prefix: List[int], current: Dict[int, float], left: List[int]) -> None:
+            nonlocal best_order, best_cost
+            if not left:
+                candidate = [ids[k] for k in prefix]
+                total, _ = model.evaluate_order(candidate)
+                if total < best_cost:
+                    best_cost, best_order = total, candidate
+                return
+            left_mask = sum(1 << k for k in left)
+            bound = min((so_far + finish[left_mask].get(j, INF)
+                         for j, so_far in current.items()), default=INF)
+            if bound > limit:
+                return
+            for position, k in enumerate(left):
+                walk(prefix + [k], layer(current, k), left[:position] + left[position + 1:])
+
+        for combo, mask in zip(itertools.combinations(range(count), size), masks):
+            if subset_best(mask) > limit:
+                continue
+            for position, k in enumerate(combo):
+                walk([k], {j: cost[0][j] for j in poses[k]},
+                     list(combo[:position] + combo[position + 1:]))
         if best_order:
             return best_order
     return []
+
+
+# Orderings costing more than the best by this much (seconds) cannot be the one
+# the plain search keeps; it only absorbs floating-point rounding in the bound.
+_ORDER_SLACK = 1e-6
 
 
 _ORDERERS = {
