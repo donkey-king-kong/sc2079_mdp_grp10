@@ -1,0 +1,19 @@
+<Page x:Class="AMDtool.ScriptsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:AMDtool"
+      Title="ScriptsPage">
+  <Grid Margin="15">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition/>
+    </Grid.RowDefinitions>
+    <TextBlock FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14" TextWrapping="Wrap"
+               Margin="0,5,0,15">
+      Select the C# script which formats the information to send when you enable the function to send arena information on change. The scripts are to be placed in the \scripts folder.
+    </TextBlock>
+    <ListBox Name="FileList" Grid.Row="1"/>
+  </Grid>
+</Page>

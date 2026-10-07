@@ -1,0 +1,81 @@
+<Window x:Class="AMDtool.SendMoreWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:p="clr-namespace:AMDtool.Properties"
+        Title="Advanced Send" Height="600" Width="800">
+  <Grid Background="{StaticResource GreyBackground}">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto"/>
+      <ColumnDefinition/>
+    </Grid.ColumnDefinitions>
+    <StackPanel Orientation="Vertical">
+      <StackPanel Orientation="Vertical" Margin="15">
+        <Button Name="StatusDemoBtn" Margin="0,0,0,15">ROBOT STATUS DEMO</Button>
+        <Button Name="DelayBtn" Margin="0,0,0,0">ADD DELAY POINT</Button>
+      </StackPanel>
+      <Border Background="LightGray" Height="0.5" Margin="0,5,0,5"/>
+      <StackPanel Orientation="Vertical" Margin="15,0,15,15">
+        <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" Foreground="DimGray" FontSize="14">QUICK INPUT</Label>
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition/>
+            <RowDefinition/>
+            <RowDefinition/>
+            <RowDefinition/>
+            <RowDefinition/>
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+          </Grid.ColumnDefinitions>
+          <Button Name="c1btn" Grid.Column="0" Grid.Row="0" FontSize="12"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel1}"/>
+          <Button Name="c2btn" Grid.Column="1" Grid.Row="0" FontSize="12"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel2}"/>
+          <Button Name="c3btn" Grid.Column="0" Grid.Row="1" FontSize="12"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel3}"/>
+          <Button Name="c4btn" Grid.Column="1" Grid.Row="1" FontSize="12"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel4}"/>
+          <Button Name="c5btn" Grid.Column="0" Grid.Row="2" FontSize="12"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel5}"/>
+          <Button Name="c6btn" Grid.Column="1" Grid.Row="2" FontSize="12"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel6}"/>
+          <Button Name="c7btn" Grid.Column="0" Grid.Row="3" FontSize="12"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel7}"/>
+          <Button Name="c8btn" Grid.Column="1" Grid.Row="3" FontSize="12"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel8}"/>
+          <Button Name="c9btn" Grid.Column="0" Grid.Row="4" FontSize="12" Grid.ColumnSpan="2"
+                  Content="{Binding Source={x:Static p:Settings.Default}, Path=clabel9}"/>
+        </Grid>
+      </StackPanel>
+      <Grid Margin="0,10,0,0">
+        <CheckBox Name="SendInstantly" FontFamily="/AMDtool;component/Resources/fonts/#Roboto" Margin="15,3,0,0"
+                  Foreground="DimGray">Send on click</CheckBox>
+        <Button Name="SendSettingBtn" Style="{StaticResource ImageBtnStyle}" Width="20" HorizontalAlignment="Right"
+                Margin="0,0,15,0">
+          <Image Source="Resources/icons/settings_blk.png"/>
+        </Button>
+      </Grid>
+    </StackPanel>
+    <StackPanel Grid.Column="1"/>
+    <Grid Column="1">
+      <Grid.RowDefinitions>
+        <RowDefinition/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <Border Background="White" Margin="5" BorderBrush="WhiteSmoke" BorderThickness="1" Grid.Row="0">
+        <TextBox Name="SendTextBox" Margin="0,5,0,0" FontSize="14" FontFamily="Consolas" Height="Auto"
+                 Style="{StaticResource MultiLineTextBox}"/>
+      </Border>
+      <Grid Margin="0,0,0,5" VerticalAlignment="Bottom" Row="1">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="1*"/>
+          <ColumnDefinition Width="2*"/>
+        </Grid.ColumnDefinitions>
+        <Button Name="ClearBtn" Margin="5" Grid.Column="0" FontSize="16">CLEAR</Button>
+        <Button Name="SendBtn" Margin="5" Grid.Column="1" FontSize="16"
+                Style="{StaticResource RaisedColouredButtonStyle}">SEND</Button>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>

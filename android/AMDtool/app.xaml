@@ -1,0 +1,325 @@
+<Application x:Class="AMDtool.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="mainwindow.xaml">
+  <Application.Resources>
+    <Style TargetType="{x:Type Window}">
+      <Setter Property="Control.FontFamily" Value="/AMDtool;component/Resources/fonts/#Roboto Medium"/>
+    </Style>
+    <SolidColorBrush x:Key="GreyBackground" Color="#fafafa"/>
+    <SolidColorBrush x:Key="UltraLightColour" Color="#a9e5fd"/>
+    <SolidColorBrush x:Key="LightColour" Color="#4fc3f7"/>
+    <SolidColorBrush x:Key="MediumColour" Color="#03a9f4"/>
+    <SolidColorBrush x:Key="MediumDarkColour" Color="#039be5"/>
+    <SolidColorBrush x:Key="DarkColour" Color="#0288d1"/>
+    <SolidColorBrush x:Key="AccentColour1" Color="#ffc400"/>
+    <SolidColorBrush x:Key="AccentColour2" Color="#ff8f00"/>
+    <DropShadowEffect x:Key="SmallShadowEffect" BlurRadius="5" ShadowDepth="1" Color="Gainsboro"/>
+    <DropShadowEffect x:Key="ShadowEffect" BlurRadius="7" ShadowDepth="2" Color="Gainsboro" Direction="270"/>
+    <DropShadowEffect x:Key="ShadowEffect2" BlurRadius="7" ShadowDepth="2" Color="Gainsboro" Direction="180"/>
+    <DropShadowEffect x:Key="ShadowEffect3" BlurRadius="7" ShadowDepth="2" Color="Gainsboro"/>
+    <Style x:Key="ImageBtnStyle" TargetType="{x:Type Button}">
+      <Setter Property="Control.Background" Value="Transparent"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Padding" Value="0"/>
+      <Setter Property="FrameworkElement.Margin" Value="5"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="ArenaToolButtonBorder" Background="{TemplateBinding Control.Background}"
+                    CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="{x:Type ListView}">
+      <Setter Property="Control.BorderBrush" Value="#dbdbdb"/>
+    </Style>
+    <Style TargetType="{x:Type ListViewItem}">
+      <Setter Property="Control.Padding" Value="15"/>
+      <Setter Property="Control.FontFamily" Value="/AMDtool;component/Resources/fonts/#Roboto Regular"/>
+      <Setter Property="Control.FontSize" Value="14"/>
+    </Style>
+    <Style TargetType="{x:Type ListBox}">
+      <Setter Property="Control.BorderBrush" Value="#dbdbdb"/>
+    </Style>
+    <Style TargetType="{x:Type ListBoxItem}">
+      <Setter Property="Control.Padding" Value="15"/>
+      <Setter Property="Control.FontFamily" Value="/AMDtool;component/Resources/fonts/#Roboto Regular"/>
+      <Setter Property="Control.FontSize" Value="14"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type ListBoxItem}">
+            <Border x:Name="DefaultButtonBorder" Background="{TemplateBinding Control.Background}"
+                    BorderBrush="{TemplateBinding Control.BorderBrush}"
+                    BorderThickness="{TemplateBinding Control.BorderThickness}" CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="UIElement.IsMouseOver" Value="true">
+                <Setter Value="{StaticResource UltraLightColour}" Property="Control.Background"/>
+              </Trigger>
+              <Trigger Property="ListBoxItem.IsSelected" Value="true">
+                <Setter Value="{StaticResource MediumColour}" Property="Control.Background"/>
+                <Setter Property="Control.Foreground" Value="White"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="{x:Type ComboBox}">
+      <Setter Property="Control.Background" Value="White"/>
+      <Setter Property="Control.BorderThickness" Value="0"/>
+      <Setter Property="Control.BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style TargetType="{x:Type ComboBoxItem}">
+      <Setter Property="Control.Padding" Value="5"/>
+      <Setter Property="Control.FontFamily" Value="/AMDtool;component/Resources/fonts/#Roboto Regular"/>
+      <Setter Property="Control.FontSize" Value="12"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type ComboBoxItem}">
+            <Border x:Name="DefaultButtonBorder" Background="{TemplateBinding Control.Background}"
+                    BorderBrush="{TemplateBinding Control.BorderBrush}"
+                    BorderThickness="{TemplateBinding Control.BorderThickness}" CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="UIElement.IsMouseOver" Value="true">
+                <Setter Value="{StaticResource UltraLightColour}" Property="Control.Background"/>
+              </Trigger>
+              <Trigger Property="ListBoxItem.IsSelected" Value="true">
+                <Setter Value="{StaticResource MediumColour}" Property="Control.Background"/>
+                <Setter Property="Control.Foreground" Value="White"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="RaisedColouredButtonStyle" TargetType="{x:Type Button}">
+      <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+      <Setter Property="Control.FontFamily" Value="/AMDtool;component/Resources/fonts/#Roboto Medium"/>
+      <Setter Property="Control.FontSize" Value="14"/>
+      <Setter Property="Control.Foreground" Value="White"/>
+      <Setter Property="Control.Background" Value="{StaticResource MediumColour}"/>
+      <Setter Property="Control.BorderBrush" Value="{StaticResource MediumColour}"/>
+      <Setter Property="Control.BorderThickness" Value="2"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Padding" Value="5"/>
+      <Setter Property="UIElement.Effect" Value="{StaticResource SmallShadowEffect}"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="DefaultButtonBorder" Background="{TemplateBinding Control.Background}"
+                    BorderBrush="{TemplateBinding Control.BorderBrush}"
+                    BorderThickness="{TemplateBinding Control.BorderThickness}" CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="UIElement.IsMouseOver" Value="true">
+                <Setter TargetName="DefaultButtonBorder" Value="{StaticResource MediumDarkColour}"
+                        Property="Border.Background"/>
+                <Setter TargetName="DefaultButtonBorder" Value="{StaticResource MediumDarkColour}"
+                        Property="Border.BorderBrush"/>
+                <Setter Property="Control.Foreground" Value="#FFFFFF"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="{x:Type Button}">
+      <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+      <Setter Property="Control.FontFamily" Value="/AMDtool;component/Resources/fonts/#Roboto Medium"/>
+      <Setter Property="Control.FontSize" Value="14"/>
+      <Setter Property="Control.Foreground" Value="DimGray"/>
+      <Setter Property="Control.Background" Value="White"/>
+      <Setter Property="Control.BorderBrush" Value="White"/>
+      <Setter Property="Control.BorderThickness" Value="1"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Padding" Value="5"/>
+      <Setter Property="UIElement.Effect" Value="{StaticResource SmallShadowEffect}"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="DefaultButtonBorder" Background="{TemplateBinding Control.Background}"
+                    BorderBrush="{TemplateBinding Control.BorderBrush}"
+                    BorderThickness="{TemplateBinding Control.BorderThickness}" CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="UIElement.IsMouseOver" Value="true">
+                <Setter TargetName="DefaultButtonBorder" Property="Border.Background" Value="White"/>
+                <Setter TargetName="DefaultButtonBorder" Property="Border.BorderBrush" Value="White"/>
+                <Setter Property="Control.Foreground" Value="Black"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="FlatButtonStyle" TargetType="{x:Type Button}">
+      <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+      <Setter Property="Control.FontFamily" Value="/AMDtool;component/Resources/fonts/#Roboto Medium"/>
+      <Setter Property="Control.FontSize" Value="14"/>
+      <Setter Property="Control.Foreground" Value="{StaticResource MediumDarkColour}"/>
+      <Setter Property="Control.Background" Value="Transparent"/>
+      <Setter Property="Control.BorderBrush" Value="Transparent"/>
+      <Setter Property="Control.BorderThickness" Value="1"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Padding" Value="5"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="DefaultButtonBorder" Background="{TemplateBinding Control.Background}"
+                    BorderBrush="{TemplateBinding Control.BorderBrush}"
+                    BorderThickness="{TemplateBinding Control.BorderThickness}" CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="UIElement.IsMouseOver" Value="true">
+                <Setter TargetName="DefaultButtonBorder" Property="Border.Background" Value="#33999999"/>
+                <Setter TargetName="DefaultButtonBorder" Property="Border.BorderBrush" Value="#33999999"/>
+                <Setter Value="{StaticResource MediumDarkColour}" Property="Control.Foreground"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="AccentedButtonStyle" TargetType="{x:Type Button}">
+      <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+      <Setter Property="Control.FontFamily" Value="/AMDtool;component/Resources/fonts/#Roboto Regular"/>
+      <Setter Property="Control.FontWeight" Value="SemiBold"/>
+      <Setter Property="Control.Foreground" Value="White"/>
+      <Setter Property="Control.Background" Value="{StaticResource AccentColour2}"/>
+      <Setter Property="Control.BorderBrush" Value="{StaticResource AccentColour2}"/>
+      <Setter Property="Control.BorderThickness" Value="2"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Padding" Value="5"/>
+      <Setter Property="UIElement.Effect" Value="{StaticResource SmallShadowEffect}"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="DefaultButtonBorder" Background="{TemplateBinding Control.Background}"
+                    BorderBrush="{TemplateBinding Control.BorderBrush}"
+                    BorderThickness="{TemplateBinding Control.BorderThickness}" CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="UIElement.IsMouseOver" Value="true">
+                <Setter TargetName="DefaultButtonBorder" Value="{StaticResource LightColour}" Property="Border.Background"/>
+                <Setter TargetName="DefaultButtonBorder" Value="{StaticResource LightColour}" Property="Border.BorderBrush"/>
+                <Setter Property="Control.Foreground" Value="#FFFFFF"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="ArenaToolButtonStyle" TargetType="{x:Type Button}">
+      <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+      <Setter Property="Control.Background" Value="Transparent"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Padding" Value="5"/>
+      <Setter Property="FrameworkElement.Margin" Value="5"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="ArenaToolButtonBorder" Background="{TemplateBinding Control.Background}"
+                    CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="UIElement.IsMouseOver" Value="true">
+                <Setter TargetName="ArenaToolButtonBorder" Value="{StaticResource DarkColour}" Property="Border.Background"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="{x:Type TextBox}">
+      <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+      <Setter Property="Control.BorderBrush" Value="{StaticResource UltraLightColour}"/>
+      <Setter Property="Control.BorderThickness" Value="0,0,0,2"/>
+      <Setter Property="TextBoxBase.SelectionBrush" Value="{StaticResource UltraLightColour}"/>
+      <Setter Property="Control.Background" Value="Transparent"/>
+      <Setter Property="TextBox.TextWrapping" Value="Wrap"/>
+      <Setter Property="TextBoxBase.AcceptsReturn" Value="true"/>
+      <Setter Property="TextBoxBase.VerticalScrollBarVisibility" Value="Auto"/>
+      <Style.Triggers>
+        <Trigger Property="UIElement.IsFocused" Value="true">
+          <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+          <Setter Property="Control.BorderThickness" Value="0,0,0,2"/>
+          <Setter Property="Control.BorderBrush" Value="{StaticResource AccentColour1}"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="MultiLineTextBox" TargetType="{x:Type TextBox}">
+      <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+      <Setter Property="Control.BorderBrush" Value="#d9d9d9"/>
+      <Setter Property="Control.BorderThickness" Value="0,0,0,2"/>
+      <Setter Property="TextBoxBase.SelectionBrush" Value="{StaticResource UltraLightColour}"/>
+      <Setter Property="Control.Background" Value="Transparent"/>
+      <Setter Property="TextBox.TextWrapping" Value="Wrap"/>
+      <Setter Property="TextBoxBase.AcceptsReturn" Value="true"/>
+      <Setter Property="TextBoxBase.VerticalScrollBarVisibility" Value="Auto"/>
+      <Style.Triggers>
+        <Trigger Property="UIElement.IsFocused" Value="true">
+          <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+          <Setter Property="Control.BorderThickness" Value="0,0,0,2"/>
+          <Setter Property="Control.BorderBrush" Value="{StaticResource MediumColour}"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="ArenaSquareStyle" TargetType="{x:Type Rectangle}">
+      <Setter Property="Shape.Stroke" Value="White"/>
+      <Setter Property="Shape.StrokeThickness" Value="2"/>
+      <Setter Property="Shape.Fill" Value="Transparent"/>
+    </Style>
+    <Style x:Key="ArenaSquareBtnStyle" TargetType="{x:Type Button}">
+      <Setter Property="UIElement.SnapsToDevicePixels" Value="true"/>
+      <Setter Property="Control.Background" Value="Transparent"/>
+      <Setter Property="FrameworkElement.Cursor" Value="Hand"/>
+      <Setter Property="Control.Padding" Value="0"/>
+      <Setter Property="Control.BorderBrush" Value="White"/>
+      <Setter Property="Control.BorderThickness" Value="2"/>
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="ArenaSquareBtnBorder" Background="{TemplateBinding Control.Background}"
+                    BorderBrush="{TemplateBinding Control.BorderBrush}"
+                    BorderThickness="{TemplateBinding Control.BorderThickness}" CornerRadius="0,0,0,0">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding Control.HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Control.Padding}"
+                                VerticalAlignment="{TemplateBinding Control.VerticalContentAlignment}" RecognizesAccessKey="true"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Application.Resources>
+</Application>

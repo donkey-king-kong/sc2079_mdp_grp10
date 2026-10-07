@@ -1,0 +1,39 @@
+<Window x:Class="AMDtool.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AMDtool"
+        Title="Settings" Height="600" Width="800">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto"/>
+      <ColumnDefinition/>
+    </Grid.ColumnDefinitions>
+    <ListBox Name="Navigator" Grid.Row="0" Grid.Column="0">
+      <ListBoxItem>Received Commands</ListBoxItem>
+      <ListBoxItem>
+        Advanced Send Options
+      </ListBoxItem>
+      <ListBoxItem FontSize="12" Content="     Delay"/>
+      <ListBoxItem FontSize="12" Content="     Quick Input"/>
+      <ListBoxItem FontSize="12" Content="     Robot Status"/>
+      <ListBoxItem>Custom Scripts</ListBoxItem>
+      <ListBoxItem>
+        Default Arena Settings
+      </ListBoxItem>
+    </ListBox>
+    <Frame Name="SettingsFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden"/>
+    <StackPanel Orientation="Horizontal" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,15,15,15"
+                HorizontalAlignment="Right">
+      <Button Name="OkBtn" Margin="10,0,0,0" Width="70" HorizontalAlignment="Right"
+              Style="{StaticResource FlatButtonStyle}" Height="36">OK</Button>
+      <Button Name="CancelBtn" Margin="10,0,0,0" Width="70" HorizontalAlignment="Right"
+              Style="{StaticResource FlatButtonStyle}" Height="36">CANCEL</Button>
+    </StackPanel>
+  </Grid>
+</Window>
