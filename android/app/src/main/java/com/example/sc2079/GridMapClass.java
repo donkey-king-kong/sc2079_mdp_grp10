@@ -131,7 +131,7 @@ public class GridMapClass extends View {
         textPaint.setTextSize(Math.min(cellWidth, cellHeight) / 2f); // scale with cell size
         textPaint.setAntiAlias(true);
         verifiedPaint.setColor(Color.parseColor("#FFA500")); // Distinguishing Orange
-        verifiedPaint.setStrokeWidth(15f); // Thick line
+        verifiedPaint.setStrokeWidth(6f);
         paintObstacleVerified.setColor(Color.rgb(255, 165, 0));
         f1CarBitmap = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.ic_f1_car);
         gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener(){
@@ -441,6 +441,11 @@ public class GridMapClass extends View {
                         } else {
                             canvas.drawRect(left, top, right, bottom, blackPaint);
                         }
+                        if (obstacle.getVerified()) {
+                            drawDirectionalArrow(canvas, obstacle, left, top, verifiedPaint);
+                        } else {
+                            drawDirectionalArrow(canvas, obstacle, left, top, redPaint);
+                        }
                         float originalSize = textPaint.getTextSize();
                         if (obstacle.getVerified()) {
                             textPaint.setTextSize(originalSize * 1.5f);
@@ -453,11 +458,6 @@ public class GridMapClass extends View {
                             canvas.drawText(String.valueOf(obstacle.getObstacleNumber()), textX, textY, textPaint);
                         }
                         textPaint.setTextSize(originalSize);
-                        if (obstacle.getVerified()) {
-                            drawDirectionalArrow(canvas, obstacle, left, top, verifiedPaint);
-                        } else {
-                            drawDirectionalArrow(canvas, obstacle, left, top, redPaint);
-                        }
                     }
                 } else if (obstacle.getObstacleType() == ObstacleData.OBSTACLETYPE.passedObstacle) {
                     canvas.drawRect(left, top, right, bottom, verifiedPaint);
