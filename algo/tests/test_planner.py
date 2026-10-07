@@ -242,6 +242,23 @@ class Reachability(unittest.TestCase):
         for leg in route.legs:
             self.assertTrue(arena.is_trajectory_free(leg.trajectory))
 
+    def test_a_block_just_in_front_of_the_start_zone_is_reached(self):
+        # The simulator layout ("park6") where obstacle 6 sits right in front of
+        # the start zone, facing it. Its photo poses bunch up against the start
+        # corner; the nearest one never fits, so a search that only ever tried
+        # the nearest gave up and the planner reported it unreachable.
+        layout = [Obstacle(1, 10.0, 80.0, "N"), Obstacle(2, 50.0, 150.0, "S"),
+                  Obstacle(3, 130.0, 140.0, "S"), Obstacle(4, 80.0, 110.0, "W"),
+                  Obstacle(5, 110.0, 100.0, "E"), Obstacle(6, 30.0, 50.0, "S"),
+                  Obstacle(7, 60.0, 40.0, "E")]
+        arena = Arena(layout)
+        route = planner.plan_route(arena, "exhaustive")
+        self.assertIn(6, route.order)
+        self.assertEqual(sorted(route.order), [1, 2, 3, 4, 5, 6, 7])
+        self.assertEqual(route.unreachable, [])
+        for leg in route.legs:
+            self.assertTrue(arena.is_trajectory_free(leg.trajectory))
+
     def test_legs_chain_exactly_after_a_hybrid_astar_leg(self):
         # Two stress-test layouts where a Hybrid A* leg used to stop within its
         # 4cm / 10 degree goal box, so the next leg started 3-4cm away from

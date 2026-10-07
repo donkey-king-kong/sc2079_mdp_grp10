@@ -230,6 +230,10 @@ HA_MATRIX_EXPANSIONS = 2500
 # did not use. Some ways in (out of a tight corner) need a long search; running
 # that first would let one hopeless obstacle eat the time the easy ones need.
 HA_DEEP_EXPANSIONS = 10000
+# In the short searches, a node this close (cm, by the search heuristic) to an
+# obstacle's best photo pose also tries to finish on it, even when another
+# of its photo poses is nearer.
+HA_NEIGHBOUR_SHOT_RANGE = 20.0
 
 # Wall-clock ceiling on the whole gap-filling pass. A call-count budget is a
 # poor bound because the cost of one search varies by two orders of magnitude --

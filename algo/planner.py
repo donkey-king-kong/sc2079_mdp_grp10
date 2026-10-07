@@ -93,6 +93,10 @@ class Leg:
     obstacle_id: int
     trajectory: Trajectory
     method: str                  # the Dubins word, "via" for a multi-hop, or "hybrid_astar"
+    # What the leg's whole-number commands really drive, from where the legs
+    # before it leave the robot (set by `anchor_legs`). It ends a little off
+    # `trajectory`'s capture pose, and it is the path the simulator draws.
+    driven: Optional[Trajectory] = None
 
     @property
     def distance(self) -> float:
@@ -144,6 +148,21 @@ def leg_cost(trajectory: Trajectory, metric: str = "time") -> float:
     if metric == "distance":
         return trajectory.length
     raise ValueError("metric must be 'time' or 'distance', got %r" % (metric,))
+
+
+def _start_zone_first(arena: Arena, obstacle_ids: List[int]) -> List[int]:
+    """`obstacle_ids` with the blocks that crowd the start zone moved to the front.
+
+    "Crowding" means the block's cell is within two cells of the 4x4 start
+    zone in both directions (x and y both under 60cm).
+    """
+    near = []
+    for oid in obstacle_ids:
+        ob = arena.obstacle_by_id(oid)
+        if ob.x < cfg.START_ZONE_SIZE + 2 * cfg.CELL_SIZE and ob.y < cfg.START_ZONE_SIZE + 2 * cfg.CELL_SIZE:
+            near.append((ob.x + ob.y, oid))
+    front = [oid for _, oid in sorted(near)]
+    return front + [oid for oid in obstacle_ids if oid not in front]
 
 
 def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
@@ -265,7 +284,13 @@ class CostModel:
                         continue
                     self._add(Node(index=len(self.nodes), pose=pose, kind="transit"))
 
-        self.obstacle_ids: List[int] = list(self.nodes_by_obstacle.keys())
+        # The order obstacles are worked through decides which way a stranded
+        # one gets searched for. A block crowding the start zone is reached
+        # most reliably while the start is still the nearest place to search
+        # from, so those go first (nearest the corner first); every other
+        # obstacle keeps the order it was sent in. Ids, and so every SNAP, are
+        # unchanged.
+        self.obstacle_ids: List[int] = _start_zone_first(arena, list(self.nodes_by_obstacle.keys()))
 
         size = len(self.nodes)
         self._cost: List[List[float]] = [[INF] * size for _ in range(size)]
@@ -471,7 +496,9 @@ class CostModel:
         found = hybrid_astar.plan_any(self.arena, self.nodes[source_index].pose,
                                       [self.nodes[j].pose for j in goals],
                                       max_expansions=max_expansions or cfg.HA_MATRIX_EXPANSIONS,
-                                      deadline=deadline)
+                                      deadline=deadline,
+                                      shoot_better_neighbours=not max_expansions
+                                      or max_expansions <= cfg.HA_MATRIX_EXPANSIONS)
         if found is None:
             return False
         target_index, trajectory = goals[found[0]], found[1]
@@ -641,21 +668,116 @@ def _exhaustive_order(model: CostModel, obstacle_ids: Sequence[int]) -> List[int
     If no complete tour exists -- one obstacle wedged where the robot can get in
     but not back out -- we drop to subsets of four, then three, and so on,
     rather than returning nothing. Checklist B.2 scores the images actually
-    recognised, so four out of five beats giving up. Even at the worst size that
-    is 325 permutations in total, which costs nothing.
+    recognised, so four out of five beats giving up.
+
+    With eight obstacles that is 8! = 40,320 orderings, and up to 8 x 7! more
+    when no complete tour exists -- most of a slow plan's time. So two dynamic
+    programmes over subsets come first: the cheapest way to have visited each
+    set of obstacles, which gives the best cost at each size exactly, and the
+    cheapest way to visit the rest of a set from each pose, which bounds any
+    partial ordering from below. The orderings are then walked in the very same
+    sequence as before, skipping every set and every prefix that cannot come
+    within `_ORDER_SLACK` of the best cost. The first ordering at the best cost
+    -- the one the plain search keeps -- is never skipped, so the answer is the
+    same ordering, found from a few dozen candidates instead of thousands.
     """
     ids = list(obstacle_ids)
-    for size in range(len(ids), 0, -1):
+    count = len(ids)
+    if not count:
+        return []
+    poses = [model.nodes_by_obstacle[oid] for oid in ids]
+    cost = model._cost
+    full = 1 << count
+
+    def layer(current: Dict[int, float], k: int) -> Dict[int, float]:
+        """One step of `evaluate_order`'s DP, done the same way."""
+        nxt: Dict[int, float] = {}
+        for j in poses[k]:
+            best = INF
+            for i, so_far in current.items():
+                if so_far >= INF:
+                    continue
+                total = so_far + cost[i][j]
+                if total < best:
+                    best = total
+            nxt[j] = best
+        return nxt
+
+    # arrive[mask][j]: cheapest cost of visiting exactly `mask`, ending on pose j.
+    arrive: List[Dict[int, float]] = [{} for _ in range(full)]
+    for mask in range(1, full):
+        for k in range(count):
+            bit = 1 << k
+            if not mask & bit:
+                continue
+            rest_mask = mask ^ bit
+            if not rest_mask:
+                arrive[mask].update({j: cost[0][j] for j in poses[k]})
+            else:
+                arrive[mask].update(layer(arrive[rest_mask], k))
+
+    # finish[mask][j]: cheapest cost of visiting exactly `mask` from pose j.
+    finish: List[Dict[int, float]] = [{} for _ in range(full)]
+    for mask in range(full):
+        for owner in range(count):
+            if mask & (1 << owner):
+                continue
+            for j in poses[owner]:
+                if not mask:
+                    finish[mask][j] = 0.0
+                    continue
+                best = INF
+                for k in range(count):
+                    bit = 1 << k
+                    if mask & bit:
+                        for nxt in poses[k]:
+                            total = cost[j][nxt] + finish[mask ^ bit][nxt]
+                            if total < best:
+                                best = total
+                finish[mask][j] = best
+
+    def subset_best(mask: int) -> float:
+        return min(arrive[mask].values(), default=INF)
+
+    for size in range(count, 0, -1):
+        masks = [sum(1 << k for k in combo) for combo in itertools.combinations(range(count), size)]
+        floor = min(subset_best(mask) for mask in masks)
+        if floor >= INF:
+            continue
+        limit = floor + _ORDER_SLACK
         best_order: List[int] = []
         best_cost = INF
-        for subset in itertools.combinations(ids, size):
-            for candidate in itertools.permutations(subset):
-                cost, _ = model.evaluate_order(candidate)
-                if cost < best_cost:
-                    best_cost, best_order = cost, list(candidate)
+
+        def walk(prefix: List[int], current: Dict[int, float], left: List[int]) -> None:
+            nonlocal best_order, best_cost
+            if not left:
+                candidate = [ids[k] for k in prefix]
+                total, _ = model.evaluate_order(candidate)
+                if total < best_cost:
+                    best_cost, best_order = total, candidate
+                return
+            left_mask = sum(1 << k for k in left)
+            bound = min((so_far + finish[left_mask].get(j, INF)
+                         for j, so_far in current.items()), default=INF)
+            if bound > limit:
+                return
+            for position, k in enumerate(left):
+                walk(prefix + [k], layer(current, k), left[:position] + left[position + 1:])
+
+        for combo, mask in zip(itertools.combinations(range(count), size), masks):
+            if subset_best(mask) > limit:
+                continue
+            for position, k in enumerate(combo):
+                walk([k], {j: cost[0][j] for j in poses[k]},
+                     list(combo[:position] + combo[position + 1:]))
         if best_order:
             return best_order
     return []
+
+
+# Orderings costing more than the best by this much (seconds) cannot be the one
+# the plain search keeps; it only absorbs floating-point rounding in the bound.
+_ORDER_SLACK = 1e-6
 
 
 _ORDERERS = {
@@ -743,8 +865,9 @@ def anchor_legs(arena: Arena, route: Route, start: Pose) -> None:
     The re-plan rejoins the original leg at one of its segment ends (the
     capture pose itself, or a transit pose on a multi-hop leg), with the same
     analytic moves `_plan_leg` uses and the same collision check; the cheapest
-    rejoin wins. If none fits, the leg is driven as planned from where the
-    robot is -- no worse than before.
+    rejoin wins. If none fits (in a cramped start zone, say), short Hybrid A*
+    searches back onto the leg are tried; only if those fail too is the leg
+    driven as planned from where the robot is, and its error carries on.
     """
     heading = commands_module.HeadingTracker()
     pose = start
@@ -754,11 +877,14 @@ def anchor_legs(arena: Arena, route: Route, start: Pose) -> None:
                 or abs(normalise_angle(pose.theta - begin.theta)) > 1e-9):
             rejoined = _rejoin(arena, pose, leg.trajectory, route.metric,
                                allow_backoff=index > 0)
+            if rejoined is None:
+                rejoined = _search_rejoin(arena, pose, leg.trajectory, allow_backoff=index > 0)
             if rejoined is not None:
                 leg.method, leg.trajectory = rejoined
         driven = commands_module.leg_commands(leg.trajectory, heading, start.theta)
         if driven:
-            pose = commands_module.commands_to_trajectory(driven, pose).end_pose()
+            leg.driven = commands_module.commands_to_trajectory(driven, pose)
+            pose = leg.driven.end_pose()
 
 
 def _rejoin(arena: Arena, pose: Pose, trajectory: Trajectory, metric: str,
@@ -777,6 +903,24 @@ def _rejoin(arena: Arena, pose: Pose, trajectory: Trajectory, metric: str,
         if cost < best_cost:
             best, best_cost = ("rejoin-" + result[0], joined), cost
     return best
+
+
+def _search_rejoin(arena: Arena, pose: Pose, trajectory: Trajectory,
+                   allow_backoff: bool) -> Optional[Tuple[str, Trajectory]]:
+    """`_rejoin`'s fallback: short Hybrid A* searches, onto the capture pose
+    first (after the usual back-out tries), then onto any segment end."""
+    direct = _plan_leg(arena, pose, trajectory.end_pose(), allow_search=True,
+                       max_expansions=cfg.HA_MATRIX_EXPANSIONS, allow_backoff=allow_backoff)
+    if direct is not None:
+        return ("rejoin-" + direct[0], direct[1])
+    segments = trajectory.segments
+    ends = list(range(len(segments) - 1, -1, -1))        # the capture pose first
+    found = hybrid_astar.plan_any(arena, pose, [segments[k].end for k in ends],
+                                  max_expansions=cfg.HA_MATRIX_EXPANSIONS)
+    if found is None:
+        return None
+    k = ends[found[0]]
+    return ("rejoin-hybrid_astar", Trajectory(merge_segments(found[1].segments + segments[k + 1:])))
 
 
 def compare_strategies(arena: Arena, start: Optional[Pose] = None,
