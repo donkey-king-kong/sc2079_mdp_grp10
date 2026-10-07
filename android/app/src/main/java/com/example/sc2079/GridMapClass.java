@@ -448,7 +448,7 @@ public class GridMapClass extends View {
                         float textX = left + (cellWidth / 2f);
                         float textY = top + (cellHeight / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2);
                         if(obstacle.getVerified()){
-                            canvas.drawText(utilities.convertObstacleIdToObstacleString(obstacle.getObstacleNumber()), textX, textY, textPaint);
+                            canvas.drawText(utilities.convertObstacleIdToObstacleString(obstacle.getScannedImageId()), textX, textY, textPaint);
                         }else{
                             canvas.drawText(String.valueOf(obstacle.getObstacleNumber()), textX, textY, textPaint);
                         }
@@ -2310,16 +2310,23 @@ public class GridMapClass extends View {
     }
 
     public void updateObstacleTarget(int obstacleNumber, String targetId) {
+        int id;
+        try {
+            id = Integer.parseInt(targetId);
+        } catch (NumberFormatException e) {
+            Log.e("GridMapClass", "Non-numeric Target ID: " + targetId);
+            return;
+        }
+        if (id < 11 || id > 40) {
+            Log.e("GridMapClass", "Out-of-range Target ID: " + id);
+            return;
+        }
         for (int y = 0; y < gridRows; y++) {
             for (int x = 0; x < gridColumns; x++) {
                 ObstacleData obs = gridMapData.get(y).get(x);
                 if (obs.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle && obs.getObstacleNumber() == obstacleNumber) {
                     obs.setVerified(true);
-                    try {
-                        obs.setObstacleNumber(Integer.parseInt(targetId));
-                    } catch (NumberFormatException e) {
-                        Log.e("GridMapClass", "Non-numeric Target ID: " + targetId);
-                    }
+                    obs.setScannedImageId(id);
                     postInvalidate();
                     notifyGridChanged();
                     return;

@@ -62,6 +62,7 @@ public class ObstacleData{
     boolean occupied;
     boolean verified;
     int obstacle_number;
+    int scannedImageId = 0;
 
     ObstacleData(int x_coord, int y_coord, Direction direction, boolean occupied, OBSTACLETYPE obstacleType, boolean verified, int obstacle_number) {
         this.x_coord = x_coord;
@@ -120,6 +121,8 @@ public class ObstacleData{
     public int getObstacleNumber(){
         return this.obstacle_number;
     }
+    public int getScannedImageId() { return scannedImageId; }
+    public void setScannedImageId(int id) { this.scannedImageId = id; }
 
     public void printObstacleData(){
         Log.d("ObstacleClass:", "X Coordinate "+utilities.convertIntToString(this.x_coord));
