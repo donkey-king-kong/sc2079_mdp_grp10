@@ -1519,7 +1519,6 @@ class MainActivity : AppCompatActivity() {
 
             gridMapObj.clearGridMap()
             gridMapObj.addGridMapSaved(loadedData)
-            gridMapObj.sendArenaDataBluetooth()
 
             Toast.makeText(this, "Loaded $slotName", Toast.LENGTH_SHORT).show()
         } else {

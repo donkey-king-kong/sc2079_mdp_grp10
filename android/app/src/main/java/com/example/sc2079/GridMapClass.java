@@ -131,7 +131,7 @@ public class GridMapClass extends View {
         textPaint.setTextSize(Math.min(cellWidth, cellHeight) / 2f); // scale with cell size
         textPaint.setAntiAlias(true);
         verifiedPaint.setColor(Color.parseColor("#FFA500")); // Distinguishing Orange
-        verifiedPaint.setStrokeWidth(15f); // Thick line
+        verifiedPaint.setStrokeWidth(6f);
         paintObstacleVerified.setColor(Color.rgb(255, 165, 0));
         f1CarBitmap = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.ic_f1_car);
         gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener(){
@@ -441,6 +441,11 @@ public class GridMapClass extends View {
                         } else {
                             canvas.drawRect(left, top, right, bottom, blackPaint);
                         }
+                        if (obstacle.getVerified()) {
+                            drawDirectionalArrow(canvas, obstacle, left, top, verifiedPaint);
+                        } else {
+                            drawDirectionalArrow(canvas, obstacle, left, top, redPaint);
+                        }
                         float originalSize = textPaint.getTextSize();
                         if (obstacle.getVerified()) {
                             textPaint.setTextSize(originalSize * 1.5f);
@@ -448,16 +453,11 @@ public class GridMapClass extends View {
                         float textX = left + (cellWidth / 2f);
                         float textY = top + (cellHeight / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2);
                         if(obstacle.getVerified()){
-                            canvas.drawText(utilities.convertObstacleIdToObstacleString(obstacle.getObstacleNumber()), textX, textY, textPaint);
+                            canvas.drawText(utilities.convertObstacleIdToObstacleString(obstacle.getScannedImageId()), textX, textY, textPaint);
                         }else{
                             canvas.drawText(String.valueOf(obstacle.getObstacleNumber()), textX, textY, textPaint);
                         }
                         textPaint.setTextSize(originalSize);
-                        if (obstacle.getVerified()) {
-                            drawDirectionalArrow(canvas, obstacle, left, top, verifiedPaint);
-                        } else {
-                            drawDirectionalArrow(canvas, obstacle, left, top, redPaint);
-                        }
                     }
                 } else if (obstacle.getObstacleType() == ObstacleData.OBSTACLETYPE.passedObstacle) {
                     canvas.drawRect(left, top, right, bottom, verifiedPaint);
@@ -2310,16 +2310,25 @@ public class GridMapClass extends View {
     }
 
     public void updateObstacleTarget(int obstacleNumber, String targetId) {
+        int id;
+        try {
+            id = Integer.parseInt(targetId);
+        } catch (NumberFormatException e) {
+            Log.e("GridMapClass", "Non-numeric Target ID: " + targetId);
+            return;
+        }
+        if (id < 11 || id > 40) {
+            Log.e("GridMapClass", "Out-of-range Target ID: " + id);
+            ((MainActivity) getContext()).logSystem(
+                "TARGET update failed — obstacle " + obstacleNumber + " received image ID " + id + ", which is outside the valid range (11–40).");
+            return;
+        }
         for (int y = 0; y < gridRows; y++) {
             for (int x = 0; x < gridColumns; x++) {
                 ObstacleData obs = gridMapData.get(y).get(x);
                 if (obs.getObstacleType() == ObstacleData.OBSTACLETYPE.Obstacle && obs.getObstacleNumber() == obstacleNumber) {
                     obs.setVerified(true);
-                    try {
-                        obs.setObstacleNumber(Integer.parseInt(targetId));
-                    } catch (NumberFormatException e) {
-                        Log.e("GridMapClass", "Non-numeric Target ID: " + targetId);
-                    }
+                    obs.setScannedImageId(id);
                     postInvalidate();
                     notifyGridChanged();
                     return;

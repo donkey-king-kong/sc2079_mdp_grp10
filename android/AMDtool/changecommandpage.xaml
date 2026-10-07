@@ -1,0 +1,88 @@
+<Page x:Class="AMDtool.ChangeCommandPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:AMDtool"
+      Title="ChangeCommandPage">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition/>
+      <ColumnDefinition/>
+      <ColumnDefinition/>
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <TextBlock TextWrapping="Wrap" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="15,20,15,15"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14">
+      Edit the commands for the virtual robot to recognize.
+    </TextBlock>
+    <StackPanel Orientation="Vertical" Grid.Row="1" Grid.Column="0" Margin="15">
+      <TextBox Name="SLtb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">STRAFE LEFT</Label>
+    </StackPanel>
+    <StackPanel Orientation="Vertical" Grid.Row="1" Grid.Column="1" Margin="15">
+      <TextBox Name="Ftb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">FORWARD</Label>
+    </StackPanel>
+    <StackPanel Orientation="Vertical" Grid.Row="1" Grid.Column="2" Margin="15">
+      <TextBox Name="SRtb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">STRAFE RIGHT</Label>
+    </StackPanel>
+    <StackPanel Orientation="Vertical" Grid.Row="2" Grid.Column="0" Margin="15">
+      <TextBox Name="RLtb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">ROTATE LEFT</Label>
+    </StackPanel>
+    <StackPanel Orientation="Vertical" Grid.Row="2" Grid.Column="1" Margin="15">
+      <TextBox Name="Rtb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">REVERSE</Label>
+    </StackPanel>
+    <StackPanel Orientation="Vertical" Grid.Row="2" Grid.Column="2" Margin="15">
+      <TextBox Name="RRtb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">ROTATE RIGHT</Label>
+    </StackPanel>
+    <StackPanel Orientation="Vertical" Grid.Row="3" Grid.Column="0" Margin="15">
+      <TextBox Name="BEtb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">BEGIN EXPLORATION</Label>
+    </StackPanel>
+    <StackPanel Orientation="Vertical" Grid.Row="3" Grid.Column="1" Margin="15">
+      <TextBox Name="BFPtb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">BEGIN FASTEST PATH</Label>
+    </StackPanel>
+    <StackPanel Orientation="Vertical" Grid.Row="3" Grid.Column="2" Margin="15">
+      <TextBox Name="SAtb" Style="{StaticResource MultiLineTextBox}" Height="40" Margin="5"
+               HorizontalContentAlignment="Center" VerticalContentAlignment="Bottom"
+               FontFamily="/AMDtool;component/Resources/fonts/#Roboto" FontSize="14"/>
+      <Label FontFamily="/AMDtool;component/Resources/fonts/#Roboto Medium" FontSize="14"
+             HorizontalContentAlignment="Center">SEND ARENA INFO</Label>
+    </StackPanel>
+  </Grid>
+</Page>

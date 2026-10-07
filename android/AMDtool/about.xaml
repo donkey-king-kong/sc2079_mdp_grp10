@@ -1,0 +1,63 @@
+<Window x:Class="AMDtool.About"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AMDtool"
+        Title="About" Height="400" Width="600">
+  <Grid>
+    <ScrollViewer>
+      <TextBlock Margin="10" FontSize="14" FontFamily="Consolas" TextWrapping="Wrap">
+        Hope you will find this tool useful for MDP.
+        <LineBreak/>
+        Any bug fix requests or help, please contact me at LEES0147@E.NTU.EDU.SG
+        <LineBreak/>
+        <LineBreak/>
+        Ver 1.0.5
+        <LineBreak/>
+        Stability fixes for when attempting to connect while the application is unaware of bluetooth disconnection.
+        <LineBreak/>
+        <LineBreak/>
+        Ver 1.0.4
+        <LineBreak/>
+        The virtual robot now points to the correct direction on start when the default application angle is not 0.
+        <LineBreak/>
+        <LineBreak/>
+        Ver 1.0.3
+        <LineBreak/>
+        The internal robot position now updates accordingly when loading arena from file.
+        <LineBreak/>
+        Fixed a problem where the robot direction does not reflect correctly after loading arena from file when the angle in the file is same as the one in the application.
+        <LineBreak/>
+        <LineBreak/>
+        Ver 1.0.2
+        <LineBreak/>
+        Sending command to move the virtual robot now updates the internal robot position.
+        <LineBreak/>
+        The application now sends the updated arena information to your device after you send a command to move the virtual robot, provided that the button to send arena information on change is toggled.
+        <LineBreak/>
+        <LineBreak/>
+        Ver 1.0.1
+        <LineBreak/>
+        Reconnect now works when your device is the Bluetooth client. (i.e. When you connect to the software using your device to the PC)
+        <LineBreak/>
+        <LineBreak/>
+        Ver 1.0
+        <LineBreak/>
+        <Run FontWeight="Bold">
+          Known issues in this version
+        </Run>
+        <LineBreak/>
+        When using this tool to connect as a server (i.e Your app initiates the connection), once the connection is broken, it can no longer connect as a server.
+        <LineBreak/>
+        <Run FontWeight="Bold">
+          Work around solution
+        </Run>
+        <LineBreak/>
+        You can continue to connect as a client.
+        <LineBreak/>
+        If needed you can close and reopen the tool. You can save your arena first if required.
+      </TextBlock>
+    </ScrollViewer>
+  </Grid>
+</Window>
