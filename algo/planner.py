@@ -150,6 +150,21 @@ def leg_cost(trajectory: Trajectory, metric: str = "time") -> float:
     raise ValueError("metric must be 'time' or 'distance', got %r" % (metric,))
 
 
+def _start_zone_first(arena: Arena, obstacle_ids: List[int]) -> List[int]:
+    """`obstacle_ids` with the blocks that crowd the start zone moved to the front.
+
+    "Crowding" means the block's cell is within two cells of the 4x4 start
+    zone in both directions (x and y both under 60cm).
+    """
+    near = []
+    for oid in obstacle_ids:
+        ob = arena.obstacle_by_id(oid)
+        if ob.x < cfg.START_ZONE_SIZE + 2 * cfg.CELL_SIZE and ob.y < cfg.START_ZONE_SIZE + 2 * cfg.CELL_SIZE:
+            near.append((ob.x + ob.y, oid))
+    front = [oid for _, oid in sorted(near)]
+    return front + [oid for oid in obstacle_ids if oid not in front]
+
+
 def _plan_leg(arena: Arena, source: Pose, target: Pose, allow_search: bool,
               max_expansions: int = cfg.HA_MAX_EXPANSIONS,
               allow_backoff: bool = True) -> Optional[Tuple[str, Trajectory]]:
@@ -269,7 +284,13 @@ class CostModel:
                         continue
                     self._add(Node(index=len(self.nodes), pose=pose, kind="transit"))
 
-        self.obstacle_ids: List[int] = list(self.nodes_by_obstacle.keys())
+        # The order obstacles are worked through decides which way a stranded
+        # one gets searched for. A block crowding the start zone is reached
+        # most reliably while the start is still the nearest place to search
+        # from, so those go first (nearest the corner first); every other
+        # obstacle keeps the order it was sent in. Ids, and so every SNAP, are
+        # unchanged.
+        self.obstacle_ids: List[int] = _start_zone_first(arena, list(self.nodes_by_obstacle.keys()))
 
         size = len(self.nodes)
         self._cost: List[List[float]] = [[INF] * size for _ in range(size)]
