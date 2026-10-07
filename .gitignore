@@ -38,6 +38,7 @@ Thumbs.db
 *.cyclo
 *.crf
 *.htm
+**/.settings/language.settings.xml
 
 Debug/
 Release/
