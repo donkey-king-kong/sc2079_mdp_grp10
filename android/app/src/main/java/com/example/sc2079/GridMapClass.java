@@ -2319,6 +2319,8 @@ public class GridMapClass extends View {
         }
         if (id < 11 || id > 40) {
             Log.e("GridMapClass", "Out-of-range Target ID: " + id);
+            ((MainActivity) getContext()).logSystem(
+                "TARGET update failed — obstacle " + obstacleNumber + " received image ID " + id + ", which is outside the valid range (11–40).");
             return;
         }
         for (int y = 0; y < gridRows; y++) {
