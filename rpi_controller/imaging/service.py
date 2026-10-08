@@ -20,6 +20,7 @@ from .detector import (
     valid_detections,
 )
 from .enhancement import contrast_variants, map_rotated_bbox_to_source, rotate_frame
+from .preprocessing import map_preprocessed_bbox_to_source, task1_preprocessing_variants
 
 
 DEFAULT_MODEL_PATH = Path(__file__).with_name("model") / "best.pt"
@@ -124,6 +125,8 @@ class ImagingService:
         max_bbox_area_ratio: float = 0.50,
         data_dir: str | Path = DATA_DIR,
         use_contrast_variants: bool = True,
+        use_preprocessing_variants: bool = False,
+        preprocessing_variants: tuple[str, ...] | None = None,
     ):
         self.model_path = Path(model_path)
         self.width = width
@@ -150,6 +153,8 @@ class ImagingService:
         self.confidence_tie_epsilon = confidence_tie_epsilon
         self.rotation_angles = rotation_angles
         self.use_contrast_variants = use_contrast_variants
+        self.use_preprocessing_variants = use_preprocessing_variants
+        self.preprocessing_variants = preprocessing_variants
         self.max_bbox_area_ratio = max_bbox_area_ratio
         self.data_dir = Path(data_dir)
         self.detector = LocalYoloDetector(self.model_path, confidence) if self.model_path.is_file() else None
@@ -253,12 +258,33 @@ class ImagingService:
             per_class: dict[str, tuple[object, DetectionResult]] = {}
             for angle in self.rotation_angles:
                 rotated_frame = rotate_frame(frame, angle)
-                inference_frames = (
-                    (rotated_frame, *contrast_variants(rotated_frame))
-                    if self.use_contrast_variants
-                    else (rotated_frame,)
-                )
-                for inference_frame in inference_frames:
+                inference_frames = [("original", rotated_frame)]
+                if self.use_contrast_variants:
+                    inference_frames.extend(
+                        zip(
+                            ("brighten_shadows", "percentile_stretch"),
+                            contrast_variants(rotated_frame),
+                        )
+                    )
+                if self.use_preprocessing_variants:
+                    preprocessing = task1_preprocessing_variants(rotated_frame)
+                    names = (
+                        self.preprocessing_variants
+                        if self.preprocessing_variants is not None
+                        else tuple(name for name in preprocessing if name != "original")
+                    )
+                    unknown_names = set(names).difference(preprocessing).union(
+                        {"original"}.intersection(names)
+                    )
+                    if unknown_names:
+                        raise ValueError(
+                            "unknown preprocessing variants: %s"
+                            % ", ".join(sorted(unknown_names))
+                        )
+                    inference_frames.extend(
+                        (name, preprocessing[name]) for name in names
+                    )
+                for variant_name, inference_frame in inference_frames:
                     raw_detections = self.detector.detect_all(inference_frame)
                     for detection in raw_detections:
                         label = detection.target_id or "unknown"
@@ -272,7 +298,14 @@ class ImagingService:
                         assert target_id is not None and detection.bbox is not None
                         upright_detection = DetectionResult(
                             True, target_id, detection.confidence,
-                            map_rotated_bbox_to_source(detection.bbox, frame.shape, inference_frame.shape, angle),
+                            map_rotated_bbox_to_source(
+                                map_preprocessed_bbox_to_source(
+                                    variant_name, detection.bbox, rotated_frame.shape,
+                                ),
+                                frame.shape,
+                                rotated_frame.shape,
+                                angle,
+                            ),
                         )
                         if _bbox_area(upright_detection.bbox) > frame.shape[0] * frame.shape[1] * self.max_bbox_area_ratio:
                             print(f"[IMAGING]   {target_id} ignored (bbox covers too much of frame)")

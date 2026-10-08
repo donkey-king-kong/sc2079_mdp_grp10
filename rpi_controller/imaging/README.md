@@ -15,5 +15,11 @@ The deployed inference weights are stored on the RPi at `/model/best.pt`. They a
 
 - `dummy_test/test_imaging_service.py` captures one image and prints its inference result.
 - `dummy_test/test_camera_http.py` serves an annotated MJPEG stream for viewing in VLC.
+- `dummy_test/continuous_camera_inference.py` continuously captures and infers.
+  Run it from `rpi_controller` with `python3 dummy_test/continuous_camera_inference.py`.
+  Set either `USE_PILLOW_CONTRAST` or `USE_CLAHE` near the top of that file;
+  the runner rejects enabling both methods. While it is running, type `save`
+  and press Enter to save the latest raw, contrast-adjusted,
+  and annotated images under `imaging/data/continuous_scan/`.
 
 Both checks require RPi camera access, Picamera2, and locally installed model weights.

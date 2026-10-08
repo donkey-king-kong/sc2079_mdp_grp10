@@ -21,18 +21,28 @@ from task1.runtime import MissionState, Task1Runtime
 # ---- Test-run configuration -------------------------------------------------
 STM_PORT = "/dev/ttyACM0"
 ALGO_HOST = "10.42.0.208"  # Laptop IP on the RPi network.
-ALGO_TIMEOUT_SECONDS = 15
+ALGO_TIMEOUT_SECONDS = 60
 
 # Select a file in imaging/model/.  The model weights are intentionally ignored
 # by Git and must be deployed to the RPi separately.
-CV_MODEL_FILENAME = "best.pt"  # Alternative: "best_JH.pt"
+CV_MODEL_FILENAME = "best_JH.pt"  # 
 CV_SAMPLE_COUNT = 1
 CV_MIN_FRAMES_SEEN = 1
 CV_ROTATION_ANGLES = (0,)
 CV_USE_CONTRAST = False
+# Run only the selected preprocessing alternatives per captured frame. These
+# two gave the strongest historical agreement across runs 080–087.
+CV_USE_PREPROCESSING = True
+CV_PREPROCESSING_VARIANTS = (
+    "grayscale_clahe",
+    "lab_clahe",
+)
 # False: capture and infer before the car continues. True: capture at SNAP,
 # then run inference while the car continues its route.
 PARALLEL_INFERENCE = True
+# False: submit the arena to Algo as soon as Android sends it. True: wait for
+# Android's beginExplore/beginFastest command before submitting it.
+WAIT_FOR_START = False
 
 BLUETOOTH_DEVICE = "/dev/rfcomm0"
 RESET_BLUETOOTH_ON_START = True
@@ -92,14 +102,18 @@ def main() -> int:
                     min_frames_seen=CV_MIN_FRAMES_SEEN,
                     rotation_angles=CV_ROTATION_ANGLES,
                     use_contrast_variants=CV_USE_CONTRAST,
+                    use_preprocessing_variants=CV_USE_PREPROCESSING,
+                    preprocessing_variants=CV_PREPROCESSING_VARIANTS,
                 )
             ),
             detections_dir=run_dir,
             continuous_camera_scan=CONTINUOUS_CAMERA_SCAN,
             continuous_scan_interval_seconds=CONTINUOUS_SCAN_INTERVAL_SECONDS,
             parallel_inference=PARALLEL_INFERENCE,
+            wait_for_start=WAIT_FOR_START,
             bluetooth=bluetooth,
             android=android,
+            on_android_disconnect=reset_bluetooth_service,
         )
         runtime.start()
         print("[KERNEL] Waiting for Android arena...")

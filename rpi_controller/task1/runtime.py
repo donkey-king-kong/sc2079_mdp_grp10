@@ -51,11 +51,13 @@ class Task1Kernel:
         shutdown,
         android_requests=None,
         parallel_inference: bool = True,
+        wait_for_start: bool = False,
     ):
         self.algo_requests, self.stm_commands = algo_requests, stm_commands
         self.camera_requests, self.events, self.shutdown = camera_requests, events, shutdown
         self.android_requests = android_requests
         self.parallel_inference = parallel_inference
+        self.wait_for_start = wait_for_start
         self.detected_images = []
         self.state = MissionState.IDLE
         self.route: list[str] = []
@@ -63,6 +65,7 @@ class Task1Kernel:
         self.active_stm_command: Optional[str] = None
         self.active_scan_obstacle: Optional[str] = None
         self.pending_inference_jobs = 0
+        self.pending_arena: Optional[tuple[Mapping[str, Any], list[Mapping[str, Any]]]] = None
 
     def start(self, robot: Mapping[str, Any], obstacles: list[Mapping[str, Any]]):
         if self.state is not MissionState.IDLE:
@@ -90,11 +93,32 @@ class Task1Kernel:
                 self._fail("invalid Android arena data")
                 return
 
-            print(
-                "[KERNEL] Android arena received: "
-                "%d obstacles" % len(obstacles)
-            )
+            self.pending_arena = (dict(robot), [dict(item) for item in obstacles])
+            if self.wait_for_start:
+                print(
+                    "[KERNEL] Android arena saved: %d obstacles; "
+                    "waiting for Android start command" % len(obstacles)
+                )
+                return
 
+            print(
+                "[KERNEL] Android arena received: %d obstacles; "
+                "starting Algo request" % len(obstacles)
+            )
+            self.start(robot, obstacles)
+        elif event.type is EventType.ANDROID_START_REQUEST:
+            if self.state is not MissionState.IDLE:
+                print("[KERNEL] Ignoring Android start: mission already active")
+                return
+            if self.pending_arena is None:
+                print("[KERNEL] Ignoring Android start: no arena has been received")
+                return
+
+            robot, obstacles = self.pending_arena
+            print(
+                "[KERNEL] Android start received (%s): %d obstacles"
+                % (event.payload.get("mode"), len(obstacles))
+            )
             self.start(robot, obstacles)
         elif event.type is EventType.ANDROID_STM_COMMAND:
             command = event.payload.get("command")
@@ -291,6 +315,8 @@ class Task1Runtime:
         detections_dir="imaging/data", continuous_camera_scan: bool = False,
         continuous_scan_interval_seconds: float = 1.0,
         bluetooth=None, android=None,
+        on_android_disconnect=None,
+        wait_for_start: bool = False,
         parallel_inference: bool = True,
     ):
         self.shutdown = threading.Event()
@@ -309,6 +335,7 @@ class Task1Runtime:
             self.shutdown,
             self.android_requests,
             parallel_inference,
+            wait_for_start,
         )
         self.workers = [
             AlgoWorker(algo_connector, self.algo_requests, self.events, self.shutdown),
@@ -349,6 +376,7 @@ class Task1Runtime:
                     android,
                     self.events,
                     self.shutdown,
+                    on_disconnect=on_android_disconnect,
                 ),
                 AndroidTXWorker(
                     bluetooth,

@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+import json
 import queue
 import threading
+import time
 from pathlib import Path
 
 from connectors.android import AndroidImageSender
+from connectors.bluetooth import BluetoothDisconnectedError
 from imaging.stitcher import stitch_images
 from task1.events import AndroidImageRequest, AndroidMessage, Event, EventType
+
+
+DIRECTION_MAP = {
+    0: "N",
+    1: "E",
+    2: "S",
+    3: "W",
+}
 
 
 class AndroidRXWorker(threading.Thread):
@@ -20,6 +31,8 @@ class AndroidRXWorker(threading.Thread):
         android,
         events,
         shutdown,
+        on_disconnect=None,
+        reconnect_delay_seconds=1,
     ):
         super().__init__(name="ANDROID-RX")
 
@@ -27,26 +40,61 @@ class AndroidRXWorker(threading.Thread):
         self.android = android
         self.events = events
         self.shutdown = shutdown
+        self.on_disconnect = on_disconnect
+        self.reconnect_delay_seconds = reconnect_delay_seconds
 
     def run(self):
-        try:
-            self.bluetooth.connect()
-            print("[ANDROID RX] Bluetooth connected")
+        while not self.shutdown.is_set():
+            connected = False
+            try:
+                self.bluetooth.connect()
+                connected = True
+                print("[ANDROID RX] Bluetooth connected")
 
-            while not self.shutdown.is_set():
-                messages = self.bluetooth.read_messages()
+                while not self.shutdown.is_set():
+                    for message in self.bluetooth.read_messages():
+                        self._handle_message(message)
 
-                for message in messages:
-                    self._handle_message(message)
-
-        except Exception as error:
-            if not self.shutdown.is_set():
+            except BluetoothDisconnectedError as error:
+                if not self.shutdown.is_set():
+                    print(f"[ANDROID RX] Android disconnected: {error}")
+            except Exception as error:
+                if self.shutdown.is_set():
+                    break
+                print(f"[ANDROID RX] Bluetooth error: {error}")
                 self.events.put(
                     Event(
                         EventType.ANDROID_ERROR,
                         {"error": str(error)},
                     )
                 )
+            finally:
+                if connected:
+                    self.bluetooth.disconnect()
+
+            if self.shutdown.is_set():
+                break
+
+            self._reset_bluetooth_service()
+            if not self.shutdown.is_set():
+                time.sleep(self.reconnect_delay_seconds)
+
+    def _reset_bluetooth_service(self):
+        if self.on_disconnect is None:
+            print("[ANDROID RX] Waiting for Android to reconnect")
+            return
+
+        print("[ANDROID RX] Resetting Bluetooth service after disconnect")
+        try:
+            self.on_disconnect()
+        except Exception as error:
+            print(f"[ANDROID RX] Bluetooth service reset failed: {error}")
+            self.events.put(
+                Event(
+                    EventType.ANDROID_ERROR,
+                    {"error": f"Bluetooth service reset failed: {error}"},
+                )
+            )
 
     def _handle_message(self, message):
         if not isinstance(message, dict):
@@ -55,23 +103,20 @@ class AndroidRXWorker(threading.Thread):
         category = message.get("cat")
         value = message.get("value")
 
-        print(f"[ANDROID RX] {message}")
+        if category == "sendArena":
+            self._print_arena(message)
+        else:
+            print(f"[ANDROID RX] {message}")
 
         if category == "sendArena":
             if not isinstance(value, dict):
                 print("[ANDROID RX] sendArena has no arena data")
                 return
 
-            direction_map = {
-                1: "N",
-                2: "E",
-                3: "S",
-                4: "W",
-            }
             robot = {
                 "x": value.get("robot_x"),
                 "y": value.get("robot_y"),
-                "dir": direction_map.get(
+                "dir": DIRECTION_MAP.get(
                     value.get("robot_direction")
                 ),
             }
@@ -83,7 +128,7 @@ class AndroidRXWorker(threading.Thread):
                     "id": obstacle.get("id"),
                     "x": obstacle.get("x"),
                     "y": obstacle.get("y"),
-                    "dir": direction_map.get(
+                    "dir": DIRECTION_MAP.get(
                         obstacle.get("d")
                     ),
                 })
@@ -99,6 +144,15 @@ class AndroidRXWorker(threading.Thread):
             )
 
         elif category == "stm":
+            if value in {"beginExplore", "beginFastest"}:
+                self.events.put(
+                    Event(
+                        EventType.ANDROID_START_REQUEST,
+                        {"mode": value},
+                    )
+                )
+                return
+
             command = self.android.to_stm_command(value)
 
             if command is None:
@@ -113,6 +167,42 @@ class AndroidRXWorker(threading.Thread):
                     {"command": command},
                 )
             )
+
+        elif category in {"beginExplore", "beginFastest"}:
+            self.events.put(
+                Event(
+                    EventType.ANDROID_START_REQUEST,
+                    {"mode": category},
+                )
+            )
+
+    @staticmethod
+    def _print_arena(message):
+        """Print Android's arena JSON with human-readable direction codes."""
+        formatted = json.loads(json.dumps(message))
+        value = formatted.get("value")
+
+        if isinstance(value, dict):
+            value["robot_direction"] = AndroidRXWorker._format_direction(
+                value.get("robot_direction")
+            )
+            obstacles = value.get("obstacles")
+            if isinstance(obstacles, list):
+                for obstacle in obstacles:
+                    if isinstance(obstacle, dict):
+                        obstacle["d"] = AndroidRXWorker._format_direction(
+                            obstacle.get("d")
+                        )
+
+        print("[ANDROID RX] Arena received:")
+        print(json.dumps(formatted, indent=2, sort_keys=True))
+
+    @staticmethod
+    def _format_direction(direction):
+        label = DIRECTION_MAP.get(direction)
+        if label is None:
+            return f"{direction} (invalid direction)"
+        return f"{direction} ({label})"
 
 
 class AndroidTXWorker(threading.Thread):

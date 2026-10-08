@@ -18,7 +18,7 @@ from imaging.detector import DetectionResult, DetectorSetupError, LocalYoloDetec
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL = PROJECT_ROOT / "imaging" / "models" / "best.pt"
+DEFAULT_MODEL = PROJECT_ROOT / "imaging" / "models" / "best_JH.pt"
 
 
 def jpeg_with_detection(image, result: DetectionResult) -> bytes:

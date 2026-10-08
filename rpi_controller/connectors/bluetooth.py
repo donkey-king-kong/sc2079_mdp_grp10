@@ -3,6 +3,10 @@ import time
 from connectors.android import AndroidStreamParser
 
 
+class BluetoothDisconnectedError(ConnectionError):
+    """Raised when Android closes the RFCOMM connection."""
+
+
 class BluetoothConnector:
     def __init__(self, device="/dev/rfcomm0", retry_delay=1):
         self.device = device
@@ -32,9 +36,13 @@ class BluetoothConnector:
 
     def disconnect(self):
         if self.connection:
-            self.connection.close()
-            self.connection = None
-            print("[BT] Disconnected")
+            try:
+                self.connection.close()
+            except OSError as error:
+                print(f"[BT] Close error: {error}")
+            finally:
+                self.connection = None
+                print("[BT] Disconnected")
 
     def send(self, message: str):
         if not self.connection:
@@ -51,7 +59,12 @@ class BluetoothConnector:
         data = self.connection.read(size)
 
         if not data:
-            return []
+            # An empty read on RFCOMM is EOF, not an idle connection.  Treat it
+            # as a disconnect so the Android worker can reset the service and
+            # wait for a fresh connection instead of silently busy-looping.
+            raise BluetoothDisconnectedError(
+                "Android closed the Bluetooth connection"
+            )
 
         chunk = data.decode(
             "utf-8",

@@ -120,7 +120,9 @@ class AndroidImageSender:
         self.delay_seconds = delay_seconds
 
     def _send_value(self, value):
-        self.bluetooth.send(json.dumps({"cat": "stitch-image", "value": value}))
+        self.bluetooth.send(
+            json.dumps({"cat": "stitch-image", "value": value}) + "\n"
+        )
         time.sleep(self.delay_seconds)
 
     def send_image(self, image_path):

@@ -106,10 +106,10 @@ From this `rpi_controller/` directory, confirm the RPi connection settings in
 python3 scripts/migrate.py
 ```
 
-This creates `/home/mdp/rpi_refactor` without changing either existing RPi
-checkout. It syncs the current controller source, then copies `.venv/` and
-every `imaging/model*` directory from
-`/home/mdp/rpi_controller_mt_android`.
+This creates or updates `/home/mdp/rpi_refactor` without changing either
+existing RPi checkout. It copies current controller source only; `.venv/`,
+`imaging/model*`, and `imaging/data/` are excluded. Existing matching source
+files in the target are overwritten, but no remote files are deleted.
 
 ### 2. Start Algo — host PC
 
