@@ -30,6 +30,7 @@ EXCLUDED_PATHS = (
     ".venv",
     "imaging/data",
     "imaging/model*",
+    "scripts/giveIMG.py",
     "__pycache__",
     "*.pyc",
     ".DS_Store",

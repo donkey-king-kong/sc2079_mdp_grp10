@@ -77,12 +77,22 @@ def create_run_directory() -> Path:
     return run_dir
 
 
+def mark_run_complete(run_dir: Path) -> None:
+    """Tell the host PC which run may be pulled after Task 1 has stopped."""
+    marker = run_dir.parent / "task1_complete.txt"
+    temporary = marker.with_name(".task1_complete.tmp")
+    temporary.write_text(run_dir.name, encoding="utf-8")
+    temporary.replace(marker)
+
+
 def main() -> int:
     reset_bluetooth_service()
     stm = STMConnector(port=STM_PORT)
     bluetooth = BluetoothConnector(device=BLUETOOTH_DEVICE)
     android = AndroidConnector()
     runtime = None
+    run_dir = None
+    state = None
 
     try:
         connection = stm.connect()
@@ -126,6 +136,11 @@ def main() -> int:
     finally:
         if runtime:
             runtime.stop()
+        # COMPLETE is reached only after the existing final stitched Android
+        # image transfer has completed. The host PC waits for this marker.
+        if state is MissionState.COMPLETE and run_dir is not None:
+            mark_run_complete(run_dir)
+            print(f"[KERNEL] host pull marker written for {run_dir.name}")
         bluetooth.disconnect()
         stm.disconnect()
         print("[SHUTDOWN] clean")
