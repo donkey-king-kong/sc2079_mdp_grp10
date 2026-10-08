@@ -1,0 +1,3 @@
+# Required only on the laptop/Windows host for scripts/giveIMG.py.
+paramiko
+Pillow

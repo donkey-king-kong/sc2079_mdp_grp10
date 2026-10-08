@@ -6,8 +6,12 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 import time
+
+try:
+    import paramiko
+except ImportError:  # Report the missing host-only dependency clearly in main().
+    paramiko = None
 
 from migrate import RPI_HOST, RPI_SSH_PORT, RPI_USER, TARGET_DIR
 
@@ -20,53 +24,59 @@ REMOTE_DATA_DIR = f"{TARGET_DIR}/imaging/data"
 REMOTE_MARKER = f"{REMOTE_DATA_DIR}/task1_complete.txt"
 
 
-def ssh_environment():
-    """Create a short-lived SSH askpass helper so no terminal prompt appears."""
+def connect():
+    """Connect from macOS or Windows without an interactive password prompt."""
     if RPI_PASSWORD == "CHANGE_ME" or not RPI_PASSWORD:
         raise RuntimeError("Set RPI_PASSWORD at the top of scripts/giveIMG.py")
-    descriptor, helper_name = tempfile.mkstemp(prefix="mdp-askpass-")
-    os.close(descriptor)
-    helper = Path(helper_name)
-    helper.write_text(
-        "#!%s\nimport os\nprint(os.environ['MDP_RPI_PASSWORD'])\n" % sys.executable,
-        encoding="utf-8",
+    if paramiko is None:
+        raise RuntimeError("Install host dependency first: python -m pip install -r scripts/requirements-host.txt")
+
+    client = paramiko.SSHClient()
+    client.load_system_host_keys()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(
+        RPI_HOST,
+        port=RPI_SSH_PORT,
+        username=RPI_USER,
+        password=RPI_PASSWORD,
+        timeout=5,
+        banner_timeout=5,
+        auth_timeout=5,
+        look_for_keys=False,
+        allow_agent=False,
     )
-    helper.chmod(0o700)
-    environment = os.environ.copy()
-    environment.update({
-        "MDP_RPI_PASSWORD": RPI_PASSWORD,
-        "SSH_ASKPASS": str(helper),
-        "SSH_ASKPASS_REQUIRE": "force",
-        "DISPLAY": environment.get("DISPLAY", ":0"),
-    })
-    return helper, environment
+    return client
 
 
-def ssh_options():
-    return [
-        "-p", str(RPI_SSH_PORT),
-        "-o", "ConnectTimeout=5",
-        "-o", "StrictHostKeyChecking=accept-new",
-    ]
+def read_marker(client) -> str | None:
+    _, stdout, _ = client.exec_command(f"cat '{REMOTE_MARKER}'", timeout=5)
+    marker = stdout.read().decode("utf-8").strip()
+    return marker or None
 
 
-def read_marker(environment):
-    command = ["ssh", *ssh_options(), f"{RPI_USER}@{RPI_HOST}", f"cat '{REMOTE_MARKER}'"]
-    result = subprocess.run(command, check=False, capture_output=True, text=True, env=environment)
-    return result.stdout.strip() if result.returncode == 0 else None
-
-
-def pull_run(run_name: str, environment) -> Path:
+def pull_run(client, run_name: str) -> Path:
+    if Path(run_name).name != run_name:
+        raise RuntimeError("Invalid Task 1 completion marker received from RPi")
     destination = LOCAL_DATA_DIR / run_name
     destination.mkdir(parents=True, exist_ok=True)
-    transport = "ssh " + " ".join(ssh_options())
-    command = [
-        "rsync", "-av", "--partial", "--timeout=20",
-        "-e", transport,
-        f"{RPI_USER}@{RPI_HOST}:{REMOTE_DATA_DIR}/{run_name}/",
-        f"{destination}/",
-    ]
-    subprocess.run(command, check=True, env=environment)
+    remote_run_dir = f"{REMOTE_DATA_DIR}/{run_name}"
+    sftp = client.open_sftp()
+    try:
+        for item in sftp.listdir_attr(remote_run_dir):
+            if item.filename in (".", ".."):
+                continue
+            remote_file = f"{remote_run_dir}/{item.filename}"
+            local_file = destination / item.filename
+            # A completed run is immutable. Existing matching files are skipped,
+            # making a manual retry safe after a partial connection failure.
+            if local_file.exists() and local_file.stat().st_size == item.st_size:
+                continue
+            print("[GIVEIMG] Downloading %s" % item.filename)
+            partial_file = local_file.with_suffix(local_file.suffix + ".part")
+            sftp.get(remote_file, str(partial_file))
+            partial_file.replace(local_file)
+    finally:
+        sftp.close()
     return destination
 
 
@@ -76,7 +86,10 @@ def show_gallery(run_dir: Path) -> None:
         import tkinter as tk
         from PIL import Image, ImageTk
     except ImportError:
-        subprocess.Popen(["open", str(run_dir)])
+        if sys.platform == "win32":
+            os.startfile(run_dir)  # type: ignore[attr-defined]
+        else:
+            subprocess.Popen(["open", str(run_dir)])
         return
 
     root = tk.Tk()
@@ -99,24 +112,26 @@ def show_gallery(run_dir: Path) -> None:
 
 
 def main() -> int:
-    helper, environment = ssh_environment()
+    client = None
     try:
-        previous_run = read_marker(environment)
+        client = connect()
+        previous_run = read_marker(client)
         print("[GIVEIMG] Waiting for Task 1 to finish...")
         while True:
-            run_name = read_marker(environment)
+            run_name = read_marker(client)
             if run_name and run_name != previous_run:
                 print("[GIVEIMG] Pulling %s" % run_name)
-                run_dir = pull_run(run_name, environment)
+                run_dir = pull_run(client, run_name)
                 print("[GIVEIMG] Download complete: %s" % run_dir)
                 show_gallery(run_dir)
                 return 0
             time.sleep(2)
-    except (OSError, subprocess.SubprocessError, RuntimeError) as error:
+    except (OSError, RuntimeError, EOFError, Exception) as error:
         print("[GIVEIMG] %s" % error, file=sys.stderr)
         return 1
     finally:
-        helper.unlink(missing_ok=True)
+        if client is not None:
+            client.close()
 
 
 if __name__ == "__main__":
