@@ -17,6 +17,8 @@
  */
 #include "main.h"
 #include "cmsis_os.h"
+#include "FreeRTOS.h"
+#include "task.h"                               // taskENTER_CRITICAL for the pose
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,6 +80,24 @@ typedef struct {
     uint16_t loops;               // Diagnostic: loops since driving began
     uint16_t startLoopL;          // Diagnostic: loop when each wheel first turned
     uint16_t startLoopR;
+    /* Sensor-ended straights (SU / SW / SE / carpark entry). until = 0 on a plain straight. */
+    float    vCap;                // Cruise speed cap (cm/s); STRAIGHT_V_MAX on a plain straight
+    uint8_t  until;               // 1 = the sensors set the target every loop (options in opt)
+    Until_t  opt;
+    uint32_t usSeq;               // Last echo already used
+    float    est[3];              // Last 3 ultrasonic stop points (cm of travel)
+    uint8_t  nEst;                // Good echoes used so far (saturates at 255)
+    float    usAt;                // Median ultrasonic stop point (cm of travel), valid once nEst >= 3
+    uint32_t irSeqSeen;           // Last IR update already used
+    uint8_t  faceCount, edgeCount, guardCount, emergCount;   // readings in a row
+    uint8_t  faceSeen, edgeFound, guardHit, emergHit;
+    float    faceAvg;             // Typical reading on the face (cm)
+    float    edgeDist;            // Travel at the first reading past the edge
+    float    edgeV;               // Speed then (cm/s): the detection lag grows with speed
+    float    edgeAt;              // Stop point from the IR edge (cm of travel)
+    char     stopBy;              // U ultrasonic, E IR edge, C cap, F floor, G guard / emergency
+    uint8_t  slowSeen;            // Diagnostic: slowing for the stop has begun
+    float    eSlow, ySlow;        // Diagnostic: heading error / sideways drift when slowing began
 } Move_t;
 
 /* ---- Turn ------------------------------------------------------------------ */
@@ -122,10 +142,18 @@ static volatile uint8_t abortReq = 0;    // button pressed during a move
 
 /* ---- Results of the last move ----------------------------------------------- */
 static char replyShort[48] = "";
-static char replyLong[80]  = "";
+static MoveResult_t lastRes = {0};      // for the Task 2 sequencer
+static char replyLong[92]  = "";     // fits the 96-byte reply buffer in main.c with "A " and "\n"
 
 static void setResults(const char *shortText, const char *longText)
 {
+    // Only used for moves that end before they start (BUSY or zero length)
+    lastRes.end = (shortText[0] == 'B') ? MOVE_BUSY : MOVE_OK;
+    lastRes.dist = 0.0f;
+    lastRes.u = -1.0f;
+    lastRes.stopBy = 'C';
+    lastRes.faceSeen = 0;
+    lastRes.target = 0.0f;
     snprintf(replyShort, sizeof(replyShort), "%s", shortText);
     snprintf(replyLong, sizeof(replyLong), "%s", longText);
 }
@@ -142,6 +170,16 @@ const char *Motion_Reply(void)
 const char *Motion_LogText(void)
 {
     return replyLong;
+}
+
+void Motion_LastResult(MoveResult_t *r)
+{
+    *r = lastRes;
+}
+
+static void setLastEnd(uint8_t aborted, uint8_t timedOut)
+{
+    lastRes.end = aborted ? MOVE_ABORT : (timedOut ? MOVE_TIMEOUT : MOVE_OK);
 }
 
 uint8_t Motion_IsBusy(void)
@@ -233,17 +271,175 @@ static void writeServo(float us)
  *  Heading
  * ========================================================================== */
 
-/* "ZH": make the robot's current direction "north" for this run. */
+/* ==========================================================================
+ *  Tracked pose (rear-axle centre). See robot_config.h section 9 for the frame.
+ *  Written only by the motor task (poseStep), read by any task via
+ *  Motion_GetPose(). The x, y pair is copied inside a critical section so a
+ *  reader never gets x from one 10 ms step and y from the next.
+ * ========================================================================== */
+static float poseX = POSE_START_X_CM;
+static float poseY = 0.0f;
+static float poseHPrev = 0.0f;           // heading at the previous step (deg, relative to ZH)
+
+static void poseReset(void)
+{
+    taskENTER_CRITICAL();
+    poseX = POSE_START_X_CM;
+    poseY = 0.0f;
+    poseHPrev = 0.0f;
+    taskEXIT_CRITICAL();
+}
+
+/* One 10 ms step: move along the average heading of this step by the average
+ * rear-wheel travel. Exact on straights and on arcs (rear-axle centre). */
+static void poseStep(int16_t cntL, int16_t cntR)
+{
+    float h  = headingDeg - headingZero;
+    float ds = 0.5f * (float)(cntL + cntR) / TICKS_PER_CM;     // signed, + = forward
+#if POSE_TURN_FROM_RADIUS
+    if (tn.active) {
+        // In a turn the rear wheels scrub, so their average under-reads the arc
+        // (LF090 read R = 18.1, not 20.2). Use the calibrated radius x the
+        // gyro's turn instead; the radius came from measured LF180 / RF180.
+        ds = (float)tn.dir * tn.radius * fabsf(h - poseHPrev) * DEG2RAD;
+    }
+#endif
+    float hm = 0.5f * (h + poseHPrev) * DEG2RAD;
+    float dx = ds * cosf(hm);
+    float dy = ds * sinf(hm);
+    if (POSE_SLIDE_CM_PER_M > 0.0f && mv.active && mv.dir > 0 && ds > 0.0f) {
+        float slide = POSE_SLIDE_CM_PER_M * 0.01f * ds;          // to the right of travel
+        dx += slide * sinf(hm);
+        dy -= slide * cosf(hm);
+    }
+    taskENTER_CRITICAL();
+    poseX += dx;
+    poseY += dy;
+    taskEXIT_CRITICAL();
+    poseHPrev = h;
+}
+
+/* Current tracked pose: x, y in cm (carpark frame), h in degrees relative
+ * to ZH (CCW +). Any task; never waits. Pass NULL for values not needed. */
+void Motion_GetPose(float *x, float *y, float *h)
+{
+    float px, py;
+    taskENTER_CRITICAL();
+    px = poseX;
+    py = poseY;
+    taskEXIT_CRITICAL();
+    if (x) *x = px;
+    if (y) *y = py;
+    if (h) *h = headingDeg - headingZero;
+}
+
+/* "ZH": make the robot's current direction "north" for this run, and put the
+ * tracked pose back at the marked start (POSE_START_X_CM, 0). */
 void Motion_ZeroHeading(void)
 {
     headingZero   = headingDeg;
     headingTarget = headingDeg;
     headingSet    = 1;
+    poseReset();
 }
 
 /* ==========================================================================
  *  Straights
  * ========================================================================== */
+
+static float median3(float a, float b, float c)
+{
+    float lo = fminf(a, b), hi = fmaxf(a, b);
+    return fmaxf(lo, fminf(hi, c));
+}
+
+static uint8_t inc8(uint8_t n)
+{
+    return (n < 200) ? (uint8_t)(n + 1) : n;
+}
+
+/* Sensor straights only (mv.until). Called every 10 ms from straightStep in
+ * the motor task; never waits. Turns the sensors into a stop point (cm of
+ * travel) and writes it to mv.target; the normal profile then stops there.
+ *  - Ultrasonic: each echo -> stop point; median of the last 3, so one false
+ *    echo can't move it.
+ *  - IR edge: 3 readings in a row under IR_FACE_CM = a face; then 2 readings
+ *    in a row more than IR_EDGE_JUMP_CM above it = the edge; stop edgeExtra
+ *    after where the edge was first seen.
+ *  - Guard IR / ultrasonic emergency: 2 readings in a row -> stop now. */
+static void untilTrack(float dist, float vNow)
+{
+    float r;
+    uint32_t seq = Ultra_Get(&r);
+    if (seq != mv.usSeq) {                               // a new echo
+        mv.usSeq = seq;
+        if (r > 0.0f && mv.opt.usEmergCm > 0.0f) {
+            mv.emergCount = (r < mv.opt.usEmergCm) ? inc8(mv.emergCount) : 0;
+            if (mv.emergCount >= 2) mv.emergHit = 1;
+        }
+        if (r > 0.0f && mv.opt.usStop > 0.0f &&
+            !(r < mv.opt.ignBelow && dist < mv.opt.ignUntil)) {   // e.g. the carpark arms at the start
+            mv.est[0] = mv.est[1];
+            mv.est[1] = mv.est[2];
+            mv.est[2] = dist + (r - mv.opt.usStop) - vNow * ULTRA_LAG_S;
+            mv.nEst = inc8(mv.nEst);
+            if (mv.nEst >= 3) mv.usAt = median3(mv.est[0], mv.est[1], mv.est[2]);
+        }
+    }
+
+    if (irSeq != mv.irSeqSeen) {                         // a new IR update
+        mv.irSeqSeen = irSeq;
+        if (mv.opt.edgeSide >= 0 && !mv.edgeFound) {
+            float d = irCm[mv.opt.edgeSide];
+            if (!mv.faceSeen) {
+                mv.faceCount = (d < IR_FACE_CM) ? inc8(mv.faceCount) : 0;
+                if (mv.faceCount >= 3) {
+                    mv.faceSeen = 1;
+                    mv.faceAvg  = d;
+                }
+            } else if (d > mv.faceAvg + IR_EDGE_JUMP_CM) {   // past the end of the face
+                if (mv.edgeCount == 0) {
+                    mv.edgeDist = dist;
+                    mv.edgeV    = vNow;
+                }
+                mv.edgeCount = inc8(mv.edgeCount);
+                if (mv.edgeCount >= 2) {
+                    mv.edgeFound = 1;
+                    // IR_EDGE_LAG_CM was measured at FACE_V_MAX; the lag is mostly time, so scale it
+                    mv.edgeAt = mv.edgeDist - IR_EDGE_LAG_CM * (mv.edgeV / FACE_V_MAX) + mv.opt.edgeExtra;
+                }
+            } else {                                     // still on the face
+                mv.edgeCount = 0;
+                mv.faceAvg = 0.8f * mv.faceAvg + 0.2f * d;
+            }
+        }
+        if (mv.opt.guardSide >= 0 && dist >= mv.opt.guardFromCm) {
+            mv.guardCount = (irCm[mv.opt.guardSide] < mv.opt.guardCm) ? inc8(mv.guardCount) : 0;
+            if (mv.guardCount >= 2) mv.guardHit = 1;
+        }
+    }
+
+    // Combine: IR edge (or the cap), then the ultrasonic, then the floor
+    float tgt;
+    char  by;
+    if (mv.edgeFound)      { tgt = mv.edgeAt;        by = 'E'; }
+    else if (mv.faceSeen)  { tgt = mv.opt.edgeMaxCm; by = 'C'; }
+    else                   { tgt = mv.opt.maxCm;     by = 'C'; }
+    if (mv.nEst >= 3 && mv.usAt < tgt) { tgt = mv.usAt; by = 'U'; }
+    if (tgt < mv.opt.minCm) {
+        float rNow = mv.usAt - dist + mv.opt.usStop;     // what the ultrasonic reads now
+        if (!(by == 'U' && rNow <= ULTRA_HARD_STOP_CM)) {  // a real close echo still stops it
+            tgt = mv.opt.minCm;
+            by  = 'F';
+        }
+    }
+    if (mv.guardHit || mv.emergHit) {                    // something too close: stop now
+        tgt = fminf(tgt, dist);
+        by  = 'G';
+    }
+    mv.target = tgt;
+    mv.stopBy = by;
+}
 
 /* One 10 ms step of a straight move. Called only from Motion_Step(). */
 static void straightStep(int16_t cntL, int16_t cntR)
@@ -266,6 +462,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
     case MV_SETTLE:
         // Wheels straight, always arriving at centre from below (servo slack)
         setMotorPwm(0, 0, 0, 0);
+        if (mv.until) untilTrack(0.0f, 0.0f);           // standing still: readings count from 0 cm
         if (el < mv.settleA) {
             writeServo(SERVO_TRUE_CENTRE + servoTrim - SERVO_APPROACH_US);
         } else {
@@ -280,6 +477,8 @@ static void straightStep(int16_t cntL, int16_t cntR)
             mv.eEarly   = 0.0f;
             mv.loops    = 0;
             mv.startLoopL = mv.startLoopR = 0;
+            mv.slowSeen = 0;
+            mv.eSlow = mv.ySlow = 0.0f;
             mv.servoCmd = SERVO_TRUE_CENTRE + servoTrim;
             // Settled from below, so the wheels sit at the low side of the play
             mv.wheelEst = mv.servoCmd - 0.5f * STEER_PLAY_US;
@@ -293,12 +492,13 @@ static void straightStep(int16_t cntL, int16_t cntR)
         break;
 
     case MV_DRIVE: {
+        float vNow = 0.5f * (mv.wl.filt + mv.wr.filt) * 100.0f / TICKS_PER_CM;
+        if (mv.until) untilTrack(dist, vNow);           // sensor straights: the sensors move the target
         float remaining = mv.target - dist;
         // Brake early enough for the speed we are actually doing: the robot
         // keeps rolling for ~STOP_T seconds after the decision, so the stop
         // point moves back in proportion to speed. Capped at the approach zone
         // so it never brakes early while still slowing down from cruise.
-        float vNow     = 0.5f * (mv.wl.filt + mv.wr.filt) * 100.0f / TICKS_PER_CM;
         float stopDist = fminf(STOP_T * vNow, STRAIGHT_APPROACH);
         if (remaining <= stopDist || now > mv.deadline) {
             mv.timedOut = (remaining > stopDist);
@@ -313,7 +513,16 @@ static void straightStep(int16_t cntL, int16_t cntR)
         // Speed profile: speed up, cruise, slow down so we arrive at V_MIN
         float slowTo = sqrtf(2.0f * STRAIGHT_DECEL *
                        fmaxf(remaining - STRAIGHT_APPROACH, 0.0f)) + STRAIGHT_V_MIN;
-        float upTo   = fminf(mv.v + STRAIGHT_ACCEL * 0.01f, STRAIGHT_V_MAX);
+        float vTop   = mv.vCap;
+        if (mv.until && mv.opt.usStop > 0.0f && mv.opt.edgeSide < 0 && mv.nEst < 3) {
+            vTop = fminf(vTop, ULTRA_BLIND_V);         // ultrasonic stop, nothing seen yet: go easy
+        }
+        if (mv.until && mv.opt.slowZoneCm > 0.0f) {    // arrive at the slow zone at vSlow, stay there
+            float zone = remaining - mv.opt.slowZoneCm;
+            vTop = fminf(vTop, (zone <= 0.0f) ? mv.opt.vSlow
+                                              : sqrtf(2.0f * STRAIGHT_DECEL * zone) + mv.opt.vSlow);
+        }
+        float upTo   = fminf(mv.v + STRAIGHT_ACCEL * 0.01f, vTop);
         int slowing  = (slowTo < upTo);                // profile is bringing us down to stop
         mv.v = fminf(upTo, slowTo);
         if (mv.v < STRAIGHT_V_MIN) mv.v = STRAIGHT_V_MIN;
@@ -337,6 +546,11 @@ static void straightStep(int16_t cntL, int16_t cntR)
         float ds = (dist - mv.distPrev) * sgn;         // signed: negative when reversing
         mv.distPrev = dist;
         mv.lateral += ds * sinf(err * DEG2RAD);
+        if (slowing && !mv.slowSeen) {                 // diagnostic: drift so far, before the stop
+            mv.slowSeen = 1;
+            mv.eSlow = err;
+            mv.ySlow = mv.lateral;
+        }
         // Fade the line holding out over the last STRAIGHT_KY_FADE cm, so the
         // robot finishes pointing straight rather than angled mid-correction.
         float fade = clampf(remaining / STRAIGHT_KY_FADE, 0.0f, 1.0f);
@@ -405,19 +619,11 @@ static void straightStep(int16_t cntL, int16_t cntR)
     }
 }
 
-/* Drives straight by distance_cm (negative = backwards) and blocks until the
- * robot has stopped. Results: Motion_Reply() / Motion_LogText(). */
-void Motion_Straight(float distance_cm)
+/* Sets up a straight and blocks until the robot has stopped. The caller has
+ * already checked Motion_IsBusy() and set mv.vCap / mv.until (and, for
+ * sensor straights, mv.opt and the tracking state). Writes the plain "d= e=" replies. */
+static void straightRun(float distance_cm)
 {
-    if (mv.active || tn.active) {
-        setResults("BUSY", "BUSY");
-        return;
-    }
-    if (fabsf(distance_cm) < 0.5f) {
-        setResults("d=0.0 e=+0.0", "d=0.0 e=+0.0");
-        return;
-    }
-
     if (!headingSet) {
         Motion_ZeroHeading();                          // no ZH received - this is "north"
     }
@@ -457,10 +663,115 @@ void Motion_Straight(float distance_cm)
     // sideways drift (cm), m = largest heading error in the first 20 cm,
     // s = which wheel started first (+ = left, in 10 ms loops),
     // vb = speed when braking began (cm/s), t = learned centre trim (us)
-    snprintf(replyLong, sizeof(replyLong), "d=%.1f e=%+.1f eb=%+.1f y=%+.1f m=%+.1f s=%+d vb=%.0f t=%+.0f%s",
+    // es / ys = heading error and sideways drift when slowing for the stop began
+    snprintf(replyLong, sizeof(replyLong), "d=%.1f e=%+.1f eb=%+.1f y=%+.1f m=%+.1f s=%+d vb=%.0f t=%+.0f es=%+.1f ys=%+.1f%s",
              mv.resDist, mv.resHead, mv.eBrake, mv.lateral, mv.eEarly,
              (int)mv.startLoopR - (int)mv.startLoopL,
-             mv.vBrake, servoTrim, end);
+             mv.vBrake, servoTrim, mv.eSlow, mv.ySlow, end);
+    setLastEnd(mv.aborted, mv.timedOut);
+    lastRes.dist = mv.resDist;
+    lastRes.u = -1.0f;
+    lastRes.stopBy = 'D';
+    lastRes.faceSeen = 0;
+    lastRes.target = mv.target;
+}
+
+/* Drives straight by distance_cm (negative = backwards) and blocks until the
+ * robot has stopped. Results: Motion_Reply() / Motion_LogText(). */
+void Motion_Straight(float distance_cm)
+{
+    if (Motion_IsBusy()) {
+        setResults("BUSY", "BUSY");
+        return;
+    }
+    if (fabsf(distance_cm) < 0.5f) {
+        setResults("d=0.0 e=+0.0", "d=0.0 e=+0.0");
+        return;
+    }
+    mv.vCap  = STRAIGHT_V_MAX;
+    mv.until = 0;                                      // plain straight: no sensors
+    straightRun(distance_cm);
+}
+
+void Motion_UntilInit(Until_t *o)
+{
+    memset(o, 0, sizeof(*o));
+    o->vCap      = STRAIGHT_V_MAX;
+    o->edgeSide  = -1;
+    o->guardSide = -1;
+    o->vSlow     = STRAIGHT_V_MIN;
+}
+
+/* Straight (forward, or backward with o->reverse) whose stop point comes from the sensors (see Until_t and
+ * untilTrack). Blocks until stopped.
+ * Reply: "d=<travel> e=<heading err> u=<ultrasonic at the stop> by=<U|E|C|F|G>"
+ *   u  = predicted from the tracked echoes and the encoders, -1 if fewer
+ *        than 3 good echoes (or no ultrasonic stop)
+ *   by = U ultrasonic, E IR edge, C cap, F floor overruled a short echo,
+ *        G guard IR / ultrasonic emergency */
+void Motion_StraightOpts(const Until_t *o)
+{
+    if (Motion_IsBusy()) {
+        setResults("BUSY", "BUSY");
+        return;
+    }
+    float far = fmaxf(o->maxCm, o->edgeSide >= 0 ? o->edgeMaxCm : 0.0f);
+    if (far < 0.5f) {
+        setResults("d=0.0 e=+0.0 u=-1.0 by=C", "d=0.0 e=+0.0 u=-1.0 by=C");
+        return;
+    }
+    float dummy;
+    mv.opt = *o;
+    if (mv.opt.edgeMaxCm < mv.opt.maxCm) mv.opt.edgeMaxCm = mv.opt.maxCm;
+    mv.opt.minCm = fminf(fmaxf(o->minCm, 0.0f), far);
+    mv.vCap      = fminf(o->vCap, STRAIGHT_V_MAX);
+    mv.usSeq     = Ultra_Get(&dummy);                  // only readings from now on count
+    mv.irSeqSeen = irSeq;
+    mv.nEst = 0;
+    mv.usAt = 0.0f;
+    mv.faceCount = mv.edgeCount = mv.guardCount = mv.emergCount = 0;
+    mv.faceSeen = mv.edgeFound = mv.guardHit = mv.emergHit = 0;
+    mv.faceAvg = mv.edgeDist = mv.edgeAt = mv.edgeV = 0.0f;
+    if (mv.opt.reverse) {
+        mv.opt.usStop = 0.0f;                          // the ultrasonic looks forward
+        mv.opt.usEmergCm = 0.0f;
+    }
+    mv.stopBy = 'C';
+    mv.until  = 1;
+    straightRun(mv.opt.reverse ? -far : far);          // the sensors set the real target each loop
+    mv.until  = 0;
+
+    float u = (mv.opt.usStop > 0.0f && mv.nEst >= 3) ? (mv.usAt - mv.resDist + mv.opt.usStop) : -1.0f;
+    const char *end = mv.aborted ? " ABORT" : (mv.timedOut ? " TO" : "");
+    snprintf(replyShort, sizeof(replyShort), "d=%.1f e=%+.1f u=%.1f by=%c%s",
+             mv.resDist, mv.resHead, u, mv.stopBy, end);
+    // Full: y = sideways drift (cm), n = echoes used, f = edge IR saw a face, vb = speed when braking began
+    snprintf(replyLong, sizeof(replyLong), "d=%.1f e=%+.1f eb=%+.1f u=%.1f by=%c y=%+.1f n=%u f=%u vb=%.0f t=%+.0f es=%+.1f ys=%+.1f%s",
+             mv.resDist, mv.resHead, mv.eBrake, u, mv.stopBy, mv.lateral, (unsigned)mv.nEst,
+             (unsigned)mv.faceSeen, mv.vBrake, servoTrim, mv.eSlow, mv.ySlow, end);
+    lastRes.u = u;
+    lastRes.stopBy = mv.stopBy;
+    lastRes.faceSeen = mv.faceSeen;
+    lastRes.target = mv.target;
+}
+
+/* SU / SW (see motion.h). */
+void Motion_StraightUntil(float usStopCm, float minCm, float maxCm, float vCap,
+                          float ignBelowCm, float ignUntilCm)
+{
+    Until_t o;
+    Motion_UntilInit(&o);
+    o.usStop   = usStopCm;
+    o.minCm    = minCm;
+    o.maxCm    = maxCm;
+    o.vCap     = vCap;
+    o.ignBelow = ignBelowCm;
+    o.ignUntil = ignUntilCm;
+    if (usStopCm < 1.0f) {
+        setResults("d=0.0 e=+0.0 u=-1.0 by=C", "d=0.0 e=+0.0 u=-1.0 by=C");
+        return;
+    }
+    Motion_StraightOpts(&o);
 }
 
 /* ==========================================================================
@@ -632,6 +943,12 @@ void Motion_Turn(int left, int dir, float angleDeg)
     // v = wheel speed when braking began (cm/s)
     snprintf(replyLong, sizeof(replyLong), "a=%.1f e=%+.1f w=%.0f v=%.0f%s",
              tn.resAngle, tn.resErr, tn.wBrake, tn.vBrake, end);
+    setLastEnd(tn.aborted, tn.timedOut);
+    lastRes.dist = 0.0f;
+    lastRes.u = -1.0f;
+    lastRes.stopBy = 'T';
+    lastRes.faceSeen = 0;
+    lastRes.target = 0.0f;
 }
 
 /* ==========================================================================
@@ -651,6 +968,8 @@ void Motion_Step(int16_t cntL, int16_t cntR)
         stillCount = 0;
     }
     robotStill = (stillCount >= 50);
+
+    poseStep(cntL, cntR);                            // tracked x, y, every 10 ms, moving or not
 
     if (tn.active) {
         turnStep(cntL, cntR);

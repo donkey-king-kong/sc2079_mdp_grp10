@@ -39,6 +39,7 @@ Thumbs.db
 *.crf
 *.htm
 **/.settings/language.settings.xml
+patch_*/
 
 Debug/
 Release/

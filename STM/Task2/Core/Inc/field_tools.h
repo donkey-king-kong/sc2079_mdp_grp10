@@ -26,7 +26,7 @@
 uint32_t Board_ReadAdc(uint32_t channel);
 
 void FieldTools_Init(void);          // before the scheduler starts: PB1 knob as analog input
-void FieldTools_UpdateKnob(void);    // from the OLED task, ~10 Hz
+void FieldTools_UpdateKnob(void);    // from the sensor task, ~10 Hz
 void FieldTools_Run(void);           // body of the default task; never returns
 
 /* Handles the serial "T" commands (TD, TV). Writes the reply text (without the

@@ -31,6 +31,7 @@
 #include "robot_config.h"   // every tunable value (edit this during calibration)
 #include "motion.h"         // straights, turns, heading
 #include "field_tools.h"    // knob-and-button test modes, TD log
+#include "task2.h"          // Task 2 sequencer: GO, AL / AR
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -132,7 +133,7 @@ volatile float dash_gyroRate = 0.0f;            // Yaw rate in deg/s (CCW positi
 /* --- OLED display dashboard --- */
 char oled_status_msg[32] = "Booting...";        // When not empty, shown instead of the dashboard
 char dash_lastCmd[15] = "None";                 // "CMD:" line: last command, or test-mode info
-float dash_ultraDist = 0.0;                     // Ultrasonic distance (cm)
+volatile float dash_ultraDist = 0.0f;           // Ultrasonic distance (cm), last echo (check age with Ultra_Get)
 int dash_encoderL = 0;                          // Left encoder total
 int dash_encoderR = 0;                          // Right encoder total
 uint16_t dash_direction = 0;                    // Encoder direction indicator
@@ -144,6 +145,13 @@ uint32_t tc1 = 0;                               // Timer capture 1 (Rising Edge)
 uint32_t tc2 = 0;                               // Timer capture 2 (Falling Edge)
 uint32_t echo = 0;                              // Delta time of echo pulse
 uint8_t first_captured = 0;                     // State flag for input capture
+volatile uint32_t ultraTick = 0;                // HAL tick of the last echo
+volatile uint32_t ultraSeq  = 0;                // +1 per echo (0 = none yet)
+
+/* --- IR distance sensors (written by the sensor task only) --- */
+volatile float    irCm[2]    = {IR_CLEAR, IR_CLEAR}; // [IR_LEFT]=IR1, [IR_RIGHT]=IR2: cm from the lens, median of 3
+volatile float    irVolts[2] = {0.0f, 0.0f};         // averaged volts (diagnostics)
+volatile uint32_t irSeq      = 0;                    // +1 per IR update
 
 /* USER CODE END PV */
 
@@ -844,6 +852,7 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
@@ -954,6 +963,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 
 			// Convert raw timer ticks to centimeters
 			dash_ultraDist = (float)echo * ULTRA_CM_PER_US + ULTRA_OFFSET_CM;   // calibrated: see robot_config.h
+			ultraTick = HAL_GetTick();          // when it arrived (stale after ULTRA_VALID_MS)
+			ultraSeq++;                         // written last: readers check it to spot a new echo
 
 			// Reset state machine for the next reading
 			first_captured = 0;
@@ -993,8 +1004,9 @@ static void bootMessage(const char *msg)
  *                     BATTERY
  * ========================================================================== */
 
-/* Reads one ADC1 channel. Only ever called from the OLED task, so the
- * battery and the knob never fight over the ADC. Returns 0xFFFFFFFF on failure. */
+/* Reads one ADC1 channel. Only ever called from the sensor task (IR, battery,
+ * knob), so nothing fights over the ADC and no mutex is needed.
+ * Returns 0xFFFFFFFF on failure. */
 uint32_t Board_ReadAdc(uint32_t channel)
 {
     ADC_ChannelConfTypeDef c = {0};
@@ -1030,6 +1042,132 @@ static int batteryPercent(float v)
     if (cell >  3.85f) return (int)(55.0f + (cell - 3.85f) * (45.0f / 0.30f));
     if (cell >  3.60f) return (int)(20.0f + (cell - 3.60f) * (35.0f / 0.25f));
     return (int)((cell - 3.30f) * (20.0f / 0.30f));
+}
+
+/* ==========================================================================
+ *                     ULTRASONIC: reading it safely from tasks
+ * ========================================================================== */
+
+/* Latest echo, safe from any task (never waits). Returns the echo's sequence
+ * number so callers can tell a new echo from one they have already used.
+ * *cm = -1 if there has been no echo, it is older than ULTRA_VALID_MS, or it
+ * was a no-echo timeout (> ULTRA_MAX_CM). */
+uint32_t Ultra_Get(float *cm)
+{
+    uint32_t s, t;
+    float d;
+    do {                                     // re-read if an echo lands mid-read
+        s = ultraSeq;
+        d = dash_ultraDist;
+        t = ultraTick;
+    } while (s != ultraSeq);
+    if (s == 0 || (HAL_GetTick() - t) > ULTRA_VALID_MS || d > ULTRA_MAX_CM) {
+        d = -1.0f;
+    }
+    *cm = d;
+    return s;
+}
+
+/* Median of the next `pings` echoes (max 9), for when the robot is standing
+ * still (US?). Waits up to (pings + 2) ping periods. Returns -1 if no good
+ * echo came back; *nGood = how many good echoes were used.
+ * Calls osDelay: tasks only, never from an interrupt or the motor task. */
+float Ultra_Query(int pings, int *nGood)
+{
+    float r[9], d;
+    int k = 0, got = 0;
+    if (pings > 9) pings = 9;
+    uint32_t last  = Ultra_Get(&d);          // only echoes from now on count
+    uint32_t start = HAL_GetTick();
+    uint32_t limit = (uint32_t)(pings + 2) * 60u + 50u;   // the sensor task pings every 60 ms
+    while (got < pings && (HAL_GetTick() - start) < limit) {
+        osDelay(5);
+        uint32_t s = Ultra_Get(&d);
+        if (s == last) continue;
+        last = s;
+        got++;
+        if (d > 0.0f) {                      // insertion sort as they arrive
+            int i = k++;
+            while (i > 0 && r[i - 1] > d) { r[i] = r[i - 1]; i--; }
+            r[i] = d;
+        }
+    }
+    *nGood = k;
+    return (k > 0) ? r[(k - 1) / 2] : -1.0f; // even count: the shorter middle one
+}
+
+/* ==========================================================================
+ *                     IR DISTANCE SENSORS (Sharp GP2Y0A21YK0F)
+ * ========================================================================== */
+
+/* Average of IR_SAMPLES readings of one IR channel, in volts (~1 ms).
+ * Negative if the ADC failed. Sensor task only (it owns the ADC). */
+static float irReadVolts(uint32_t channel)
+{
+    uint32_t sum = 0;
+    for (int i = 0; i < IR_SAMPLES; i++) {
+        uint32_t raw = Board_ReadAdc(channel);
+        if (raw == 0xFFFFFFFFu) {
+            return -1.0f;
+        }
+        sum += raw;
+    }
+    return ((float)sum / IR_SAMPLES) * 3.3f / 4095.0f;
+}
+
+/* Volts -> cm from the lens, from the calibration table in robot_config.h.
+ * Interpolates linearly in 1/volts between table points. Past IR_MAX_CM (or
+ * no signal) -> IR_CLEAR; closer than the first point -> IR_MIN_CM.
+ * idx: IR_LEFT (IR1) or IR_RIGHT (IR2). */
+static float irToCm(int idx, float volts)
+{
+    static const float cm[IR_TABLE_N]  = IR_TABLE_CM;
+    static const float tv[2][IR_TABLE_N] = { IR1_TABLE_V, IR2_TABLE_V };
+    const float *v = tv[idx];
+
+    if (volts < IR_V_NOSIG)          return IR_CLEAR;   // unplugged / nothing at all
+    if (volts >= v[0])               return IR_MIN_CM;  // closer than the first point
+    if (volts <= v[IR_TABLE_N - 1])  return IR_CLEAR;   // farther than the last point
+
+    int i = 0;
+    while (volts < v[i + 1]) i++;                       // v[i] > volts >= v[i+1]
+    float t = (1.0f / volts - 1.0f / v[i]) / (1.0f / v[i + 1] - 1.0f / v[i]);
+    float d = cm[i] + t * (cm[i + 1] - cm[i]);
+    return (d > IR_MAX_CM) ? IR_CLEAR : d;
+}
+
+static float median3f(float a, float b, float c)
+{
+    float lo = fminf(a, b), hi = fmaxf(a, b);
+    return fmaxf(lo, fminf(hi, c));
+}
+
+/* Median of the next `updates` IR updates (max 15) for each side, for when the
+ * robot is standing still (IR?). IR_CLEAR wins if most updates were clear.
+ * Calls osDelay: tasks only. */
+void IR_Query(int updates, float out[2])
+{
+    float v[2][15];
+    int k = 0;
+    if (updates > 15) updates = 15;
+    if (updates < 1)  updates = 1;
+    uint32_t last  = irSeq;
+    uint32_t start = HAL_GetTick();
+    while (k < updates && (HAL_GetTick() - start) < (uint32_t)(updates + 3) * IR_PERIOD_MS) {
+        osDelay(5);
+        if (irSeq == last) continue;
+        last = irSeq;
+        for (int s = 0; s < 2; s++) {        // insertion sort per side
+            float d = irCm[s];
+            int i = k;
+            while (i > 0 && v[s][i - 1] > d) { v[s][i] = v[s][i - 1]; i--; }
+            v[s][i] = d;
+        }
+        k++;
+    }
+    for (int s = 0; s < 2; s++) {
+        out[s] = (k > 0) ? v[s][k / 2] : IR_CLEAR;
+    }
 }
 
 /* USER CODE END 4 */
@@ -1071,6 +1209,15 @@ void StartCommunicateTask(void *argument)
    *   SF<cm> / S<cm> / F<cm>   straight forward     -> "A d=<cm> e=<heading error>"
    *   SB<cm> / B<cm>           straight backward
    *   LF / LB / RF / RB <deg>  turn at full lock     -> "A a=<deg turned> e=<heading error>"
+   *   SU<D>[,<ign>,<until>]    forward until the ultrasonic reads D cm  -> "A d= e= u= by="
+   *                            (echoes under <ign> cm ignored for the first <until> cm)
+   *   SW<D>[,<max>[,<min>]]    same at <= FACE_V_MAX, never past <max> / before <min> cm of travel
+   *   US?                      stationary ultrasonic, median of 5 pings -> "A US u=<cm> n=<good>"
+   *   IR?                      stationary IR, median of 5 updates       -> "A IR l=<cm> r=<cm>" (999 = clear)
+   *   PO?                      tracked pose (rear-axle centre)          -> "A PO x=<cm> y=<cm> h=<deg>"
+   *   GO / AL / AR             Task 2 sequencer (task2.h)               -> "A S1 ..", "A S2 ..", "A FIN .."
+   *   SEL / SER                one "along obstacle 2's face" leg, next turn left / right
+   *   ST?                      free stack per task (bytes, lowest seen) -> "A ST c= m= s= o= g= d="
    *   ZH                       this direction is "north" (send once before the first move)
    *   D                        task done (shown on the OLED)
    *   TD / TV<us>              field tools (FIELD_TOOLS = 1 only)
@@ -1126,6 +1273,34 @@ void StartCommunicateTask(void *argument)
 				if (c2 == 'B') {
 					Motion_Straight(-(float)value);
 					isMove = 1;
+				} else if ((c2 == 'U' || c2 == 'W') && value > 0) {
+					// SU / SW, optional extra numbers after commas
+					int a = 0, b = -1, c = -1;
+					sscanf(cmdBuffer + 2, "%d,%d,%d", &a, &b, &c);
+					if (c2 == 'U') {                    // SU<D>[,<ignore below>,<until travelled>]
+						Motion_StraightUntil((float)value, 0.0f, SU_MAX_CM, STRAIGHT_V_MAX,
+						                     (b > 0) ? (float)b : 0.0f, (c > 0) ? (float)c : 0.0f);
+					} else {                            // SW<D>[,<max travel>[,<min travel>]]
+						Motion_StraightUntil((float)value,
+						                     (c >= 0) ? (float)c : SW_MIN_CM_DEFAULT,
+						                     (b > 0)  ? (float)b : SW_MAX_CM_DEFAULT,
+						                     FACE_V_MAX, 0.0f, 0.0f);
+					}
+					isMove = 1;
+				} else if (c2 == 'T' && cmdBuffer[2] == '?') {
+					// ST?: least free stack each task has had (bytes). Under ~200 = too tight.
+					snprintf(replyText, sizeof(replyText), "ST c=%lu m=%lu s=%lu o=%lu g=%lu d=%lu",
+					         (unsigned long)osThreadGetStackSpace(communicateTaskHandle),
+					         (unsigned long)osThreadGetStackSpace(motorTaskHandle),
+					         (unsigned long)osThreadGetStackSpace(ultrasonicTaskHandle),
+					         (unsigned long)osThreadGetStackSpace(oledTaskHandle),
+					         (unsigned long)osThreadGetStackSpace(gyroTaskHandle),
+					         (unsigned long)osThreadGetStackSpace(defaultTaskHandle));
+				} else if (c2 == 'E' && (cmdBuffer[2] == 'L' || cmdBuffer[2] == 'R')) {
+					Task2_AlongFace(cmdBuffer[2] == 'L');   // SEL / SER
+					isMove = 1;
+				} else if (c2 == 'U' || c2 == 'W' || c2 == 'E') {
+					unknown = 1;                        // SU / SW without a distance, bad SE
 				} else if (c2 == 'L' || c2 == 'R') {
 					unknown = 1;                        // old slide commands: removed
 				} else {
@@ -1157,7 +1332,55 @@ void StartCommunicateTask(void *argument)
 			case 'Z':                                   // ZH: zero heading
 				if (c2 == 'H') {
 					Motion_ZeroHeading();
+					Task2_Reset();                      // sequencer back to "waiting for GO"
 					strcpy(replyText, "ZH");
+				} else {
+					unknown = 1;
+				}
+				break;
+
+			case 'U':                                   // US?: stationary ultrasonic
+				if (c2 == 'S' && cmdBuffer[2] == '?') {
+					int n = 0;
+					float u = Ultra_Query(US_QUERY_PINGS, &n);
+					snprintf(replyText, sizeof(replyText), "US u=%.1f n=%d", u, n);
+				} else {
+					unknown = 1;
+				}
+				break;
+
+			case 'I':                                   // IR?: stationary side IRs
+				if (c2 == 'R' && cmdBuffer[2] == '?') {
+					float ir[2];
+					IR_Query(5, ir);
+					snprintf(replyText, sizeof(replyText), "IR l=%.1f r=%.1f vl=%.2f vr=%.2f",
+					         ir[IR_LEFT], ir[IR_RIGHT], irVolts[IR_LEFT], irVolts[IR_RIGHT]);
+				} else {
+					unknown = 1;
+				}
+				break;
+
+			case 'P':                                   // PO?: tracked pose
+				if (c2 == 'O' && cmdBuffer[2] == '?') {
+					float px, py, ph;
+					Motion_GetPose(&px, &py, &ph);
+					snprintf(replyText, sizeof(replyText), "PO x=%.1f y=%.1f h=%+.1f", px, py, ph);
+				} else {
+					unknown = 1;
+				}
+				break;
+
+			case 'G':                                   // GO: Task 2, drive to scan 1
+				if (c2 == 'O') {
+					Task2_Go(replyText, sizeof(replyText));
+				} else {
+					unknown = 1;
+				}
+				break;
+
+			case 'A':                                   // AL / AR: arrow seen (1st, then 2nd)
+				if (c2 == 'L' || c2 == 'R') {
+					Task2_Arrow(c2 == 'L', replyText, sizeof(replyText));
 				} else {
 					unknown = 1;
 				}
@@ -1273,8 +1496,7 @@ void StartOledTask(void *argument)
 {
   /* USER CODE BEGIN StartOledTask */
   char textBuffer[32];	// Temp buffer to format numbers into text
-
-  dash_battV = readBatteryVoltage();
+  float u;
 
   /* Infinite loop */
   for(;;)
@@ -1291,10 +1513,21 @@ void StartOledTask(void *argument)
 		OLED_ShowString(0, 0, (uint8_t*) "CMD: ");
 		OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
 
-		// Line 2: Gyroscope Angle & Ultrasonic Distance
-		sprintf(textBuffer, "G: %.1f D: %.1fcm", headingDeg - headingZero, dash_ultraDist);   // heading relative to "north"
+		// Line 2: Gyroscope Angle & Ultrasonic Distance ("--" = stale / no echo)
+		Ultra_Get(&u);
+		if (u > 0.0f) sprintf(textBuffer, "G: %.1f D: %.1fcm", headingDeg - headingZero, u);   // heading relative to "north"
+		else          sprintf(textBuffer, "G: %.1f D: --", headingDeg - headingZero);
 		OLED_ShowString(0, 12, (uint8_t*) textBuffer);
 
+#if OLED_SHOW_IR
+		// Lines 3-4: IR sensors, cm from the lens ("--" = clear / over 60 cm)
+		for (int s = 0; s < 2; s++) {
+			float d = irCm[s];
+			if (d < IR_CLEAR) sprintf(textBuffer, "IR%d %.2fV %4.1fcm", s + 1, irVolts[s], d);
+			else              sprintf(textBuffer, "IR%d %.2fV  --   ", s + 1, irVolts[s]);
+			OLED_ShowString(0, 24 + 12 * s, (uint8_t *) textBuffer);
+		}
+#else
 		// Line 3: Accumulated Left Encoder
 		sprintf(textBuffer, "Enc L: %d", dash_encoderL);
 		OLED_ShowString(0, 24, (uint8_t *) textBuffer);
@@ -1302,12 +1535,9 @@ void StartOledTask(void *argument)
 		// Line 4: Accumulated Right Encoder
 		sprintf(textBuffer, "Enc R: %d", dash_encoderR);
 		OLED_ShowString(0, 36, (uint8_t *) textBuffer);
-
-		// Line 5: Raw Direction Indicator & Battery Percentage
-		dash_battV = dash_battV * 0.9f + readBatteryVoltage() * 0.1f;   // smooth out load sag
-#if FIELD_TOOLS
-		FieldTools_UpdateKnob();
 #endif
+
+		// Line 5: Raw Direction Indicator & Battery Percentage (battery read by the sensor task)
 		dash_battPct = batteryPercent(dash_battV);
 		sprintf(textBuffer, "Dir:%d B:%d%%", dash_direction, dash_battPct);
 		OLED_ShowString(0, 48, (uint8_t *) textBuffer);
@@ -1413,25 +1643,60 @@ void StartGyroTask(void *argument)
 void StartUltrasonicTask(void *argument)
 {
   /* USER CODE BEGIN StartUltrasonicTask */
-  /* Infinite loop */
+  /* SENSOR TASK. Owns the ultrasonic trigger AND the ADC (IR, battery, knob):
+   * one owner, so no mutex. A new task wasn't added because the FreeRTOS heap
+   * (15360 B) is nearly full. One loop every IR_PERIOD_MS (20 ms):
+   *   every loop      IR1 + IR2, 8 samples each (~2 ms)
+   *   every 3rd loop  ultrasonic ping (60 ms apart, so old echoes have died)
+   *   every 5th loop  battery (and the knob with FIELD_TOOLS), 10 Hz as before */
+  float    hist[2][3] = {{IR_CLEAR, IR_CLEAR, IR_CLEAR}, {IR_CLEAR, IR_CLEAR, IR_CLEAR}};
+  uint8_t  h = 0;                                     // slot in hist for this update
+  uint8_t  loop = 0;                                  // 0..14
+  uint32_t wake = osKernelGetTickCount();
+
+  dash_battV = readBatteryVoltage();
+
   for(;;)
   {
-	// 1. Ensure trigger line is completely low before pulsing
-	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
-	delay_us(2);
+	if (loop % 3 == 0) {
+		// 1. Ensure trigger line is completely low before pulsing
+		HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+		delay_us(2);
 
-	// 2. Prime the input capture interrupt to wait for the rising edge
-	first_captured = 0;
-	__HAL_TIM_SET_CAPTUREPOLARITY(&htim5, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
-	__HAL_TIM_ENABLE_IT(&htim5, TIM_IT_CC3);
+		// 2. Prime the input capture interrupt to wait for the rising edge
+		first_captured = 0;
+		__HAL_TIM_SET_CAPTUREPOLARITY(&htim5, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+		__HAL_TIM_ENABLE_IT(&htim5, TIM_IT_CC3);
 
-	// 3. Send 10us HIGH acoustic pulse
-	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_SET);
-	delay_us(10); // Hardware blocking delay here is brief and safe
-	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+		// 3. Send 10us HIGH acoustic pulse (the echo is caught by the TIM5 interrupt)
+		HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_SET);
+		delay_us(10); // Hardware blocking delay here is brief and safe
+		HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+	}
 
-	// 4. Yield task to allow echo interrupt processing
-	osDelay(60);
+	// 4. IR: average 8 ADC samples per side, convert, median of the last 3
+	//    updates (one bad update can't fake an obstacle edge), then publish.
+	for (int s = 0; s < 2; s++) {
+		float v = irReadVolts((s == IR_LEFT) ? IR1_ADC_CHANNEL : IR2_ADC_CHANNEL);
+		if (v < 0.0f) continue;                       // ADC failed: keep the last value
+		irVolts[s] = v;
+		hist[s][h] = irToCm(s, v);
+		irCm[s]    = median3f(hist[s][0], hist[s][1], hist[s][2]);
+	}
+	h = (uint8_t)((h + 1) % 3);
+	irSeq++;
+
+	// 5. Battery (and knob), 10 Hz
+	if (loop % 5 == 0) {
+		dash_battV = dash_battV * 0.9f + readBatteryVoltage() * 0.1f;   // smooth out load sag
+#if FIELD_TOOLS
+		FieldTools_UpdateKnob();
+#endif
+	}
+
+	loop = (uint8_t)((loop + 1) % 15);
+	wake += IR_PERIOD_MS;
+	osDelayUntil(wake);                               // fixed 20 ms rate, however long the reads took
   }
   /* USER CODE END StartUltrasonicTask */
 }

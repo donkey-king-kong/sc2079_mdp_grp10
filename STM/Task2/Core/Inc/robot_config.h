@@ -39,7 +39,8 @@
   #define TICKS_PER_CM        75.5f   // [CAL] Encoder ticks per cm (measured by tape)
   #define STOP_T              0.050f  // [CAL] Straights: robot rolls this many seconds after deciding to stop
   #define TURN_STOP_T         0.075f  // [CAL] Turns: robot keeps rotating this many seconds after deciding to stop
-  #define TURN_RADIUS_L       20.2f   // [CAL] Left-lock turning radius at the rear-axle centre (cm), LF180 diameter
+  #define TURN_RADIUS_L       19.6f   // [CAL] Left-lock turning radius at the rear-axle centre (cm). 12 Oct: LF090 moved
+                                      //       the rear axle 19.6 forward and 19.6 left (was 20.2 from LF180)
   #define TURN_RADIUS_R       36.2f   // [CAL] Right-lock turning radius (cm), RF180 diameter
   #define SERVO_TRUE_CENTRE   1504    // [CAL] Servo value for straight ahead (approached from below)
   #define MOTOR_FF_BASE       2100.0f // [CAL] PWM that just keeps the robot rolling (Phase 2 floor test)
@@ -168,19 +169,120 @@
  * ========================================================================== */
 #define ULTRA_CM_PER_US     0.017673f // [CAL] cm per microsecond of echo (speed of sound + clock)
 #define ULTRA_OFFSET_CM     0.65f     // [CAL] fixed offset (cm), measured from the sensor face
+#define ULTRA_VALID_MS      100       // A reading older than this is stale (no echo came back)
+#define ULTRA_MAX_CM        300.0f    // Longer than this = no echo (HC-SR04 gives ~38 ms then)
+#define ULTRA_LAG_S         0.010f    // [CAL] An echo is this old when the motor task uses it
+#define ULTRA_BLIND_V       35.0f     // SU / SW speed cap until 3 good echoes are in (test T1)
+#define ULTRA_HARD_STOP_CM  10.0f     // An SW travel floor never overrides an echo this close
+#define US_QUERY_PINGS      5         // US?: median of this many fresh pings (~0.3 s)
 
 
 /* ==========================================================================
- *  8. IR DISTANCE SENSORS (Sharp GP2Y0A21YK0F, 10-80 cm)
- *     Power them from 5 V (4.5-5.5 V). Output is ~0.4 V (80 cm) to ~3.1 V (10 cm).
+ *  7c. SENSOR-ENDED STRAIGHTS (SU, SW)
+ *      The ultrasonic decides WHERE to stop; the encoders still do the
+ *      stopping, so the stop is as precise as a plain straight.
+ * ========================================================================== */
+#define SU_MAX_CM           200.0f  // SU: stop here if the ultrasonic never sees the target
+#define FACE_V_MAX          25.0f   // SW (and SE later): speed cap along obstacle 2 / into the carpark
+#define SW_MAX_CM_DEFAULT   35.0f   // SW with no arguments: travel cap  (lane cap,   computed by the sequencer later)
+#define SW_MIN_CM_DEFAULT   0.0f    // SW with no arguments: travel floor (lane floor, computed by the sequencer later)
+
+
+/* ==========================================================================
+ *  8. IR DISTANCE SENSORS (Sharp GP2Y0A21YK0F)
+ *     Power them from 5 V (4.5-5.5 V). Output is ~0.2 V (nothing) to ~2.4 V (10 cm).
+ *     Read by the sensor task (main.c) every IR_PERIOD_MS.
  * ========================================================================== */
 #define OLED_SHOW_IR        1       // 1 = OLED shows the IR sensors instead of the encoder totals
-#define IR1_ADC_CHANNEL     ADC_CHANNEL_14   // IR1 on PC4 (ADC1 channel 14)
-#define IR2_ADC_CHANNEL     ADC_CHANNEL_5    // IR2 on PA5 (ADC1 channel 5)
+#define IR1_ADC_CHANNEL     ADC_CHANNEL_14   // IR1 = LEFT,  PC4 (ADC1 channel 14)
+#define IR2_ADC_CHANNEL     ADC_CHANNEL_5    // IR2 = RIGHT, PA5 (ADC1 channel 5)
 #define IR_SAMPLES          8       // ADC readings averaged per update (the output is noisy)
-/* Distance (cm) = IR_FIT_A x volts ^ IR_FIT_B. Fitted to the datasheet's typical
- * curve; each sensor differs by up to ~10%, so check against a ruler later. */
-#define IR_FIT_A            27.5f
-#define IR_FIT_B            (-1.21f)
+#define IR_PERIOD_MS        20      // IR update period: 0.5 cm of travel at 25 cm/s
+
+/* Volts -> cm from the lens: lookup table from the 11 Oct sweep (flat board,
+ * square to each lens, mean of 3 IR? readings). Between points the distance
+ * is interpolated in 1/volts, which follows the Sharp curve. To recalibrate,
+ * redo the sweep and replace the volts. Volts must keep falling left to right.
+ * IR2 is weak at 40-50 cm (40 and 45 read almost the same), +-3 cm there.  */
+#define IR_TABLE_N          12
+#define IR_TABLE_CM         { 10.0f,  15.0f,  20.0f,  25.0f,  30.0f,  35.0f,  40.0f,  45.0f,  50.0f,  55.0f,  60.0f,  70.0f }
+#define IR1_TABLE_V         { 2.247f, 1.517f, 1.217f, 1.017f, 0.827f, 0.760f, 0.660f, 0.633f, 0.573f, 0.547f, 0.503f, 0.447f }
+#define IR2_TABLE_V         { 2.413f, 1.707f, 1.387f, 1.090f, 1.013f, 0.847f, 0.760f, 0.750f, 0.703f, 0.573f, 0.477f, 0.423f }
+
+#define IR_MIN_CM           10.0f   // Closer -> reported as IR_MIN_CM (the Sharp output folds back below ~10 cm)
+#define IR_MAX_CM           70.0f   // Farther -> IR_CLEAR (= the table's last point; "nothing" reads 0.19-0.29 V,
+                                    // 70 cm 0.42-0.45 V). Was 60: a wall at ~84 cm then read "none" (run 3, 12 Oct)
+#define IR_CLEAR            999.0f  // "Path clear / > 60 cm"
+#define IR_V_NOSIG          0.10f   // Below this the sensor is unplugged -> IR_CLEAR
+
+/* IR edge detection (SE: the end of obstacle 2's face) */
+#define IR_FACE_CM          50.0f   // 3 readings in a row under this = the IR is on a face
+#define IR_EDGE_JUMP_CM     12.0f   // then 2 in a row this far above the face reading = past its end
+#define IR_EDGE_LAG_CM      1.2f    // [CAL] the edge is first seen this far after the sensor passes it, at FACE_V_MAX
+                                    //       (scaled with speed). 12 Oct SEL: rear axle 3.1 past the box end, 3.4 expected
+
+/* Where the lenses are (calipers, 10 Oct) */
+#define IR_LENS_FROM_CL_CM  5.35f   // Lens to the robot centreline, sideways (53.5 mm)
+#define IR_AHEAD_CM         14.72f  // Lens ahead of the rear axle (147.2 mm)
+
+
+
+/* ==========================================================================
+ *  9. TRACKED POSE (rear-axle centre)
+ *     Frame: origin at the centre of the carpark opening, x forward along the
+ *     start heading, y to the robot's left, h in degrees (CCW +). ZH resets it.
+ * ========================================================================== */
+#define POSE_START_X_CM     (-30.0f) // [CAL] rear-axle x at the marked start. -30 = nose 8 cm inside the
+                                     //       opening line, as task2_sim.py assumes. MARK THIS ON THE FLOOR.
+#define POSE_SLIDE_CM_PER_M 0.5f     // [CAL] sideways slide the gyro can't see, forward straights,
+                                     //       cm to the RIGHT per metre. SF100 / SF170 x6 (11-12 Oct): 0.1-0.6
+#define POSE_TURN_FROM_RADIUS 1      // 1 = in turns, arc = calibrated radius x gyro angle (wheels scrub:
+                                     //     LF090 read R 18.1 from the encoders). 0 = encoders
+
+
+
+/* ==========================================================================
+ *  10. TASK 2 ROUTE (task2.c). Values from TASK2_DESIGN.md / task2_sim.py.
+ *      Distances in cm; "travel" = along the robot's heading.
+ * ========================================================================== */
+#define ROBOT_FRONT_CM      22.0f   // front of the robot ahead of the rear axle
+
+#define T2_D1               30.0f   // GO: stop with the front this far from obstacle 1 (scan 1)
+#define T2_IGN_BELOW_CM     45.0f   // GO: ignore echoes shorter than this ...
+#define T2_IGN_PAST_CM      10.0f   // ... until the nose is this far past the opening line
+#define T2_SU1_MAX_CM       160.0f  // GO: travel cap (obstacle 1 never seen)
+#define T2_TH1              52.0f   // dodge arcs around obstacle 1 (lane 21.7 off the centreline)
+#define T2_RSCAN            41.0f   // stop with the front this far from obstacle 2 (scan 2)
+#define T2_SU2_MAX_CM       140.0f  // travel cap to scan 2
+#define T2_OB_DEPTH         10.0f   // obstacle 2 front face to back face
+#define T2_XPASS            11.0f   // R then L only: straight before the crossing left turn
+#define T2_PAST             8.35f   // rear axle this far past obstacle 2's back face before the loop turn
+#define T2_GAP_L            23.0f   // SE: lane = obstacle end + this when the next turn is left ...
+#define T2_GAP_R            25.0f   // ... or right
+#define T2_DW_L             25.0f   // SE: ultrasonic wall stop before a left 90 ...
+#define T2_DW_R             39.0f   // ... or a right 90
+#define T2_LANE_CAP         50.0f   // SE: lane used when the IR never sees the face
+#define T2_LANE_FLOOR       38.0f   // SE: never a lane closer than this to the centreline
+#define T2_LANE_HARD        90.0f   // SE: never a lane farther than this from the centreline (even if the IR edge is missed)
+#define T2_LOOP_V           45.0f   // SE behind obstacle 2: speed (cm/s); an overshoot past the edge stop is backed off
+#define T2_OVERSHOOT_FIX_CM 1.5f    // SE: back off an overshoot past the IR edge stop point larger than this
+#define T2_GAP_REV          25.0f   // same side, no wall seen: lane = obstacle end + this (entered by a reversing turn)
+#define T2_REV_MAX_CM       100.0f  // same side, no wall seen: longest reverse along the face looking for its end
+#define T2_WALL_L           26.7f   // same side, wall seen at scan 2: lane = wall - this (last arc left) ...
+#define T2_WALL_R           24.6f   // ... or (last arc right)
+#define T2_WALL_MARGIN      3.0f    // ... and this much more: the IR reads +-3-5 cm at 55-70 cm, so lean toward obstacle 2
+                                    //     (wall 9 -> 12 cm, obstacle 2 12.6 -> 9.6 cm nominal)
+#define T2_ALPHA            20.0f   // carpark entry angle (steepened only if there is no room)
+#define T2_ALPHA_MAX        35.0f
+#define T2_M_IN             7.0f    // tail this far inside the opening when parked
+#define T2_REAR_CM          3.35f   // robot outline behind the rear axle
+#define T2_HALFW_CM         10.7f   // robot half width
+#define T2_TURN_LEAD        4.0f    // the entry turn must start at least this far ahead
+#define T2_ENTRY_DRIFT_CM   0.0f    // [CAL] parked rear axle ends this far to the robot's RIGHT of the carpark
+                                    //       centreline (measure it, cm); the entry aims this much left to cancel it
+#define T2_WALL_QUERY_N     11      // scan 2: IR updates (20 ms each) in the outer-wall median
+#define T2_ENTRY_SLOW_CM    45.0f   // last part of the entry driven at <= FACE_V_MAX
+#define T2_GUARD_CM         13.0f   // entry: far-side IR under this = stop at once
+#define T2_US_EMERG_CM      8.0f    // entry: ultrasonic under this = stop at once
 
 #endif /* ROBOT_CONFIG_H */
