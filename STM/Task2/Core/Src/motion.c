@@ -603,14 +603,14 @@ static void straightStep(int16_t cntL, int16_t cntR)
 
     case MV_BRAKE:
     default:
-        if (el < 200) {                                // active brake
+        if (el < MOVE_BRAKE_MS) {                      // active brake
             setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
             mv.stillLoops = 0;
             break;
         }
         setMotorPwm(0, 0, 0, 0);
         mv.stillLoops = (cntL == 0 && cntR == 0) ? (uint8_t)(mv.stillLoops + 1) : 0;
-        if (mv.stillLoops >= 5 || el > 700) {
+        if (mv.stillLoops >= MOVE_STILL_LOOPS || el > 700) {
             mv.resDist = dist;
             mv.resHead = headingDeg - (float)mv.heading0;   // final error vs target
             mv.active = 0;
@@ -637,8 +637,8 @@ static void straightRun(float distance_cm)
 
     mv.dir       = (distance_cm > 0.0f) ? 1 : -1;
     mv.target    = fabsf(distance_cm);
-    mv.settleA   = far ? 250 : 120;
-    mv.settleB   = far ? 200 : 120;
+    mv.settleA   = far ? 250 : SETTLE_NEAR_MS;
+    mv.settleB   = far ? 200 : SETTLE_NEAR_MS;
     mv.deadline  = HAL_GetTick() + mv.settleA + mv.settleB + 2000
                    + (uint32_t)(mv.target * 1000.0f / STRAIGHT_V_MIN);
     mv.timedOut  = 0;
@@ -724,7 +724,7 @@ void Motion_StraightOpts(const Until_t *o)
     mv.opt = *o;
     if (mv.opt.edgeMaxCm < mv.opt.maxCm) mv.opt.edgeMaxCm = mv.opt.maxCm;
     mv.opt.minCm = fminf(fmaxf(o->minCm, 0.0f), far);
-    mv.vCap      = fminf(o->vCap, STRAIGHT_V_MAX);
+    mv.vCap      = fminf(o->vCap, STRAIGHT_V_ABS_MAX);
     mv.usSeq     = Ultra_Get(&dummy);                  // only readings from now on count
     mv.irSeqSeen = irSeq;
     mv.nEst = 0;
@@ -862,14 +862,14 @@ static void turnStep(int16_t cntL, int16_t cntR)
 
     case TN_BRAKE:
     default:
-        if (el < 200) {                                // active brake
+        if (el < MOVE_BRAKE_MS) {                      // active brake
             setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
             tn.stillLoops = 0;
             break;
         }
         setMotorPwm(0, 0, 0, 0);
         tn.stillLoops = (cntL == 0 && cntR == 0) ? (uint8_t)(tn.stillLoops + 1) : 0;
-        if (tn.stillLoops >= 5 || el > 700) {
+        if (tn.stillLoops >= MOVE_STILL_LOOPS || el > 700) {
             tn.resAngle = turned;
             tn.resErr   = headingDeg - tn.targetAbs;
             // Start bringing the wheels back towards straight (from below, like
@@ -918,7 +918,14 @@ void Motion_Turn(int left, int dir, float angleDeg)
     tn.radius    = left ? TURN_RADIUS_L : TURN_RADIUS_R;
     tn.io        = left ? TURN_IO_L : TURN_IO_R;
     tn.lockUs    = left ? SERVO_LEFT_LOCK : SERVO_RIGHT_LOCK;
-    tn.settleMs  = (abs(cur - (int)tn.lockUs) > 20) ? TURN_SETTLE_MS : 60;
+    int swing    = abs(cur - (int)tn.lockUs);           // servo travel needed (us)
+#if TURN_SETTLE_PROP
+    // TURN_SETTLE_MS covers a full lock-to-lock swing; a shorter swing needs less
+    tn.settleMs  = (swing > 20) ? (uint16_t)(60 + (TURN_SETTLE_MS - 60) * swing / (SERVO_RIGHT_LOCK - SERVO_LEFT_LOCK)) : 60;
+    if (tn.settleMs > TURN_SETTLE_MS) tn.settleMs = TURN_SETTLE_MS;
+#else
+    tn.settleMs  = (swing > 20) ? TURN_SETTLE_MS : 60;
+#endif
     tn.deadline  = HAL_GetTick() + tn.settleMs + 2000
                    + (uint32_t)(angleDeg * DEG2RAD * tn.radius * 1000.0f / TURN_V_MIN);
     tn.timedOut  = 0;

@@ -118,7 +118,23 @@
 #define STRAIGHT_APPROACH   2.0f    // Last few cm of a straight are driven at STRAIGHT_V_MIN
 #define TURN_V_MIN          14.0f   // Slowest turn speed: keeps the inner wheel above stick-slip
 #define TURN_APPROACH_CM    4.0f    // Last few cm of arc of a turn are driven at TURN_V_MIN
-#define TURN_SETTLE_MS      300     // Time for the servo to swing from centre to a lock
+#define TURN_SETTLE_MS      300     // Time for the servo to swing lock to lock (centre to lock: QUICK_STOPS scales it)
+#define STRAIGHT_V_ABS_MAX  85.0f   // No straight may ask for more: the right motor tops out ~86 cm/s at
+                                    // MOTOR_PWM_MAX (2100 + v / 0.0196), and it needs PI headroom
+
+/* Shorter stops and servo waits between moves (12 Oct). 0 = the old values. */
+#define QUICK_STOPS         1
+#if QUICK_STOPS
+  #define MOVE_BRAKE_MS     120     // [CAL] active brake at the end of a move (was 200)
+  #define MOVE_STILL_LOOPS  3       // [CAL] 10 ms loops without a tick = stopped (was 5)
+  #define SETTLE_NEAR_MS    90      // [CAL] straight servo settle, each of 2 steps, servo near centre (was 120)
+  #define TURN_SETTLE_PROP  1       // turn servo settle in proportion to the swing (centre-lock ~190 ms, lock-lock 300)
+#else
+  #define MOVE_BRAKE_MS     200
+  #define MOVE_STILL_LOOPS  5
+  #define SETTLE_NEAR_MS    120
+  #define TURN_SETTLE_PROP  0
+#endif
 
 
 /* ==========================================================================
@@ -251,7 +267,11 @@
 #define T2_IGN_BELOW_CM     45.0f   // GO: ignore echoes shorter than this ...
 #define T2_IGN_PAST_CM      10.0f   // ... until the nose is this far past the opening line
 #define T2_SU1_MAX_CM       160.0f  // GO: travel cap (obstacle 1 never seen)
-#define T2_TH1              52.0f   // dodge arcs around obstacle 1 (lane 21.7 off the centreline)
+#define T2_DODGE_LANE       23.5f   // dodge obstacle 1 into this lane (cm off the centreline, rear axle). Was 21.4:
+                                    // 5.7 cm from obstacle 1, which AL/AL at d1 150 lost to drift. Now 7.8 cm, and
+                                    // the dodge also corrects the drift the tracker saw on the way to scan 1
+#define T2_TH1_MIN          40.0f   // dodge arc limits (deg)
+#define T2_TH1_MAX          75.0f
 #define T2_RSCAN            41.0f   // stop with the front this far from obstacle 2 (scan 2)
 #define T2_SU2_MAX_CM       140.0f  // travel cap to scan 2
 #define T2_OB_DEPTH         10.0f   // obstacle 2 front face to back face
@@ -267,6 +287,11 @@
 #define T2_LOOP_V           45.0f   // SE behind obstacle 2: speed (cm/s); an overshoot past the edge stop is backed off
 #define T2_OVERSHOOT_FIX_CM 1.5f    // SE: back off an overshoot past the IR edge stop point larger than this
 #define T2_GAP_REV          25.0f   // same side, no wall seen: lane = obstacle end + this (entered by a reversing turn)
+#define T2_SAME_SIDE_USE_WALL 0     // 0 = same-side arrows ALWAYS find obstacle 2's end by reversing along its face.
+                                    // 1 = use the two-arc route when the side IR sees "a wall" at scan 2 (faster,
+                                    //     but anything within 70 cm beside the robot - a person, a bag - counts)
+#define T2_FAST_V           80.0f   // [CAL] clear straights: past obstacle 2, the return lane, the carpark entry
+                                    //       (before its slow last 45 cm). Lower to 75 if the robot curves on them
 #define T2_REV_MAX_CM       100.0f  // same side, no wall seen: longest reverse along the face looking for its end
 #define T2_WALL_L           26.7f   // same side, wall seen at scan 2: lane = wall - this (last arc left) ...
 #define T2_WALL_R           24.6f   // ... or (last arc right)

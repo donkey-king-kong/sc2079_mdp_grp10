@@ -80,6 +80,17 @@ static int sensorStraight(const Until_t *o, const char *name)
     return moveOk(name);
 }
 
+/* A clear straight at T2_FAST_V (no sensors). Backwards or tiny: normal straight. */
+static int fastStraight(float cm)
+{
+    if (cm < 5.0f) return straight(cm);
+    Until_t o;
+    Motion_UntilInit(&o);
+    o.maxCm = cm;
+    o.vCap  = T2_FAST_V;
+    return sensorStraight(&o, "SFFAST");
+}
+
 /* ---- SE: along obstacle 2's face --------------------------------------------
  * The robot heads +y or -y beside obstacle 2's front or back face. It stops
  * where the next 90 deg turn (left if turnLeft, at radius R) puts it in the
@@ -176,8 +187,17 @@ void Task2_Go(char *reply, size_t len)
 /* ---- Arrow 1: dodge obstacle 1, lane to scan 2, outer wall from the IR ----- */
 static int arrow1Moves(MoveResult_t *r)
 {
-    if (!turn(a1 > 0, T2_TH1)) return 0;
-    if (!turn(a1 < 0, T2_TH1)) return 0;                 // in the lane, 21.7 off the centreline
+    // Dodge: two equal arcs into the lane T2_DODGE_LANE off the centreline,
+    // measured from where the tracker says the robot is now (the long
+    // approach to scan 1 can drift it a few cm sideways).
+    float x, y, h;
+    Motion_GetPose(&x, &y, &h);
+    float s   = (a1 > 0) ? 1.0f : -1.0f;
+    float dy  = T2_DODGE_LANE - s * y;                   // sideways move needed
+    float th  = acosf(fminf(fmaxf(1.0f - dy / (RL + RR), -1.0f), 1.0f)) / DEG2RAD;
+    th = fminf(fmaxf(th, T2_TH1_MIN), T2_TH1_MAX);
+    if (!turn(a1 > 0, th)) return 0;
+    if (!turn(a1 < 0, th)) return 0;
 
     Until_t o;
     Motion_UntilInit(&o);
@@ -186,7 +206,6 @@ static int arrow1Moves(MoveResult_t *r)
     if (!sensorStraight(&o, "SU041")) return 0;
     Motion_LastResult(r);
 
-    float x, y, h;
     Motion_GetPose(&x, &y, &h);
     float u2 = (r->u > 0.0f) ? r->u : T2_RSCAN;          // no echo: assume the stop distance
     x2b = x + ROBOT_FRONT_CM + u2 + T2_OB_DEPTH;
@@ -260,7 +279,7 @@ static int arrow2Moves(int a2)
         if (wallY > 0.0f) {
             Y2 = wallY - T2_WALL_MARGIN - ((a1 < 0) ? T2_WALL_L : T2_WALL_R);
         }
-        if (Y2 >= T2_LANE_FLOOR) {
+        if (T2_SAME_SIDE_USE_WALL && Y2 >= T2_LANE_FLOOR) {
             // Wall seen beside the robot: two arcs straight into the lane, Y2 from the wall
             float c   = 1.0f - (Y2 - fabsf(y)) / (RL + RR);
             float phi = acosf(fminf(fmaxf(c, 0.0f), 1.0f)) / DEG2RAD;
@@ -283,7 +302,7 @@ static int arrow2Moves(int a2)
     // 2. Past obstacle 2, then the loop behind it (left arrow = right turns)
     float gapLane;
     Motion_GetPose(&x, &gapLane, &h);
-    if (!straight(x2b + T2_PAST - x)) return 0;
+    if (!fastStraight(x2b + T2_PAST - x)) return 0;
     int tl = (a2 < 0);
     if (!turn(tl, 90.0f)) return 0;
     if (!alongFace(tl, fmaxf(T2_LANE_CAP, fabsf(gapLane)), 1, T2_LOOP_V)) return 0;   // behind obstacle 2: faster
@@ -302,12 +321,13 @@ static int arrow2Moves(int a2)
         al += 0.5f;
         entryPlan(al, fabsf(y), R, ya, &x0, &Lh);
     }
-    if (!straight(x - x0)) return 0;                     // heading 180: forward = toward -x
+    if (!fastStraight(x - x0)) return 0;                 // heading 180: forward = toward -x
     if (!turn(s > 0, al)) return 0;
 
     Until_t o;
     Motion_UntilInit(&o);
     o.maxCm      = Lh;                                   // stop on tracked distance
+    o.vCap       = T2_FAST_V;
     o.slowZoneCm = T2_ENTRY_SLOW_CM;                     // last 45 cm slowly
     o.vSlow      = FACE_V_MAX;
     o.guardSide  = (s > 0) ? IR_LEFT : IR_RIGHT;         // far-side IR: the other arm
