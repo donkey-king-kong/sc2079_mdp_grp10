@@ -6,8 +6,8 @@
  *
  *   ZH   (main.c)  zero heading and pose; sequencer back to "waiting for GO"
  *   GO             drive to scan 1                     -> "A S1 u=<cm> by=<c>"
- *   AL / AR        arrow 1: dodge, drive to scan 2     -> "A S2 u=<cm> w=<cm>"
- *   AL / AR        arrow 2: round obstacle 2, park     -> "A FIN x=<cm> y=<cm> h=<deg>"
+ *   AL / AR        arrow 1: dodge, drive to scan 2, turn to face the card  -> "A S2 u=<cm> w=<cm> by=<c> a=<deg>"
+ *   AL / AR        arrow 2: round obstacle 2, park     -> "A FIN x=<cm> y=<cm> h=<deg> by=<c> end=<cm> re=<n>"
  *   '!'            stops the current move; the reply ends in "ABORT at <move>"
  *
  * Bench helpers: SEL / SER = one "along the face" leg (next turn left / right).

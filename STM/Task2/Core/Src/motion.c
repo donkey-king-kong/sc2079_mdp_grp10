@@ -91,6 +91,9 @@ typedef struct {
     uint32_t irSeqSeen;           // Last IR update already used
     uint8_t  faceCount, edgeCount, guardCount, emergCount;   // readings in a row
     uint8_t  faceSeen, edgeFound, guardHit, emergHit;
+    uint8_t  edgeFar;             // readings since the edge candidate began that were >= IR_EDGE_FAR_CM
+    uint8_t  backCount;           // after the edge: readings in a row back on a face
+    uint8_t  edgeRej;             // Diagnostic: edge candidates ignored (too early) or dropped (still the face)
     float    faceAvg;             // Typical reading on the face (cm)
     float    edgeDist;            // Travel at the first reading past the edge
     float    edgeV;               // Speed then (cm/s): the detection lag grows with speed
@@ -364,8 +367,12 @@ static uint8_t inc8(uint8_t n)
  *  - Ultrasonic: each echo -> stop point; median of the last 3, so one false
  *    echo can't move it.
  *  - IR edge: 3 readings in a row under IR_FACE_CM = a face; then 2 readings
- *    in a row more than IR_EDGE_JUMP_CM above it = the edge; stop edgeExtra
- *    after where the edge was first seen.
+ *    in a row more than IR_EDGE_JUMP_CM above it, 2 of them IR_EDGE_FAR_CM or
+ *    more, = the edge; stop edgeExtra after where the edge was first seen.
+ *    Jumps before edgeFromCm of travel are ignored; a jump that stays under
+ *    IR_EDGE_FAR_CM is still the face (the face reading follows it). If the
+ *    face comes back within IR_EDGE_CONFIRM_CM while still driving, that edge
+ *    was a seam or the card's edge: dropped, the search goes on.
  *  - Guard IR / ultrasonic emergency: 2 readings in a row -> stop now. */
 static void untilTrack(float dist, float vNow)
 {
@@ -397,20 +404,40 @@ static void untilTrack(float dist, float vNow)
                     mv.faceSeen = 1;
                     mv.faceAvg  = d;
                 }
-            } else if (d > mv.faceAvg + IR_EDGE_JUMP_CM) {   // past the end of the face
-                if (mv.edgeCount == 0) {
-                    mv.edgeDist = dist;
-                    mv.edgeV    = vNow;
-                }
-                mv.edgeCount = inc8(mv.edgeCount);
-                if (mv.edgeCount >= 2) {
-                    mv.edgeFound = 1;
-                    // IR_EDGE_LAG_CM was measured at FACE_V_MAX; the lag is mostly time, so scale it
-                    mv.edgeAt = mv.edgeDist - IR_EDGE_LAG_CM * (mv.edgeV / FACE_V_MAX) + mv.opt.edgeExtra;
+            } else if (d > mv.faceAvg + IR_EDGE_JUMP_CM) {   // past the end of the face, or a patch on it
+                if (dist < mv.opt.edgeFromCm) {          // too early to be the end (image card): ignore
+                    if (mv.edgeCount == 0) mv.edgeRej = inc8(mv.edgeRej);
+                    mv.edgeCount = 0;
+                    mv.edgeFar   = 0;
+                } else {
+                    if (mv.edgeCount == 0) {
+                        mv.edgeDist = dist;
+                        mv.edgeV    = vNow;
+                        mv.edgeFar  = 0;
+                    }
+                    mv.edgeCount = inc8(mv.edgeCount);
+                    if (d >= IR_EDGE_FAR_CM) mv.edgeFar = inc8(mv.edgeFar);
+                    if (mv.edgeCount >= 2 && mv.edgeFar >= 2) {
+                        mv.edgeFound = 1;
+                        // IR_EDGE_LAG_CM was measured at FACE_V_MAX; the lag is mostly time, so scale it
+                        mv.edgeAt = mv.edgeDist - IR_EDGE_LAG_CM * (mv.edgeV / FACE_V_MAX) + mv.opt.edgeExtra;
+                    } else if (mv.edgeCount >= IR_EDGE_HOLD_N && mv.edgeFar == 0) {
+                        mv.edgeRej   = inc8(mv.edgeRej);     // stayed near: the face just reads higher here
+                        mv.edgeCount = 0;
+                        mv.faceAvg   = d;
+                    }
                 }
             } else {                                     // still on the face
                 mv.edgeCount = 0;
                 mv.faceAvg = 0.8f * mv.faceAvg + 0.2f * d;
+            }
+        } else if (mv.opt.edgeSide >= 0 && dist < mv.edgeDist + IR_EDGE_CONFIRM_CM) {
+            // Edge found, still near it: back on a face = it was not the end
+            mv.backCount = (irCm[mv.opt.edgeSide] < IR_FACE_CM) ? inc8(mv.backCount) : 0;
+            if (mv.backCount >= 2) {
+                mv.edgeFound = 0;
+                mv.edgeCount = mv.edgeFar = mv.backCount = 0;
+                mv.edgeRej   = inc8(mv.edgeRej);
             }
         }
         if (mv.opt.guardSide >= 0 && dist >= mv.opt.guardFromCm) {
@@ -731,6 +758,7 @@ void Motion_StraightOpts(const Until_t *o)
     mv.usAt = 0.0f;
     mv.faceCount = mv.edgeCount = mv.guardCount = mv.emergCount = 0;
     mv.faceSeen = mv.edgeFound = mv.guardHit = mv.emergHit = 0;
+    mv.edgeFar = mv.edgeRej = mv.backCount = 0;
     mv.faceAvg = mv.edgeDist = mv.edgeAt = mv.edgeV = 0.0f;
     if (mv.opt.reverse) {
         mv.opt.usStop = 0.0f;                          // the ultrasonic looks forward
@@ -745,10 +773,11 @@ void Motion_StraightOpts(const Until_t *o)
     const char *end = mv.aborted ? " ABORT" : (mv.timedOut ? " TO" : "");
     snprintf(replyShort, sizeof(replyShort), "d=%.1f e=%+.1f u=%.1f by=%c%s",
              mv.resDist, mv.resHead, u, mv.stopBy, end);
-    // Full: y = sideways drift (cm), n = echoes used, f = edge IR saw a face, vb = speed when braking began
-    snprintf(replyLong, sizeof(replyLong), "d=%.1f e=%+.1f eb=%+.1f u=%.1f by=%c y=%+.1f n=%u f=%u vb=%.0f t=%+.0f es=%+.1f ys=%+.1f%s",
+    // Full: y = sideways drift (cm), n = echoes used, f = edge IR saw a face, er = edge candidates rejected,
+    //       vb = speed when braking began
+    snprintf(replyLong, sizeof(replyLong), "d=%.1f e=%+.1f eb=%+.1f u=%.1f by=%c y=%+.1f n=%u f=%u er=%u vb=%.0f t=%+.0f es=%+.1f ys=%+.1f%s",
              mv.resDist, mv.resHead, mv.eBrake, u, mv.stopBy, mv.lateral, (unsigned)mv.nEst,
-             (unsigned)mv.faceSeen, mv.vBrake, servoTrim, mv.eSlow, mv.ySlow, end);
+             (unsigned)mv.faceSeen, (unsigned)mv.edgeRej, mv.vBrake, servoTrim, mv.eSlow, mv.ySlow, end);
     lastRes.u = u;
     lastRes.stopBy = mv.stopBy;
     lastRes.faceSeen = mv.faceSeen;

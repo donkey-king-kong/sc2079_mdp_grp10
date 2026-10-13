@@ -233,7 +233,11 @@
 
 /* IR edge detection (SE: the end of obstacle 2's face) */
 #define IR_FACE_CM          50.0f   // 3 readings in a row under this = the IR is on a face
-#define IR_EDGE_JUMP_CM     12.0f   // then 2 in a row this far above the face reading = past its end
+#define IR_EDGE_JUMP_CM     12.0f   // then 2 in a row this far above the face reading = past its end ...
+#define IR_EDGE_FAR_CM      50.0f   // ... with 2 of them at least this far ("nothing there"). Step 7: a card edge, seam
+                                    //     or dark patch on a face 15-30 cm away can jump 12 cm, but not to 50+
+#define IR_EDGE_HOLD_N      4       // a jump that stays under IR_EDGE_FAR_CM this many updates = still the face
+#define IR_EDGE_CONFIRM_CM  4.0f    // face back (2 readings) within this after an edge, still driving = not the end
 #define IR_EDGE_LAG_CM      1.2f    // [CAL] the edge is first seen this far after the sensor passes it, at FACE_V_MAX
                                     //       (scaled with speed). 12 Oct SEL: rear axle 3.1 past the box end, 3.4 expected
 
@@ -274,6 +278,12 @@
 #define T2_TH1_MAX          75.0f
 #define T2_RSCAN            41.0f   // stop with the front this far from obstacle 2 (scan 2)
 #define T2_SU2_MAX_CM       140.0f  // travel cap to scan 2
+#define T2_SCAN2_AIM        1       // Step 8: at the scan 2 stop, turn toward the arrow card at obstacle 2's centre so the
+                                    //   camera sees it square (from the 23.5 lane it was ~30 deg off-axis). Undone by the
+                                    //   same arc in reverse before arrow 2's moves. 0 = off (step 7 behaviour)
+#define T2_CAM_AHEAD_CM     18.0f   // [MEASURE] camera lens ahead of the rear axle (cm). The aim hardly depends on it:
+                                    //   22 deg (AR lane) / 23 deg (AL lane) for anything from 10 to 22
+#define T2_AIM_MAX          35.0f   // aim turn limit (deg)
 #define T2_OB_DEPTH         10.0f   // obstacle 2 front face to back face
 #define T2_XPASS            11.0f   // R then L only: straight before the crossing left turn
 #define T2_PAST             8.35f   // rear axle this far past obstacle 2's back face before the loop turn
@@ -293,6 +303,16 @@
 #define T2_FAST_V           80.0f   // [CAL] clear straights: past obstacle 2, the return lane, the carpark entry
                                     //       (before its slow last 45 cm). Lower to 75 if the robot curves on them
 #define T2_REV_MAX_CM       100.0f  // same side, no wall seen: longest reverse along the face looking for its end
+#define T2_EDGE_MIN_Y       15.0f   // Step 7: an IR "end" of obstacle 2's front face counts only once the lens is this far
+                                    //   past the centreline on the pass side. Obstacle 2 is >= 30 cm long and centred, and
+                                    //   its image card sits at the centre: 13 Oct AR/AR stopped at the card's edge (lens
+                                    //   ~5 cm off centre), entered a lane in front of obstacle 2 and drove into it
+#define T2_REV_PAST_CM      5.0f    // Step 7, same side: reverse this far past the end before stopping (> IR_EDGE_CONFIRM_CM)
+#define T2_END_CHECK_N      5       // Step 7: stopped past an end, IR updates in the "nothing there" check
+#define T2_BLOCKED_CM       60.0f   // Step 7, same side: after the reversing turn an echo under this = obstacle 2 is ahead:
+                                    //   retrace the turn and search further along the face
+#define T2_EDGE_RETRY_CM    3.0f    // ... the next end must be at least this far past the rejected one
+#define T2_REV_TRIES        4       // ... searches in all (either check); then stop (FIN ABORT at BLOCK), never drive into it
 #define T2_WALL_L           26.7f   // same side, wall seen at scan 2: lane = wall - this (last arc left) ...
 #define T2_WALL_R           24.6f   // ... or (last arc right)
 #define T2_WALL_MARGIN      3.0f    // ... and this much more: the IR reads +-3-5 cm at 55-70 cm, so lean toward obstacle 2

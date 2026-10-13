@@ -38,6 +38,7 @@ typedef struct {
     int8_t edgeSide;    // IR_LEFT / IR_RIGHT: stop edgeExtra after this IR loses a face; -1 = off
     float  edgeExtra;
     float  edgeMaxCm;   // Cap once that IR has seen a face (replaces maxCm)
+    float  edgeFromCm;  // Ignore "ends" seen before this much travel (the image card at the face's centre); 0 = off
     int8_t guardSide;   // IR_LEFT / IR_RIGHT: stop at once if it reads under guardCm; -1 = off
     float  guardCm;
     float  guardFromCm; // ... checked only after this much travel
