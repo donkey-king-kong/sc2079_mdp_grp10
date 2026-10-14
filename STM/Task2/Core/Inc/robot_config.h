@@ -350,23 +350,44 @@
  *      Each part has its own switch so they can be tried one at a time.
  *      Banzai 2 (14 Oct): faster legs, flown carpark entry with an obstacle 1
  *      guard, forward slalom for short obstacles, GL / GR (no stop at scan 1).
+ *      Banzai 3 (14 Oct evening): no standing checks or retries, every move that
+ *      keeps its direction flies into the next, steep accel / decel.
  * ========================================================================== */
 #define TASK2_BANZAI_MODE 1
 #if TASK2_BANZAI_MODE
 #define BZ_FAST 1         // faster turns, straights, SE legs and stops (values below)
 #define BZ_FLY 1          // no stop between: dodge -> scan 2 approach, pass -> loop turn, loop turn 2 -> return
                           //   -> entry turn -> entry straight (the "sweeping return")
-#define BZ_ENTRY_BRAKE 1  // entry at T2B_ENTRY_V, hard brake T2B_BRAKE_CM before the parked point (no creep)
+#define BZ_ENTRY_BRAKE 0  // 1 = entry at T2B_ENTRY_V, hard brake T2B_BRAKE_CM before the parked point (no creep).
+                          //   Banzai 3: 0 = entry at T2_FAST_V (90) with BZ_PUNCH's 150 cm/s^2 slow-down to the parked
+                          //   point, no slow zone (faster, and needs no VB skid calibration)
 #define BZ_WALL_SLALOM 1  // same side: forward two-arc slalom when a FULL wall is confirmed beside the approach
 #define BZ_SHORT_SLALOM 1 // same side: forward two-arc slalom (no reverse search) when the ultrasonic shows obstacle 2's
                           //   face does NOT reach the robot's lane at scan 2 (short obstacle: end < ~23 cm out)
+#define BZ_NO_CHECKS 1    // Banzai 3: no standing checks, no retries, no back-ups. The first IR end is THE end:
+                          //   - same side: no standing IR re-check, no "obstacle 2 ahead?" ultrasonic check, no
+                          //     retrace / search-on (the 14 Oct AR/AR retry loop)
+                          //   - SE legs: no standing ultrasonic wall check first, no re-check, no overshoot back-up
+                          //   - carpark entry: no far-side IR guard, no ultrasonic emergency stop
+                          //   Kept (they cost no time): the end window T2_EDGE_MIN_Y (the image card at the
+                          //   centre is never an end), the moving edge confirm, the scan 2 travel cap
+#define BZ_FLY_ALL 1      // Banzai 3: every hand-over that keeps the direction rolls on at T2B_FLY_V: cross turn ->
+                          //   front-face SE -> lane turn -> pass -> loop turn 1 -> SE behind -> loop turn 2 -> return ->
+                          //   entry turn -> entry. Opposite side: the crossing turn carries on from the scan 2 aim
+                          //   (same lock, same circle) instead of undoing it. Only a change of direction
+                          //   (forward <-> reverse) or a wait for the Pi stops the robot.
+#define BZ_PUNCH 1        // Banzai 3: steep speed-up / slow-down + acceleration feed-forward (values below)
 #else
 #define BZ_FAST 0
 #define BZ_FLY 0
 #define BZ_ENTRY_BRAKE 0
 #define BZ_WALL_SLALOM 0
 #define BZ_SHORT_SLALOM 0
+#define BZ_NO_CHECKS 0
+#define BZ_FLY_ALL 0
+#define BZ_PUNCH 0
 #endif
+#define T2_TRACE 1        // 14 Oct: keep a log of the last run's moves; VT prints it (both modes, costs no time)
 
 /* Calibration tests (compiled in always; bench / floor commands only) */
 #define VMAX_TEST_CM 250.0f // VMAX?: the robot stops within this (VMAX<cm> overrides); clear this much floor + 30 cm
@@ -414,6 +435,32 @@
 #define T2_OB1_GUARD 1         // carpark entry clears obstacle 1 by >= T2_OB1_MIN_CM 17 (alpha up to T2B_ALPHA_MAX). 14 Oct
                                //   60 / 60: the entry path ran ~7 cm closer to obstacle 1 than planned (alpha 20 plan: 9.8 cm)
 #define T2B_ALPHA_MAX 30.0f    // ... steepest entry for that (arms 8.5 cm at 30, 12.4 at 20)
+#endif
+
+#if BZ_PUNCH
+// Banzai 3. The straights never got near top speed: speeding up at 140 and slowing at 60 cm/s per s, a
+// 50 cm straight peaked ~60 cm/s and a stop from 90 took 67 cm and 1.3 s. The speed controller (WHEEL_KP)
+// only follows this profile; the profile and the feed-forward set the launch.
+#undef STRAIGHT_ACCEL
+#define STRAIGHT_ACCEL 300.0f   // was 140: 0 -> 90 cm/s in 0.3 s / 13 cm (the wheels saturate at 7199 on the way)
+#undef STRAIGHT_DECEL
+#define STRAIGHT_DECEL 150.0f   // was 60: 90 -> 40 in 22 cm (was 54), 90 -> stop in 27 cm (was 67). Expect 1-3 cm
+                                //   more slide at stops (step 2 saw 1 cm at 90): stops land a little long
+#undef STRAIGHT_APPROACH
+#define STRAIGHT_APPROACH 1.0f  // was 2: the creep at 12 cm/s before a stop
+#undef TURN_ACCEL
+#define TURN_ACCEL 150.0f       // was 80
+#undef TURN_DECEL
+#define TURN_DECEL 150.0f
+#undef TURN_APPROACH_CM
+#define TURN_APPROACH_CM 2.0f   // was 4: the creep at 14 cm/s before a standing turn ends
+#define WHEEL_KA 6.0f           // PWM per cm/s^2 of the profile's speed-up (- while slowing): the "punch". At 300
+                                //   that is +1800 PWM on top of the speed feed-forward, i.e. ~full PWM from the start
+#endif
+
+#if BZ_NO_CHECKS
+#undef T2_REV_PAST_CM
+#define T2_REV_PAST_CM 4.0f     // same side: reverse this far past the end (was 5; = IR_EDGE_CONFIRM_CM, no standing check)
 #endif
 
 #if BZ_FLY

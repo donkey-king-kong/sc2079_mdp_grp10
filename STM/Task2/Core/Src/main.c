@@ -1183,6 +1183,26 @@ float Ultra_Query(int pings, int *nGood)
     return (k > 0) ? r[(k - 1) / 2] : -1.0f; // even count: the shorter middle one
 }
 
+/* Banzai 3: how many echoes nearer than maxCm come back in about `pings` ping
+ * periods (standing). Echoes from farther away (the room behind) don't count.
+ * Calls osDelay: tasks only. */
+int Ultra_CountNear(int pings, float maxCm)
+{
+    float d;
+    int n = 0;
+    uint32_t last  = Ultra_Get(&d);          // only echoes from now on count
+    uint32_t start = HAL_GetTick();
+    uint32_t limit = (uint32_t)pings * 60u + 30u;   // the sensor task pings every 60 ms
+    while ((HAL_GetTick() - start) < limit) {
+        osDelay(5);
+        uint32_t s = Ultra_Get(&d);
+        if (s == last) continue;
+        last = s;
+        if (d > 0.0f && d < maxCm) n++;
+    }
+    return n;
+}
+
 /* ==========================================================================
  *                     IR DISTANCE SENSORS (Sharp GP2Y0A21YK0F)
  * ========================================================================== */
@@ -1304,6 +1324,7 @@ void StartCommunicateTask(void *argument)
    *   PO?                      tracked pose (rear-axle centre)          -> "A PO x=<cm> y=<cm> h=<deg>"
    *   GO / AL / AR             Task 2 sequencer (task2.h)               -> "A S1 ..", "A S2 ..", "A FIN .."
    *   GL / GR                  Task 2: GO with arrow 1 known, no stop at scan 1 -> "A S2 .. u1=.."
+   *   VT                       Task 2: the last run's moves and times, one line "A TR .."
    *   SEL / SER                one "along obstacle 2's face" leg, next turn left / right
    *   ST?                      free stack per task (bytes, lowest seen) -> "A ST c= m= s= o= g= d="
    *   VMAX? / VMAX<cm>         Banzai calibration: top stable straight speed (stops within 250 cm, or <cm>)
@@ -1353,6 +1374,7 @@ void StartCommunicateTask(void *argument)
 
 	// 2. EXECUTE and prepare the reply text (without the leading "A")
 	char replyText[64] = "";
+	int sentOwn = 0;                                 // the command already sent its own reply line (VT)
 	int isMove  = 0;                                 // reply with the move's result
 	int unknown = 0;                                 // reply "A ERR <command>"
 
@@ -1487,6 +1509,13 @@ void StartCommunicateTask(void *argument)
 				} else if (c2 == 'B' && value > 0) {
 					Motion_BrakeTest((float)value);         // VB<v>
 					isMove = 1;
+				} else if (c2 == 'T') {                     // VT: the last Task 2 run's move log (one long line)
+					static char trBuf[640];
+					trBuf[0] = 'A'; trBuf[1] = ' ';
+					Task2_Trace(trBuf + 2, sizeof(trBuf) - 3);
+					strcat(trBuf, "\n");
+					HAL_UART_Transmit(&huart3, (uint8_t *)trBuf, strlen(trBuf), 300);
+					sentOwn = 1;
 				} else {
 					unknown = 1;
 				}
@@ -1512,7 +1541,9 @@ void StartCommunicateTask(void *argument)
 
 	// 3. REPLY TO THE RPI
 	char ackMsg[96];
-	if (unknown) {
+	if (sentOwn) {
+		ackMsg[0] = '\0';
+	} else if (unknown) {
 		snprintf(ackMsg, sizeof(ackMsg), "A ERR %s\n", cmdBuffer);
 	} else if (isMove) {
 		snprintf(ackMsg, sizeof(ackMsg), "A %s\n", Motion_Reply());
@@ -1521,7 +1552,9 @@ void StartCommunicateTask(void *argument)
 	} else {
 		snprintf(ackMsg, sizeof(ackMsg), "A\n");
 	}
-	HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
+	if (ackMsg[0] != '\0') {
+		HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
+	}
 
 	// 4. DASHBOARD
 	strcpy(dash_lastCmd, cmdBuffer);

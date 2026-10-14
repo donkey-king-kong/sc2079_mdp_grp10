@@ -257,6 +257,11 @@ static void driveWheel(int left, int dir, uint16_t pwm, int brake)
  * Returns the PWM magnitude to apply. When braking = 1 the caller is braking
  * both wheels this loop: only the speed filter is updated, and the integral
  * is left alone so it doesn't wind down. */
+#ifndef WHEEL_KA
+#define WHEEL_KA 0.0f
+#endif
+static float ffAccel = 0.0f;   // Banzai 3: the straight profile's acceleration this loop (cm/s^2), for WHEEL_KA
+
 static uint16_t wheelControl(WheelCtl_t *w, float tgtCmS, int32_t cnt, float gain, int braking)
 {
     float meas = (float)abs((int)cnt);
@@ -278,7 +283,7 @@ static uint16_t wheelControl(WheelCtl_t *w, float tgtCmS, int32_t cnt, float gai
     w->integ = clampf(w->integ + WHEEL_KI * e, -WHEEL_I_LIMIT, WHEEL_I_LIMIT);
 
     // Feedforward from the Phase 2 model, then feedback for everything else
-    float pwm = MOTOR_FF_BASE + tgtCmS / gain + WHEEL_KP * e + w->integ;
+    float pwm = MOTOR_FF_BASE + tgtCmS / gain + WHEEL_KP * e + w->integ + WHEEL_KA * ffAccel;
 
     // Starting takes about twice the power of keeping going: give a burst
     // whenever the wheel should be turning but isn't.
@@ -345,7 +350,7 @@ static void preSteer(uint16_t us)
  * Motion_Fly() before a move: flyIn = start at the speed the last move handed
  * over (no stop, no servo settle: the servo swings while rolling); flyOut =
  * end at T2B_FLY_V without braking. While the command task sets up the next
- * move (up to ~20 ms) the motors keep the last PWM (flyHold). If the last move
+ * move (up to ~20 ms; 120 ms allowed) the motors keep the last PWM (flyHold). If the last move
  * stopped normally, flyIn does nothing. Nothing here runs unless the sequencer
  * asks for it (BZ_FLY). */
 static uint8_t  flyNext   = 0;        // bit 0 = flyIn, bit 1 = flyOut, for the next move
@@ -359,6 +364,11 @@ static uint32_t flyBrakeUntil = 0;    // motor task: a hand-over nobody took: br
 void Motion_Fly(int flyIn, int flyOut)
 {
     flyNext = (uint8_t)((flyIn ? 1 : 0) | (flyOut ? 2 : 0));
+}
+
+float Motion_ExitV(void)                 // speed the last move handed over at (cm/s); 0 = it stopped
+{
+    return exitV;
 }
 
 static uint8_t takeFly(void)
@@ -381,7 +391,7 @@ static void handOver(float v, int8_t dir, const WheelCtl_t *l, const WheelCtl_t 
     exitWR = *r;
     holdPL = pL;
     holdPR = pR;
-    flyHoldUntil = HAL_GetTick() + 40;
+    flyHoldUntil = HAL_GetTick() + 120;          // Banzai 3: was 40 (room for the entry planning at -O0)
 }
 
 /* ==========================================================================
@@ -762,8 +772,10 @@ static void straightStep(int16_t cntL, int16_t cntR)
         }
         float upTo   = fminf(mv.v + STRAIGHT_ACCEL * 0.01f, vTop);
         int slowing  = (slowTo < upTo);                // profile is bringing us down to stop
+        float vWas   = mv.v;
         mv.v = fminf(upTo, slowTo);
         if (mv.v < STRAIGHT_V_MIN) mv.v = STRAIGHT_V_MIN;
+        ffAccel = (mv.v - vWas) * 100.0f;              // Banzai 3 punch (WHEEL_KA): the profile's acceleration
 
         // Heading hold through the servo (+ error = drifted left).
         // P term reacts; servoTrim slowly learns where "straight" really is
@@ -834,6 +846,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
                           (0.5f * (mv.wl.filt + mv.wr.filt) > tgtTicks + BRAKE_ASSIST_TICKS);
         uint16_t pL = wheelControl(&mv.wl, mv.v, cntL, (mv.dir > 0) ? GAIN_L_FWD : GAIN_L_REV, brakeBoth);
         uint16_t pR = wheelControl(&mv.wr, mv.v, cntR, (mv.dir > 0) ? GAIN_R_FWD : GAIN_R_REV, brakeBoth);
+        ffAccel = 0.0f;                                // only for this straight's two wheels
         driveWheel(1, mv.dir, pL, brakeBoth);
         driveWheel(0, mv.dir, pR, brakeBoth);
 

@@ -9,6 +9,7 @@
  *   AL / AR        arrow 1: dodge, drive to scan 2, turn to face the card  -> "A S2 u=<cm> w=<cm> by=<c> a=<deg>"
  *   AL / AR        arrow 2: round obstacle 2, park     -> "A FIN x=<cm> y=<cm> h=<deg> by=<c> end=<cm> re=<n>"
  *   GL / GR        (Banzai 2) GO with arrow 1 known: no stop at scan 1 -> the "A S2 ..." reply (+ u1=)
+ *   VT             (main.c) the last run's moves: "A TR n=.. <move>[/by][~|T|X]@<s> ..." (one long line)
  *   '!'            stops the current move; the reply ends in "ABORT at <move>"
  *
  * Bench helpers: SEL / SER = one "along the face" leg (next turn left / right).
@@ -24,5 +25,6 @@ void Task2_Go(char *reply, size_t len);                  // GO
 void Task2_Arrow(int left, char *reply, size_t len);     // AL (left = 1) / AR (left = 0)
 void Task2_GoArrow(int left, char *reply, size_t len);   // GL / GR: GO + arrow 1 in one go (Banzai 2)
 void Task2_AlongFace(int turnLeft);                      // SEL / SER bench test (reply: Motion_Reply)
+void Task2_Trace(char *buf, size_t len);                // VT: the last run's moves and times, one line
 
 #endif /* TASK2_H */

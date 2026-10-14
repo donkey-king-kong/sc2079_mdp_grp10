@@ -85,6 +85,7 @@ typedef struct {
     float   watchMean;            // ... its average reading (cm)
 } MoveResult_t;
 void Motion_LastResult(MoveResult_t *r);
+float Motion_ExitV(void);          // Banzai: speed the last move handed over at (cm/s), 0 = it stopped
 
 /* ---- Results of the last move --------------------------------------------- */
 const char *Motion_Reply(void);   // for the RPi (short unless DEBUG_REPLIES)
@@ -103,6 +104,7 @@ extern volatile float    irVolts[2];      // raw averaged volts
 extern volatile uint32_t irSeq;           // +1 per IR update (every IR_PERIOD_MS)
 uint32_t Ultra_Get(float *cm);            // latest echo: returns its sequence number; *cm < 0 if stale / no echo
 float    Ultra_Query(int pings, int *nGood);       // TASKS ONLY (waits): median of fresh pings, -1 if none
+int      Ultra_CountNear(int pings, float maxCm);  // TASKS ONLY (waits ~pings x 60 ms): echoes nearer than maxCm
 void     IR_Query(int updates, float out[2]);      // TASKS ONLY (waits): median of fresh IR updates
 
 #endif /* MOTION_H */
