@@ -88,6 +88,7 @@ typedef struct {
     uint32_t deadline;            // Timeout tick
     uint8_t  timedOut;
     uint8_t  aborted;
+    uint8_t  stallLoops;          // 14 Oct: loops in a row driving with no encoder tick on either wheel
     uint8_t  stillLoops;          // Used while waiting to stop after braking
     WheelCtl_t wl, wr;
     float    resDist, resHead;    // Results: distance travelled, final heading error
@@ -102,9 +103,10 @@ typedef struct {
     uint8_t  until;               // 1 = the sensors set the target every loop (options in opt)
     Until_t  opt;
     uint32_t usSeq;               // Last echo already used
-    float    est[3];              // Last 3 ultrasonic stop points (cm of travel)
+    float    est[5];              // Last ultrasonic stop points (cm of travel), newest last
     uint8_t  nEst;                // Good echoes used so far (saturates at 255)
-    float    usAt;                // Median ultrasonic stop point (cm of travel), valid once nEst >= 3
+    float    usAt;                // Ultrasonic stop point (cm of travel), valid once usValid()
+    uint8_t  usOk;                // US_PAIR_CONFIRM: a pair of echoes agreed (usAt = the nearest such pair)
     uint32_t irSeqSeen;           // Last IR update already used
     uint8_t  faceCount, edgeCount, guardCount, emergCount;   // readings in a row
     uint8_t  faceSeen, edgeFound, guardHit, emergHit;
@@ -141,6 +143,7 @@ typedef struct {
     uint32_t deadline;
     uint8_t  timedOut;
     uint8_t  aborted;
+    uint8_t  stallLoops;          // 14 Oct: loops in a row driving with no encoder tick on either wheel
     uint8_t  stillLoops;
     WheelCtl_t wl, wr;
     float    resAngle;            // Heading change actually achieved (degrees)
@@ -490,6 +493,16 @@ static uint8_t inc8(uint8_t n)
  *    face comes back within IR_EDGE_CONFIRM_CM while still driving, that edge
  *    was a seam or the card's edge: dropped, the search goes on.
  *  - Guard IR / ultrasonic emergency: 2 readings in a row -> stop now. */
+/* A usable ultrasonic stop point (US_PAIR_CONFIRM: a pair agreed; else 3 echoes). */
+static inline int usValid(void)
+{
+#if US_PAIR_CONFIRM
+    return mv.usOk;
+#else
+    return mv.nEst >= 3;
+#endif
+}
+
 static void untilTrack(float dist, float vNow)
 {
     float r;
@@ -502,11 +515,29 @@ static void untilTrack(float dist, float vNow)
         }
         if (r > 0.0f && mv.opt.usStop > 0.0f &&
             !(r < mv.opt.ignBelow && dist < mv.opt.ignUntil)) {   // e.g. the carpark arms at the start
-            mv.est[0] = mv.est[1];
-            mv.est[1] = mv.est[2];
-            mv.est[2] = dist + (r - mv.opt.usStop) - vNow * ULTRA_LAG_S;
+            float e = dist + (r - mv.opt.usStop) - vNow * ULTRA_LAG_S;
+#if US_PAIR_CONFIRM
+            // 14 Oct: a target = two echoes (of the last 5) that put the stop point
+            // within US_PAIR_TOL_CM of each other; the nearest such pair wins. A box
+            // corner that echoes only now and then is no longer outvoted by echoes
+            // from the room behind it (the median of 3 needed it 2 times in a row).
+            int nOld = (mv.nEst < 4) ? mv.nEst : 4;
+            for (int k = 0; k < nOld; k++) {
+                float o = mv.est[4 - k];
+                if (fabsf(e - o) <= US_PAIR_TOL_CM) {
+                    float c = 0.5f * (e + o);
+                    mv.usAt = mv.usOk ? fminf(mv.usAt, c) : c;
+                    mv.usOk = 1;
+                    break;
+                }
+            }
+#endif
+            for (int k = 0; k < 4; k++) mv.est[k] = mv.est[k + 1];
+            mv.est[4] = e;
             mv.nEst = inc8(mv.nEst);
-            if (mv.nEst >= 3) mv.usAt = median3(mv.est[0], mv.est[1], mv.est[2]);
+#if !US_PAIR_CONFIRM
+            if (mv.nEst >= 3) mv.usAt = median3(mv.est[2], mv.est[3], mv.est[4]);
+#endif
         }
     }
 
@@ -587,7 +618,7 @@ static void untilTrack(float dist, float vNow)
     if (mv.edgeFound)      { tgt = mv.edgeAt;        by = 'E'; }
     else if (mv.faceSeen)  { tgt = mv.opt.edgeMaxCm; by = 'C'; }
     else                   { tgt = mv.opt.maxCm;     by = 'C'; }
-    if (mv.nEst >= 3 && mv.usAt < tgt) { tgt = mv.usAt; by = 'U'; }
+    if (usValid() && mv.usAt < tgt) { tgt = mv.usAt; by = 'U'; }
     if (tgt < mv.opt.minCm) {
         float rNow = mv.usAt - dist + mv.opt.usStop;     // what the ultrasonic reads now
         if (!(by == 'U' && rNow <= ULTRA_HARD_STOP_CM)) {  // a real close echo still stops it
@@ -618,6 +649,21 @@ static void straightStep(int16_t cntL, int16_t cntR)
         mv.phaseTick = now;
         el = 0;
     }
+#if MOVE_STALL_MS > 0
+    // 14 Oct: driving, but neither wheel has moved for MOVE_STALL_MS (motor / driver
+    // fault, wheels jammed against something): stop and fail the move at once
+    // instead of pushing until the deadline.
+    if (mv.phase == MV_DRIVE && el > MOVE_STALL_MS) {
+        mv.stallLoops = (cntL == 0 && cntR == 0) ? inc8(mv.stallLoops) : 0;
+        if (mv.stallLoops * 10u >= MOVE_STALL_MS) {
+            mv.aborted = 1;
+            mv.stopBy  = 'S';
+            mv.phase = MV_BRAKE;
+            mv.phaseTick = now;
+            el = 0;
+        }
+    }
+#endif
 
     switch (mv.phase) {
 
@@ -701,8 +747,13 @@ static void straightStep(int16_t cntL, int16_t cntR)
             mv.vRamp = fminf(mv.vRamp + VMAX_RAMP * 0.01f, VMAX_V_CAP);
             vTop = fminf(vTop, mv.vRamp);
         }
-        if (mv.until && mv.opt.usStop > 0.0f && mv.opt.edgeSide < 0 && mv.nEst < 3) {
+        if (mv.until && mv.opt.usStop > 0.0f && mv.opt.edgeSide < 0 && !usValid()) {
             vTop = fminf(vTop, ULTRA_BLIND_V);         // ultrasonic stop, nothing seen yet: go easy
+        }
+        if (mv.until && mv.opt.slowFromCm > 0.0f) {    // Banzai: at vSlow from slowFromCm of travel on
+            float zone = mv.opt.slowFromCm - dist;
+            vTop = fminf(vTop, (zone <= 0.0f) ? mv.opt.vSlow
+                                              : sqrtf(2.0f * STRAIGHT_DECEL * zone) + mv.opt.vSlow);
         }
         if (mv.until && mv.opt.slowZoneCm > 0.0f) {    // arrive at the slow zone at vSlow, stay there
             float zone = remaining - mv.opt.slowZoneCm;
@@ -859,6 +910,7 @@ static void straightRun(float distance_cm)
                    + (uint32_t)(mv.target * 1000.0f / STRAIGHT_V_MIN);
     mv.timedOut  = 0;
     mv.aborted   = 0;
+    mv.stallLoops = 0;
     mv.vBrake    = 0.0f;
     mv.eBrake    = 0.0f;
     mv.phase     = MV_SETTLE;
@@ -957,6 +1009,7 @@ void Motion_StraightOpts(const Until_t *o)
     mv.irSeqSeen = irSeq;
     mv.nEst = 0;
     mv.usAt = 0.0f;
+    mv.usOk = 0;
     mv.faceCount = mv.edgeCount = mv.guardCount = mv.emergCount = 0;
     mv.faceSeen = mv.edgeFound = mv.guardHit = mv.emergHit = 0;
     mv.edgeFar = mv.edgeRej = mv.backCount = 0;
@@ -978,7 +1031,7 @@ void Motion_StraightOpts(const Until_t *o)
     mv.until  = 0;
     mv.brakeAt = 0.0f;
 
-    float u = (mv.opt.usStop > 0.0f && mv.nEst >= 3) ? (mv.usAt - mv.resDist + mv.opt.usStop) : -1.0f;
+    float u = (mv.opt.usStop > 0.0f && usValid()) ? (mv.usAt - mv.resDist + mv.opt.usStop) : -1.0f;
     const char *end = mv.aborted ? " ABORT" : (mv.timedOut ? " TO" : "");
     snprintf(replyShort, sizeof(replyShort), "d=%.1f e=%+.1f u=%.1f by=%c%s",
              mv.resDist, mv.resHead, u, mv.stopBy, end);
@@ -1076,6 +1129,17 @@ static void turnStep(int16_t cntL, int16_t cntR)
         tn.phaseTick = now;
         el = 0;
     }
+#if MOVE_STALL_MS > 0
+    if (tn.phase == TN_DRIVE && el > MOVE_STALL_MS) {   // 14 Oct: no wheel movement at all: stop (see straightStep)
+        tn.stallLoops = (cntL == 0 && cntR == 0) ? inc8(tn.stallLoops) : 0;
+        if (tn.stallLoops * 10u >= MOVE_STALL_MS) {
+            tn.aborted = 1;
+            tn.phase = TN_BRAKE;
+            tn.phaseTick = now;
+            el = 0;
+        }
+    }
+#endif
 
     switch (tn.phase) {
 
@@ -1266,6 +1330,7 @@ void Motion_Turn(int left, int dir, float angleDeg)
                    + (uint32_t)(angleDeg * DEG2RAD * tn.radius * 1000.0f / TURN_V_MIN);
     tn.timedOut  = 0;
     tn.aborted   = 0;
+    tn.stallLoops = 0;
     tn.wBrake    = 0.0f;
     tn.vBrake    = 0.0f;
     tn.phase     = TN_SETTLE;

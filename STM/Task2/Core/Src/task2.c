@@ -21,6 +21,19 @@
 #ifndef T2B_FLY_ENTRY
 #define T2B_FLY_ENTRY 0     // Banzai: fly the entry turn too (robot_config.h); 0 = stop before it
 #endif
+#ifndef T2B_ALPHA_MAX
+#define T2B_ALPHA_MAX T2_ALPHA_MAX
+#endif
+#ifndef T2_BLOCK_PINGS
+#define T2_BLOCK_PINGS 3    // same side: ultrasonic pings in the "obstacle 2 ahead?" check after the reversing turn
+#endif
+#if BZ_WALL_SLALOM || BZ_SHORT_SLALOM
+#define T2_WALL_IR_N 5      // Banzai: IR updates in the standing wall reading at scan 2 (the approach saw the rest)
+#elif T2_SAME_SIDE_USE_WALL
+#define T2_WALL_IR_N T2_WALL_QUERY_N
+#else
+#define T2_WALL_IR_N 0      // 14 Oct: nothing uses the wall reading: no standing IR query (was 11 updates, 0.22 s)
+#endif
 
 #define RL  TURN_RADIUS_L
 #define RR  TURN_RADIUS_R
@@ -35,6 +48,9 @@ static float aimDeg   = 0.0f;      // step 8: scan 2 aim turn still to undo (deg
 static int   aimLeft  = 0;         // ... its steering side (1 = left lock)
 static int   wallOk   = 0;         // Banzai: a full wall was seen all along the approach to scan 2
 static int   reTries  = 0;         // same side: ends rejected by the step 7 checks (FIN "re=")
+static float x1f      = -1.0f;     // 14 Oct: obstacle 1's front face (tracked x) from scan 1, -1 = unknown
+static float endSeen  = -1.0f;     // Banzai: |y| of obstacle 2's end seen by the front-face SE, -1 = none
+static int   goFly    = 0;         // Banzai GL / GR: GO hands over at speed into the dodge
 
 void Task2_Reset(void)
 {
@@ -47,6 +63,9 @@ void Task2_Reset(void)
     aimDeg   = 0.0f;
     aimLeft  = 0;
     wallOk   = 0;
+    x1f      = -1.0f;
+    endSeen  = -1.0f;
+    goFly    = 0;
 }
 
 /* ---- Move wrappers: 1 = carry on. An abort ('!' / button) or a busy motor
@@ -118,7 +137,7 @@ static int fastStraight(float cm)
  * useEdge = 0: ignore the IR (only cap / wall / floor).
  * vCap: speed. Above FACE_V_MAX the robot may run past the IR edge stop
  * point before it can stop; it then backs up to it.  Returns 1 to carry on. */
-static int alongFace(int turnLeft, float capLane, int useEdge, float vCap)
+static int alongFace(int turnLeft, float capLane, int useEdge, float vCap, float expectEnd)
 {
     float x, y, h;
     Motion_GetPose(&x, &y, &h);
@@ -150,6 +169,18 @@ static int alongFace(int turnLeft, float capLane, int useEdge, float vCap)
         o.minCm     = dFloor;
         o.vCap      = vCap;
         o.usStop    = dw;
+#if BZ_FAST
+        if (useEdge && attempt == 1 && expectEnd > 0.0f && vCap > T2B_EDGE_V) {
+            // Banzai: the end it looks for is predictable (obstacle 2 is centred and its
+            // other end was measured): fast most of the way, T2B_EDGE_V near it.
+            float tEnd = expectEnd - dirn * y - IR_AHEAD_CM;   // travel until the lens reaches that end
+            o.slowFromCm = fmaxf(0.0f, tEnd - T2B_EDGE_SLOW_CM);
+            o.vSlow      = T2B_EDGE_V;
+            if (o.slowFromCm < 5.0f) { o.slowFromCm = 0.0f; o.vCap = T2B_EDGE_V; }
+        }
+#else
+        (void)expectEnd;
+#endif
         if (useEdge) {
             o.edgeSide  = side;
             o.edgeExtra = (turnLeft ? T2_GAP_L : T2_GAP_R) - R + IR_AHEAD_CM;
@@ -179,6 +210,9 @@ static int alongFace(int turnLeft, float capLane, int useEdge, float vCap)
                 continue;
             }
         }
+        if (r.stopBy == 'E') {                           // where the end was: lens at the edge point
+            endSeen = fabsf(y + dirn * (r.target - o.edgeExtra + IR_AHEAD_CM));
+        }
         if (r.stopBy == 'E' && r.dist > r.target + T2_OVERSHOOT_FIX_CM) {
             Motion_EndSteer(turnLeft);
             return straight(-(r.dist - r.target));       // ran past the edge stop point: back up to it
@@ -201,13 +235,64 @@ static void entryPlan(float alDeg, float absY, float R, float ya, float *x0, flo
     *x0 = xa + R * sinf(a) + *Lh * cosf(a);
 }
 
-/* ---- GO: to scan 1 ------------------------------------------------------------ */
-void Task2_Go(char *reply, size_t len)
+#if T2_OB1_GUARD
+/* Distance from point (px, py) to obstacle 1 (10 x 10 cm, front face at x1f, centred). */
+static float ob1Dist(float px, float py)
 {
-    if (phase != 0) {
-        snprintf(reply, len, "S1 ERR phase %d, send ZH", phase);
-        return;
+    float dx = fmaxf(fmaxf(x1f - px, 0.0f), px - (x1f + 10.0f));
+    float dy = fmaxf(fabsf(py) - 5.0f, 0.0f);
+    return sqrtf(dx * dx + dy * dy);
+}
+
+/* Smallest gap between the robot's outline and obstacle 1 along the planned
+ * return: from (x, y) heading 180 straight to x0, the turn of al (radius R,
+ * toward the centreline, s = +1 top lane), then Lh straight. Sampled every 2 cm. */
+static float entryOb1Clear(float x, float y, float R, int s, float al, float x0, float Lh)
+{
+    float best = 1.0e9f;
+    float a    = al * DEG2RAD;
+    float sg   = (s > 0) ? 1.0f : -1.0f;                 // +1 = left turn
+    float arc  = R * a;
+    float len  = fmaxf(0.0f, x - x0) + arc + fmaxf(0.0f, Lh);
+    for (float t = 0.0f; t <= len + 0.01f; t += 2.0f) {
+        float px, py, ph;
+        float t1 = fmaxf(0.0f, x - x0);
+        if (t <= t1) {                                   // the return straight
+            px = x - t; py = y; ph = 3.14159265f;
+        } else if (t <= t1 + arc) {                      // the turn
+            float phi = (t - t1) / R;
+            float hh  = 3.14159265f + sg * phi;
+            px = x0 + sg * R * sinf(hh);
+            py = (y - sg * R) - sg * R * cosf(hh);
+            ph = hh;
+        } else {                                         // the entry straight
+            float he = 3.14159265f + sg * a;
+            float ex = x0 + sg * R * sinf(he);
+            float ey = (y - sg * R) - sg * R * cosf(he);
+            float d  = t - t1 - arc;
+            px = ex + d * cosf(he); py = ey + d * sinf(he); ph = he;
+        }
+        if (fabsf(px - (x1f + 5.0f)) > 45.0f) continue;   // nowhere near it
+        float c = cosf(ph), sn = sinf(ph);
+        for (float lx = -T2_REAR_CM; lx <= ROBOT_FRONT_CM + 0.01f; lx += 2.0f) {
+            for (int k = -1; k <= 1; k += 2) {
+                float ly = k * T2_HALFW_CM;
+                float d  = ob1Dist(px + lx * c - ly * sn, py + lx * sn + ly * c);
+                if (d < best) best = d;
+            }
+        }
+        for (float ly = -T2_HALFW_CM; ly <= T2_HALFW_CM + 0.01f; ly += 2.0f) {
+            float d = ob1Dist(px + ROBOT_FRONT_CM * c - ly * sn, py + ROBOT_FRONT_CM * sn + ly * c);
+            if (d < best) best = d;
+        }
     }
+    return best;
+}
+#endif
+
+/* ---- GO: to scan 1 ------------------------------------------------------------ */
+static int goMoves(MoveResult_t *r, int fly)
+{
     float x, y, h;
     Motion_GetPose(&x, &y, &h);
     Until_t o;
@@ -216,12 +301,38 @@ void Task2_Go(char *reply, size_t len)
     o.maxCm    = T2_SU1_MAX_CM;
     o.ignBelow = T2_IGN_BELOW_CM;                        // the carpark arms
     o.ignUntil = fmaxf(0.0f, T2_IGN_PAST_CM - (x + ROBOT_FRONT_CM));
-    if (!sensorStraight(&o, "SU030")) {
-        snprintf(reply, len, "S1 ABORT at %s", failAt);
+#if BZ_FAST
+    o.vCap     = T2B_SU_V;                               // Banzai: obstacle 1 is dead ahead, a strong echo
+#endif
+#if BZ_FLY
+    if (fly) {
+        // GL / GR: no stop at scan 1. Hand over at speed T2B_FLY_SWING_CM early:
+        // the first dodge arc bites that much later (servo still swinging).
+        o.usStop += T2B_FLY_SWING_CM;
+        Motion_Fly(0, 1);
+    }
+#else
+    (void)fly;
+#endif
+    if (!sensorStraight(&o, "SU030")) return 0;
+    Motion_LastResult(r);
+    Motion_GetPose(&x, &y, &h);
+    float u1 = (r->u > 0.0f) ? r->u : o.usStop;
+    x1f = x + ROBOT_FRONT_CM + u1;                       // obstacle 1's front face, for the carpark entry check
+    return 1;
+}
+
+void Task2_Go(char *reply, size_t len)
+{
+    if (phase != 0) {
+        snprintf(reply, len, "S1 ERR phase %d, send ZH", phase);
         return;
     }
     MoveResult_t r;
-    Motion_LastResult(&r);
+    if (!goMoves(&r, 0)) {
+        snprintf(reply, len, "S1 ABORT at %s", failAt);
+        return;
+    }
     phase = 1;
     snprintf(reply, len, "S1 u=%.1f by=%c", r.u, r.stopBy);
 }
@@ -257,19 +368,36 @@ static int arrow1Moves(MoveResult_t *r)
     float dy  = T2_DODGE_LANE - s * y;                   // sideways move needed
     float th  = acosf(fminf(fmaxf(1.0f - dy / (RL + RR), -1.0f), 1.0f)) / DEG2RAD;
     th = fminf(fmaxf(th, T2_TH1_MIN), T2_TH1_MAX);
+#if BZ_FLY
+    if (goFly) Motion_Fly(1, 0);                         // GL / GR: rolls in from the approach to obstacle 1
+#endif
     if (!turn(a1 > 0, th)) return 0;
+#if BZ_FLY
+    Motion_Fly(0, 1);                                    // Banzai: the 2nd arc rolls straight on to scan 2
+#endif
     if (!turn(a1 < 0, th)) return 0;
 
     Until_t o;
     Motion_UntilInit(&o);
     o.usStop = T2_RSCAN;
     o.maxCm  = T2_SU2_MAX_CM;
+    if (x1f > 0.0f) {
+        // 14 Oct: never past the scan 2 stop for the farthest obstacle 2 the rules
+        // allow, even if the ultrasonic never sees it (a 30 cm obstacle's face does
+        // not reach the 23.5 lane: only its corner echoes, now and then).
+        Motion_GetPose(&x, &y, &h);
+        float cap = (x1f + 10.0f + T2_D2_MAX_CM - T2_RSCAN - ROBOT_FRONT_CM) - x;
+        o.maxCm = fmaxf(1.0f, fminf(o.maxCm, cap));
+    }
 #if BZ_WALL_SLALOM
     o.watchSide = (a1 > 0) ? IR_LEFT : IR_RIGHT;         // Banzai: is there a full wall along the outer side?
     o.watchTol  = T2B_WALL_TOL;
 #endif
 #if T2_SCAN2_AIM
     Motion_EndSteer(a1 < 0);                             // step 9: steer for the aim turn while stopping
+#endif
+#if BZ_FLY
+    Motion_Fly(1, 0);
 #endif
     if (!sensorStraight(&o, "SU041")) return 0;
     Motion_LastResult(r);
@@ -278,10 +406,13 @@ static int arrow1Moves(MoveResult_t *r)
     float u2 = (r->u > 0.0f) ? r->u : T2_RSCAN;          // no echo: assume the stop distance
     x2b = x + ROBOT_FRONT_CM + u2 + T2_OB_DEPTH;
 
+    wallY = -1.0f;
+#if T2_WALL_IR_N > 0
     float ir[2];
-    IR_Query(T2_WALL_QUERY_N, ir);
+    IR_Query(T2_WALL_IR_N, ir);
     float rOut = ir[(a1 > 0) ? IR_LEFT : IR_RIGHT];      // the side away from the centreline
     wallY = (rOut < IR_CLEAR) ? fabsf(y) + IR_LENS_FROM_CL_CM + rOut : -1.0f;
+#endif
 #if BZ_WALL_SLALOM
     // Banzai: a FULL wall = the outer IR read the same distance over at least
     // T2B_WALL_CONFIRM_CM of the approach, and it still does here. A person,
@@ -414,7 +545,7 @@ static int sameSideByFace(void)
         // Obstacle 2 must not be ahead. In the right lane its corner is
         // ~50 deg off the ultrasonic's axis, so nothing is seen within 60 cm.
         int   n;
-        float u = Ultra_Query(3, &n);
+        float u = Ultra_Query(T2_BLOCK_PINGS, &n);
         if (!(u > 0.0f && u < T2_BLOCKED_CM)) return 1;  // clear: on to the pass
         reTries++;
         if (attempt >= T2_REV_TRIES || endP < 0.0f) {
@@ -446,9 +577,31 @@ static int arrow2Moves(int a2)
         if (wallY > 0.0f) {
             Y2 = wallY - T2_WALL_MARGIN - ((a1 < 0) ? T2_WALL_L : T2_WALL_R);
         }
-        if ((T2_SAME_SIDE_USE_WALL || wallOk) && Y2 >= T2_LANE_FLOOR) {
-            // Wall seen beside the robot: two arcs straight into the lane, Y2 from the wall
-            // (Banzai: only for a wall confirmed all along the approach, wallOk)
+        int slalom = ((T2_SAME_SIDE_USE_WALL || wallOk) && Y2 >= T2_LANE_FLOOR);
+#if BZ_SHORT_SLALOM
+        if (!slalom) {
+            // Banzai 2: standing at the scan 2 stop, heading straight. If obstacle 2's
+            // face reached the robot's lane, the ultrasonic (on the robot's centreline)
+            // would get a square echo from it on every ping. Few or no echoes = its end
+            // is inside the lane (|end| < ~23 cm): slalom forward to T2B_SHORT_LANE_L/_R, no
+            // reverse search. A board beside such a short obstacle may stand 65 cm out, unseen
+            // from here: the lane splits the room between it and the obstacle's end.
+            // A wall / board the outer IR does see caps the lane.
+            int   n;
+            (void)Ultra_Query(T2B_SHORT_PINGS, &n);
+            if (n <= T2B_SHORT_MAX_ECHO) {
+                float Ys = (a1 > 0) ? T2B_SHORT_LANE_L : T2B_SHORT_LANE_R;
+                if (Y2 > 0.0f) Ys = fminf(Ys, Y2);       // a wall / board seen beside the robot
+                if (Ys >= T2_LANE_FLOOR) {
+                    Y2 = Ys;
+                    slalom = 1;
+                }
+            }
+        }
+#endif
+        if (slalom) {
+            // Wall seen beside the robot (or a short obstacle 2): two arcs straight
+            // into the lane Y2 (Banzai: wall confirmed all along the approach, wallOk)
             float c   = 1.0f - (Y2 - fabsf(y)) / (RL + RR);
             float phi = acosf(fminf(fmaxf(c, 0.0f), 1.0f)) / DEG2RAD;
             if (!turn(a1 > 0, phi)) return 0;
@@ -467,7 +620,7 @@ static int arrow2Moves(int a2)
         if (a1 < 0) Motion_EndSteer(1);                  // step 9: LF090 next
         if (a1 < 0 && !straight(T2_XPASS)) return 0;     // R then L: clear obstacle 1 first
         if (!turn(a1 < 0, 90.0f)) return 0;
-        if (!alongFace(a2 < 0, T2_LANE_CAP, 1, T2_FACE_V)) return 0;
+        if (!alongFace(a2 < 0, T2_LANE_CAP, 1, T2_FACE_V, -1.0f)) return 0;
 #if BZ_FLY
         Motion_Fly(0, 1);                                // Banzai: straight on into the pass, no stop
 #endif
@@ -487,7 +640,15 @@ static int arrow2Moves(int a2)
     Motion_Fly(1, 0);                                    // loop turn 1 rolls in, stops before the SE behind
 #endif
     if (!turn(tl, 90.0f)) return 0;
-    if (!alongFace(tl, fmaxf(T2_LANE_CAP, fabsf(gapLane)), 1, T2_LOOP_V)) return 0;   // behind obstacle 2: faster
+    {   // Behind obstacle 2. Banzai: fast with a slow-down near the far end when it
+        // is predictable (one end measured: the reverse search or the front face).
+        float endKnown = (endFound > 0.0f) ? endFound : endSeen;
+        float vLoop    = T2_LOOP_V;
+#if BZ_FAST
+        if (endKnown <= 0.0f) vLoop = T2B_LOOP_V_BLIND;
+#endif
+        if (!alongFace(tl, fmaxf(T2_LANE_CAP, fabsf(gapLane)), 1, vLoop, endKnown)) return 0;
+    }
 #if BZ_FLY
     Motion_Fly(0, 1);                                    // loop turn 2 rolls straight on into the return
 #endif
@@ -511,6 +672,16 @@ static int arrow2Moves(int a2)
         al += 0.5f;
         entryPlan(al, fabsf(y), R, ya, &x0, &Lh);
     }
+#if T2_OB1_GUARD
+    // 14 Oct: keep the planned path T2_OB1_MIN_CM clear of obstacle 1 (seen at scan 1).
+    // At d1 = 60 alpha 20 passes it with 9.8 cm and the robot ran ~7 cm closer than
+    // planned; a steeper entry turns later and passes it farther out.
+    while (x1f > 0.0f && al < T2B_ALPHA_MAX &&
+           entryOb1Clear(x, y, R, s, al, x0, Lh) < T2_OB1_MIN_CM) {
+        al += 0.5f;
+        entryPlan(al, fabsf(y), R, ya, &x0, &Lh);
+    }
+#endif
     Motion_EndSteer(s > 0);                              // step 9: the entry turn next
 #if BZ_FLY && T2B_FLY_ENTRY
     // Banzai "sweeping return": return straight -> entry turn -> entry straight
@@ -589,8 +760,37 @@ void Task2_Arrow(int left, char *reply, size_t len)
     }
 }
 
+/* ---- GL / GR (Banzai 2): GO with arrow 1 already known (the Pi read it from the
+ * carpark). No stop at scan 1: the approach hands over at speed into the dodge,
+ * and the reply is scan 2's: "S2 u= w= by= a= u1=<scan 1 echo>". Then AL / AR
+ * for arrow 2 as usual. GO / AL / AR still work as before. */
+void Task2_GoArrow(int left, char *reply, size_t len)
+{
+    if (phase != 0) {
+        snprintf(reply, len, "S2 ERR phase %d, send ZH", phase);
+        return;
+    }
+    a1 = left ? 1 : -1;
+    MoveResult_t r1, r;
+    if (!goMoves(&r1, 1)) {
+        snprintf(reply, len, "S2 ABORT at %s", failAt);
+        return;
+    }
+    phase = 1;
+    goFly = 1;
+    int ok = arrow1Moves(&r);
+    goFly = 0;
+    if (!ok) {
+        phase = 0;
+        snprintf(reply, len, "S2 ABORT at %s", failAt);
+        return;
+    }
+    phase = 2;
+    snprintf(reply, len, "S2 u=%.1f w=%.1f by=%c a=%.1f u1=%.1f", r.u, wallY, r.stopBy, aimDeg, r1.u);
+}
+
 /* ---- Bench: one SE leg with the default lane cap. Reply: Motion_Reply() ----- */
 void Task2_AlongFace(int turnLeft)
 {
-    alongFace(turnLeft, T2_LANE_CAP, 1, FACE_V_MAX);
+    alongFace(turnLeft, T2_LANE_CAP, 1, FACE_V_MAX, -1.0f);
 }

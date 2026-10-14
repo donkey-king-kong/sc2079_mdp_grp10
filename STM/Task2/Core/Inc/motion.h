@@ -57,6 +57,7 @@ typedef struct {
     float  brakeAtCm;   // Banzai: no slow-down; hard brake when this close to the stop point (cm); 0 = normal stop
     int8_t watchSide;   // Banzai: IR_LEFT / IR_RIGHT: report the longest steady stretch of this IR (MoveResult_t); -1 = off
     float  watchTol;    // ... readings within this of the stretch's mean so far (cm; a few odd ones are skipped)
+    float  slowFromCm;  // Banzai: from this travel on drive at no more than vSlow (slowing down before it); 0 = off
 } Until_t;
 
 void Motion_UntilInit(Until_t *o);                 // everything off, vCap = STRAIGHT_V_MAX

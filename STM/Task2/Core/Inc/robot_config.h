@@ -142,6 +142,8 @@
 #define TURN_SETTLE_PROP 0
 #endif
 
+#define MOVE_STALL_MS 400 // 14 Oct: driving with no encoder tick on either wheel this long = stop, move fails (0 = off)
+
 /* ==========================================================================
  *  5. MOTOR SPEED CONTROL
  * ========================================================================== */
@@ -151,7 +153,7 @@
 #define GAIN_L_REV 0.0179f
 #define GAIN_R_REV 0.0193f
 #define KICK_AFTER_LOOPS 3      // Start burst if a wheel hasn't turned for this many 10 ms loops
-#define MOTOR_PWM_MAX 6500.0f   // Stay below the non-linear top end (ARR is 7199)
+#define MOTOR_PWM_MAX 7199.0f   // 14 Oct: full range (was 6500). VMAX?: 112-113 cm/s, right wheel ~7080 (ARR is 7199)
 #define PWM_BRAKE 7200          // Compare value above ARR = pin held high; both pins high = brake
 #define WHEEL_KP 120.0f         // PWM per (tick / 10 ms) of speed error
 #define WHEEL_KI 3.0f           // PWM added per tick of error, every 10 ms
@@ -193,6 +195,10 @@
 #define ULTRA_BLIND_V 35.0f       // SU / SW speed cap until 3 good echoes are in (test T1)
 #define ULTRA_HARD_STOP_CM 10.0f  // An SW travel floor never overrides an echo this close
 #define US_QUERY_PINGS 5          // US?: median of this many fresh pings (~0.3 s)
+#define US_PAIR_CONFIRM 1         // 14 Oct: a sensor-straight's ultrasonic stop = the NEAREST pair of echoes (of the last 5)
+                                  //   that agree within US_PAIR_TOL_CM. 0 = median of the last 3: far echoes from the room
+                                  //   could outvote a box corner's patchy echoes (150 / 150, 30 cm obstacle 2: ran into it)
+#define US_PAIR_TOL_CM 5.0f
 
 /* ==========================================================================
  *  7c. SENSOR-ENDED STRAIGHTS (SU, SW)
@@ -274,6 +280,8 @@
 #define T2_TH1_MAX 75.0f
 #define T2_RSCAN 41.0f              // stop with the front this far from obstacle 2 (scan 2)
 #define T2_SU2_MAX_CM 140.0f        // travel cap to scan 2
+#define T2_D2_MAX_CM 150.0f         // 14 Oct: rules: obstacle 2 is at most this far beyond obstacle 1. The scan 2 approach never
+                                    //   goes past the scan 2 stop for this d2, even if the ultrasonic never sees obstacle 2
 #define T2_SCAN2_AIM 1              // Step 8: at the scan 2 stop, turn toward the arrow card at obstacle 2's centre so the
                                     //   camera sees it square (from the 23.5 lane it was ~30 deg off-axis). Undone by the
                                     //   same arc in reverse before arrow 2's moves. 0 = off (step 7 behaviour)
@@ -321,6 +329,8 @@
                                     //     (wall 9 -> 12 cm, obstacle 2 12.6 -> 9.6 cm nominal)
 #define T2_ALPHA 20.0f              // carpark entry angle (steepened only if there is no room)
 #define T2_ALPHA_MAX 35.0f
+#define T2_OB1_GUARD 0               // 14 Oct: 1 = carpark entry: steepen alpha until the planned path clears obstacle 1 (position
+#define T2_OB1_MIN_CM 17.0f         //   from scan 1) by T2_OB1_MIN_CM. 0 = off (step 9: alpha 20 passes it with ~9.8 at d1 = 60)
 #define T2_M_IN 7.0f           // tail this far inside the opening when parked
 #define T2_REAR_CM 3.35f       // robot outline behind the rear axle
 #define T2_HALFW_CM 10.7f      // robot half width
@@ -336,23 +346,26 @@
 #define T2_FACE_V 35.0f   // opposite side: SE along obstacle 2's front face (cm/s)
 
 /* ==========================================================================
- *  11. TASK 2 BANZAI MODE (experimental, 13 Oct). TASK2_BANZAI_MODE 0 = step 9.
+ *  11. TASK 2 BANZAI MODE (experimental). TASK2_BANZAI_MODE 0 = step 9.
  *      Each part has its own switch so they can be tried one at a time.
- *      Calibrate first: VMAX? (top straight speed) and VB<v> (hard-brake skid).
+ *      Banzai 2 (14 Oct): faster legs, flown carpark entry with an obstacle 1
+ *      guard, forward slalom for short obstacles, GL / GR (no stop at scan 1).
  * ========================================================================== */
 #define TASK2_BANZAI_MODE 1
 #if TASK2_BANZAI_MODE
-#define BZ_FAST 1        // faster turns, straights, SE legs and stops (values below)
-#define BZ_FLY 1         // no stop between: pass straight -> loop turn, loop turn 2 -> return straight
-                         //   -> entry turn -> entry straight (the "sweeping return")
-#define BZ_ENTRY_BRAKE 1 // entry at T2B_ENTRY_V, hard brake T2B_BRAKE_CM before the parked point (no creep)
-#define BZ_WALL_SLALOM 1 // same side: forward two-arc slalom when a FULL wall is confirmed beside the approach
-                         //   to scan 2; otherwise the step 9 reverse route (see README: why not "no wall")
+#define BZ_FAST 1         // faster turns, straights, SE legs and stops (values below)
+#define BZ_FLY 1          // no stop between: dodge -> scan 2 approach, pass -> loop turn, loop turn 2 -> return
+                          //   -> entry turn -> entry straight (the "sweeping return")
+#define BZ_ENTRY_BRAKE 1  // entry at T2B_ENTRY_V, hard brake T2B_BRAKE_CM before the parked point (no creep)
+#define BZ_WALL_SLALOM 1  // same side: forward two-arc slalom when a FULL wall is confirmed beside the approach
+#define BZ_SHORT_SLALOM 1 // same side: forward two-arc slalom (no reverse search) when the ultrasonic shows obstacle 2's
+                          //   face does NOT reach the robot's lane at scan 2 (short obstacle: end < ~23 cm out)
 #else
 #define BZ_FAST 0
 #define BZ_FLY 0
 #define BZ_ENTRY_BRAKE 0
 #define BZ_WALL_SLALOM 0
+#define BZ_SHORT_SLALOM 0
 #endif
 
 /* Calibration tests (compiled in always; bench / floor commands only) */
@@ -365,15 +378,16 @@
 #define VMAX_YAW_DEG 3.0f   // VMAX?: heading error over this = the steering can't hold it straight (by=Y)
 
 #if BZ_FAST
-// [CAL] after VMAX?: T2B_VMAX = about 90% of the reported v (PI headroom); T2B_FAST_V <= T2B_VMAX
-#define T2B_VMAX 85.0f   // replaces STRAIGHT_V_ABS_MAX for every sensor straight
-#define T2B_FAST_V 80.0f // clear straights (was T2_FAST_V 80)
+// 14 Oct VMAX? (MOTOR_PWM_MAX 7199): 112-113 cm/s, no wheel saturated, heading within 2 deg.
+#define T2B_VMAX 100.0f  // replaces STRAIGHT_V_ABS_MAX for every sensor straight (~0.9 x 113)
+#define T2B_FAST_V 90.0f // clear straights: GO to scan 1, the pass, the return (was 80)
 #undef STRAIGHT_V_ABS_MAX
 #define STRAIGHT_V_ABS_MAX T2B_VMAX
 #undef T2_FAST_V
 #define T2_FAST_V T2B_FAST_V
 #undef TURN_V_MAX
-#define TURN_V_MAX 55.0f // was 45
+#define TURN_V_MAX 55.0f // was 45. [CAL] the radii were measured at 45: if LF090 / RF090 at this speed land more than
+                         //   ~1.5 cm off (tape the rear axle), set TURN_RADIUS_L / _R (section 2) to the new values
 #undef TURN_ACCEL
 #define TURN_ACCEL 80.0f // was 60 (keep equal to TURN_DECEL: symmetric turns)
 #undef TURN_DECEL
@@ -384,12 +398,22 @@
 #define MOVE_BRAKE_MS 80 // was 120: every stop ends from 12-14 cm/s
 #undef MOVE_STILL_LOOPS
 #define MOVE_STILL_LOOPS 2 // was 3
-#undef T2_LOOP_V
-#define T2_LOOP_V 60.0f // SE behind obstacle 2 (was 45; an overshoot is backed off)
 #undef T2_REV_V
-#define T2_REV_V 40.0f // same-side reverse along the face (was 35)
+#define T2_REV_V 50.0f   // same-side reverse along the face (step 9 45; it stops 5 cm past the end, any overshoot is
+                         //   taken up by the next move)
 #undef T2_FACE_V
-#define T2_FACE_V 30.0f // opposite side: SE along the front face (was 25; FACE_V_MAX stays the IR lag reference)
+#define T2_FACE_V 40.0f  // opposite side: SE along the front face (step 9 35)
+#undef T2_LOOP_V
+#define T2_LOOP_V 70.0f  // SE behind obstacle 2 when its far end is predictable (front face / reverse search found the
+                         //   near end; obstacle 2 is centred): slows to T2B_EDGE_V T2B_EDGE_SLOW_CM before it
+#define T2B_LOOP_V_BLIND 50.0f // ... when it is not (short-obstacle or wall slalom)
+#define T2B_EDGE_V 30.0f       // speed while the IR looks for the predicted end
+#define T2B_EDGE_SLOW_CM 15.0f // slow down this far before the predicted end
+#define T2B_SU_V 80.0f         // GO: approach to scan 1 (obstacle 1 dead ahead, strong echo)
+#undef T2_OB1_GUARD
+#define T2_OB1_GUARD 1         // carpark entry clears obstacle 1 by >= T2_OB1_MIN_CM 17 (alpha up to T2B_ALPHA_MAX). 14 Oct
+                               //   60 / 60: the entry path ran ~7 cm closer to obstacle 1 than planned (alpha 20 plan: 9.8 cm)
+#define T2B_ALPHA_MAX 30.0f    // ... steepest entry for that (arms 8.5 cm at 30, 12.4 at 20)
 #endif
 
 #if BZ_FLY
@@ -398,9 +422,8 @@
                               //   turning while the servo swings back to centre (~150 ms lock -> centre)
 #define T2B_FLY_SWING_CM 3.0f // a flying turn starts this much later than a standing one (servo still swinging):
                               //   the entry turn is started this much earlier to keep the same line
-#define T2B_FLY_ENTRY 0       // 14 Oct: 0 = the return straight stops before the carpark entry turn (standing turn,
-                              //   as step 9). 1 = fly it too (needs T2B_FLY_LEAD_S calibrated: at d1 = 60 the entry
-                              //   diagonal passes obstacle 1 with only ~8 cm, so a few degrees off hits it)
+#define T2B_FLY_ENTRY 1       // 1 = the return straight flies into the carpark entry turn and the entry straight
+                              //   (T2_OB1_MIN_CM keeps obstacle 1 clear). 0 = stop before the entry turn
 #endif
 
 #if BZ_ENTRY_BRAKE
@@ -415,6 +438,16 @@
                                   //   table leg is not 40 cm long; short boards beside obstacle 2 are not seen there,
                                   //   so they never trigger the slalom)
 #define T2B_WALL_MIN_Y 65.0f      // a wall is >= 50 cm past obstacle 2's end, and the end is >= 15 cm out
+#endif
+
+#if BZ_SHORT_SLALOM
+#define T2B_SHORT_PINGS 5         // standing at scan 2 (heading straight): pings at obstacle 2's face
+#define T2B_SHORT_MAX_ECHO 1      // ... this many good echoes or fewer = the face is not in front of the robot
+#define T2B_SHORT_LANE_L 42.0f    // ... then slalom to this lane: robot in the left lane (last arc and loop turns right)
+#define T2B_SHORT_LANE_R 40.5f    // ... or the right lane (last arc and loop turns left: the corner swings ~3 cm wider)
+                                  //   A board beside obstacle 2 may stand 50 cm past its end (65 cm out for L 30),
+                                  //   unseen from scan 2. Simulator: >= 6.7 cm from it, >= 6.8 cm from an obstacle end
+                                  //   at 23 cm (the widest one that gives no echo). +1 cm here = 1 cm from one to the other
 #endif
 
 #endif /* ROBOT_CONFIG_H */

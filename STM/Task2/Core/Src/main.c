@@ -1303,6 +1303,7 @@ void StartCommunicateTask(void *argument)
    *   IR?                      stationary IR, median of 5 updates       -> "A IR l=<cm> r=<cm>" (999 = clear)
    *   PO?                      tracked pose (rear-axle centre)          -> "A PO x=<cm> y=<cm> h=<deg>"
    *   GO / AL / AR             Task 2 sequencer (task2.h)               -> "A S1 ..", "A S2 ..", "A FIN .."
+   *   GL / GR                  Task 2: GO with arrow 1 known, no stop at scan 1 -> "A S2 .. u1=.."
    *   SEL / SER                one "along obstacle 2's face" leg, next turn left / right
    *   ST?                      free stack per task (bytes, lowest seen) -> "A ST c= m= s= o= g= d="
    *   VMAX? / VMAX<cm>         Banzai calibration: top stable straight speed (stops within 250 cm, or <cm>)
@@ -1463,6 +1464,8 @@ void StartCommunicateTask(void *argument)
 			case 'G':                                   // GO: Task 2, drive to scan 1
 				if (c2 == 'O') {
 					Task2_Go(replyText, sizeof(replyText));
+				} else if (c2 == 'L' || c2 == 'R') {    // GL / GR: GO with arrow 1 known (no scan 1 stop)
+					Task2_GoArrow(c2 == 'L', replyText, sizeof(replyText));
 				} else {
 					unknown = 1;
 				}
