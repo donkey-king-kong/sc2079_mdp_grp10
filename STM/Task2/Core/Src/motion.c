@@ -26,6 +26,10 @@
 #include "robot_config.h"
 #include "motion.h"
 
+#ifndef T2B_WALL_MISS_N
+#define T2B_WALL_MISS_N 3       // watchSide (Banzai): odd readings in a row ignored
+#endif
+
 /* ---- Owned by main.c ------------------------------------------------------ */
 extern TIM_HandleTypeDef htim4;                 // left motor PWM
 extern TIM_HandleTypeDef htim9;                 // right motor PWM
@@ -68,6 +72,19 @@ typedef struct {
     float    distPrev;            // Distance travelled at the previous loop (cm)
     float    servoCmd;            // Current servo command (us)
     uint16_t settleA, settleB;    // Servo settle times (ms): below-centre, then centre
+    uint16_t endSteerUs;          // Step 9: servo value to write when braking starts (next turn's lock), 0 = none
+    uint8_t  flyIn, flyOut;       // Banzai: start at the handed-over speed / end at speed without braking
+    float    vExit;               // flyOut: speed to hand over (cm/s)
+    float    brakeAt;             // Banzai entry / VB: no slow-down, hard brake this close to the target (cm); 0 = off
+    uint8_t  vmaxTest;            // VMAX? running
+    char     vTrip;               // VMAX?: why the ramp stopped (P / L / Y / D), 0 = still ramping
+    float    vRamp;               // VMAX?: ramp target (cm/s)
+    uint8_t  satCount, lagCount;  // VMAX?: loops in a row saturated / lagging
+    float    tripV, tripVL, tripVR, tripErr, tripServo, tripDist;   // VMAX?: state when it stopped
+    uint16_t tripPL, tripPR;
+    float    wRef, wStart, wSum, wBest, wBestMean;   // watchSide: current steady stretch / the longest one
+    uint16_t wN;
+    uint8_t  wRun, wMiss;
     uint32_t deadline;            // Timeout tick
     uint8_t  timedOut;
     uint8_t  aborted;
@@ -116,6 +133,9 @@ typedef struct {
     float    io;                  // Inner/outer wheel speed ratio for this lock
     uint16_t lockUs;              // Servo lock value
     uint16_t settleMs;            // Servo settle time before driving
+    uint16_t endSteerUs;          // Step 9: servo value to leave at the end (next turn's lock), 0 = centre
+    uint8_t  flyIn, flyOut;       // Banzai: start at the handed-over speed / end at speed without braking
+    float    vExit;               // flyOut: speed to hand over (cm/s)
     float    v;                   // Current centre speed (cm/s)
     double   heading0;            // Heading when driving began
     uint32_t deadline;
@@ -129,6 +149,7 @@ typedef struct {
     float    wBrake;              // Diagnostic: yaw rate when braking started (deg/s)
     float    wFilt;               // Yaw rate averaged over a few readings (deg/s)
     float    vBrake;              // Diagnostic: wheel speed when braking started (cm/s)
+    uint16_t lastPL, lastPR;      // Banzai: last wheel PWM (held through a flying hand-over)
 } Turn_t;
 
 static Move_t mv = {0};
@@ -270,6 +291,96 @@ static void writeServo(float us)
     __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, (uint16_t)(us + 0.5f));
 }
 
+/* ---- Step 9: steer for the next turn while this move stops ------------------
+ * The sequencer calls Motion_EndSteer() just before a move that a turn will
+ * follow. The move takes the request when it starts (any move: a skipped or
+ * different move simply drops it) and, as it stops, writes that lock. The
+ * turn then only waits for what is left of the swing. */
+static int8_t   endSteerNext  = -1;   // requested by Motion_EndSteer, taken by the next move
+static uint16_t preSteerUs    = 0;    // lock written early by the last move, 0 = none
+static uint16_t preSteerSwing = 0;    // ... how far the servo had to swing (us)
+static uint32_t preSteerTick  = 0;    // ... when
+
+void Motion_EndSteer(int lock)
+{
+    endSteerNext = (int8_t)((lock < 0) ? -1 : (lock ? 1 : 0));
+}
+
+static uint16_t takeEndSteer(void)
+{
+    int8_t l = endSteerNext;
+    endSteerNext = -1;
+#if FLOW_MOVES
+    return (l < 0) ? 0 : (uint16_t)(l ? SERVO_LEFT_LOCK : SERVO_RIGHT_LOCK);
+#else
+    (void)l;
+    return 0;
+#endif
+}
+
+/* Servo settle for a swing of this many us (the turn rule of QUICK_STOPS) */
+static uint16_t swingSettleMs(int swing)
+{
+#if TURN_SETTLE_PROP
+    uint32_t ms = (swing > 20) ? 60u + (uint32_t)(TURN_SETTLE_MS - 60) * (uint32_t)swing / (SERVO_RIGHT_LOCK - SERVO_LEFT_LOCK) : 60u;
+    return (uint16_t)((ms > TURN_SETTLE_MS) ? TURN_SETTLE_MS : ms);
+#else
+    return (swing > 20) ? TURN_SETTLE_MS : 60;
+#endif
+}
+
+static void preSteer(uint16_t us)
+{
+    int cur = (int)__HAL_TIM_GET_COMPARE(&htim12, TIM_CHANNEL_2);
+    preSteerSwing = (uint16_t)abs(cur - (int)us);
+    preSteerTick  = HAL_GetTick();
+    preSteerUs    = us;
+    writeServo(us);
+}
+
+/* ---- Banzai: flying hand-over between moves ---------------------------------
+ * Motion_Fly() before a move: flyIn = start at the speed the last move handed
+ * over (no stop, no servo settle: the servo swings while rolling); flyOut =
+ * end at T2B_FLY_V without braking. While the command task sets up the next
+ * move (up to ~20 ms) the motors keep the last PWM (flyHold). If the last move
+ * stopped normally, flyIn does nothing. Nothing here runs unless the sequencer
+ * asks for it (BZ_FLY). */
+static uint8_t  flyNext   = 0;        // bit 0 = flyIn, bit 1 = flyOut, for the next move
+static float    exitV     = 0.0f;     // speed handed over by the last move (cm/s), 0 = it stopped
+static int8_t   exitDir   = 1;
+static WheelCtl_t exitWL, exitWR;     // its wheel controllers, so the next move starts smoothly
+static uint16_t holdPL = 0, holdPR = 0;
+static uint32_t flyHoldUntil = 0;     // motor task: keep holdPL / holdPR until this tick
+static uint32_t flyBrakeUntil = 0;    // motor task: a hand-over nobody took: brake until this tick
+
+void Motion_Fly(int flyIn, int flyOut)
+{
+    flyNext = (uint8_t)((flyIn ? 1 : 0) | (flyOut ? 2 : 0));
+}
+
+static uint8_t takeFly(void)
+{
+    uint8_t f = flyNext;
+    flyNext = 0;
+#ifdef T2B_FLY_V
+    return f;
+#else
+    (void)f;
+    return 0;
+#endif
+}
+
+static void handOver(float v, int8_t dir, const WheelCtl_t *l, const WheelCtl_t *r, uint16_t pL, uint16_t pR)
+{
+    exitV = v;
+    exitDir = dir;
+    exitWL = *l;
+    exitWR = *r;
+    holdPL = pL;
+    holdPR = pR;
+    flyHoldUntil = HAL_GetTick() + 40;
+}
+
 /* ==========================================================================
  *  Heading
  * ========================================================================== */
@@ -304,7 +415,12 @@ static void poseStep(int16_t cntL, int16_t cntR)
         // In a turn the rear wheels scrub, so their average under-reads the arc
         // (LF090 read R = 18.1, not 20.2). Use the calibrated radius x the
         // gyro's turn instead; the radius came from measured LF180 / RF180.
-        ds = (float)tn.dir * tn.radius * fabsf(h - poseHPrev) * DEG2RAD;
+        float dsArc = (float)tn.dir * tn.radius * fabsf(h - poseHPrev) * DEG2RAD;
+        // Banzai flown turn (14 Oct): while the servo is still swinging to the lock
+        // the robot rolls almost straight, which gyro x radius misses: take the
+        // larger. Standing turns (step 9) are unchanged.
+        if (tn.flyIn && fabsf(ds) > fabsf(dsArc)) dsArc = ds;
+        ds = dsArc;
     }
 #endif
     float hm = 0.5f * (h + poseHPrev) * DEG2RAD;
@@ -440,6 +556,25 @@ static void untilTrack(float dist, float vNow)
                 mv.edgeRej   = inc8(mv.edgeRej);
             }
         }
+        if (mv.opt.watchSide >= 0) {                     // Banzai: longest steady stretch of a side IR
+            float d = irCm[mv.opt.watchSide];
+            if (mv.wRun && d < IR_CLEAR && fabsf(d - mv.wRef) <= mv.opt.watchTol) {
+                mv.wSum += d;
+                mv.wN++;
+                mv.wRef  = mv.wSum / (float)mv.wN;       // compare with the stretch's mean so far
+                mv.wMiss = 0;
+                if (dist - mv.wStart > mv.wBest) {
+                    mv.wBest     = dist - mv.wStart;
+                    mv.wBestMean = mv.wRef;
+                }
+            } else if (mv.wRun && mv.wMiss < T2B_WALL_MISS_N) {
+                mv.wMiss++;                              // a few odd readings: keep the stretch
+            } else if (d < IR_CLEAR) {
+                mv.wRef = d; mv.wStart = dist; mv.wSum = d; mv.wN = 1; mv.wRun = 1; mv.wMiss = 0;
+            } else {
+                mv.wRun = 0;
+            }
+        }
         if (mv.opt.guardSide >= 0 && dist >= mv.opt.guardFromCm) {
             mv.guardCount = (irCm[mv.opt.guardSide] < mv.opt.guardCm) ? inc8(mv.guardCount) : 0;
             if (mv.guardCount >= 2) mv.guardHit = 1;
@@ -488,7 +623,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
 
     case MV_SETTLE:
         // Wheels straight, always arriving at centre from below (servo slack)
-        setMotorPwm(0, 0, 0, 0);
+        if (!mv.flyIn) setMotorPwm(0, 0, 0, 0);
         if (mv.until) untilTrack(0.0f, 0.0f);           // standing still: readings count from 0 cm
         if (el < mv.settleA) {
             writeServo(SERVO_TRUE_CENTRE + servoTrim - SERVO_APPROACH_US);
@@ -513,6 +648,13 @@ static void straightStep(int16_t cntL, int16_t cntR)
             mv.wl.integ = mv.wr.integ = 0.0f;
             mv.wl.filt  = mv.wr.filt  = 0.0f;
             mv.wl.still = mv.wr.still = KICK_AFTER_LOOPS;   // burst from the first loop
+            if (mv.flyIn) {                            // Banzai: carry on at the handed-over speed
+                mv.v  = fmaxf(STRAIGHT_V_MIN, exitV);
+                mv.wl = exitWL;
+                mv.wr = exitWR;
+                mv.wl.still = mv.wr.still = 0;
+            }
+            exitV = 0.0f;
             mv.phase = MV_DRIVE;
             mv.phaseTick = now;
         }
@@ -527,20 +669,38 @@ static void straightStep(int16_t cntL, int16_t cntR)
         // point moves back in proportion to speed. Capped at the approach zone
         // so it never brakes early while still slowing down from cruise.
         float stopDist = fminf(STOP_T * vNow, STRAIGHT_APPROACH);
-        if (remaining <= stopDist || now > mv.deadline) {
+        if (mv.brakeAt > 0.0f) stopDist = mv.brakeAt;  // Banzai entry / VB: hard brake at a fixed distance
+        if (mv.flyOut && remaining <= 0.0f && !mv.timedOut) {   // Banzai: hand over at speed, no brake
+            if (mv.endSteerUs) preSteer(mv.endSteerUs);  // the next turn's lock, now
+            mv.resDist = dist;
+            mv.resHead = headingDeg - (float)mv.heading0;
+            handOver(vNow, mv.dir, &mv.wl, &mv.wr,
+                     (uint16_t)__HAL_TIM_GET_COMPARE(&htim4, (mv.dir > 0) ? TIM_CHANNEL_4 : TIM_CHANNEL_3),
+                     (uint16_t)__HAL_TIM_GET_COMPARE(&htim9, (mv.dir > 0) ? TIM_CHANNEL_2 : TIM_CHANNEL_1));
+            mv.active = 0;
+            break;
+        }
+        if ((!mv.flyOut && remaining <= stopDist) || now > mv.deadline) {
             mv.timedOut = (remaining > stopDist);
             mv.vBrake = vNow;
             mv.eBrake = headingDeg - (float)mv.heading0;
             mv.phase = MV_BRAKE;
             mv.phaseTick = now;
             setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
+            if (mv.endSteerUs) preSteer(mv.endSteerUs);  // step 9: the next turn's lock, while stopping
             break;
         }
 
         // Speed profile: speed up, cruise, slow down so we arrive at V_MIN
         float slowTo = sqrtf(2.0f * STRAIGHT_DECEL *
                        fmaxf(remaining - STRAIGHT_APPROACH, 0.0f)) + STRAIGHT_V_MIN;
+        if (mv.flyOut) slowTo = sqrtf(2.0f * STRAIGHT_DECEL * fmaxf(remaining, 0.0f)) + mv.vExit;
+        if (mv.brakeAt > 0.0f) slowTo = 1.0e6f;        // full speed up to the brake point
         float vTop   = mv.vCap;
+        if (mv.vmaxTest && !mv.vTrip) {                // VMAX?: slow ramp
+            mv.vRamp = fminf(mv.vRamp + VMAX_RAMP * 0.01f, VMAX_V_CAP);
+            vTop = fminf(vTop, mv.vRamp);
+        }
         if (mv.until && mv.opt.usStop > 0.0f && mv.opt.edgeSide < 0 && mv.nEst < 3) {
             vTop = fminf(vTop, ULTRA_BLIND_V);         // ultrasonic stop, nothing seen yet: go easy
         }
@@ -625,12 +785,34 @@ static void straightStep(int16_t cntL, int16_t cntR)
         uint16_t pR = wheelControl(&mv.wr, mv.v, cntR, (mv.dir > 0) ? GAIN_R_FWD : GAIN_R_REV, brakeBoth);
         driveWheel(1, mv.dir, pL, brakeBoth);
         driveWheel(0, mv.dir, pR, brakeBoth);
+
+        if (mv.vmaxTest && !mv.vTrip) {                // VMAX?: has a wheel run out of power?
+            float vL = mv.wl.filt * 100.0f / TICKS_PER_CM;
+            float vR = mv.wr.filt * 100.0f / TICKS_PER_CM;
+            mv.satCount = (pL >= (uint16_t)MOTOR_PWM_MAX || pR >= (uint16_t)MOTOR_PWM_MAX) ? (uint8_t)(mv.satCount + 1) : 0;
+            mv.lagCount = (mv.v > 30.0f && (mv.v - vL > VMAX_LAG_CMS || mv.v - vR > VMAX_LAG_CMS))
+                          ? (uint8_t)(mv.lagCount + 1) : 0;
+            char why = 0;
+            float stopNeed = vNow * vNow / (2.0f * STRAIGHT_DECEL) + STRAIGHT_APPROACH + 2.0f;
+            if (mv.satCount >= VMAX_SAT_LOOPS)       why = 'P';
+            else if (mv.lagCount >= VMAX_LAG_LOOPS)  why = 'L';
+            else if (fabsf(err) > VMAX_YAW_DEG)      why = 'Y';
+            else if (remaining <= stopNeed)          why = 'D';
+            if (why) {
+                mv.vTrip = why;
+                mv.tripV = vNow; mv.tripVL = vL; mv.tripVR = vR; mv.tripErr = err;
+                mv.tripPL = pL; mv.tripPR = pR; mv.tripDist = dist;
+                mv.tripServo = mv.servoCmd - (SERVO_TRUE_CENTRE + servoTrim);
+                mv.target = fminf(mv.target, dist + stopNeed);   // slow down and stop from here
+            }
+        }
         break;
     }
 
     case MV_BRAKE:
     default:
-        if (el < MOVE_BRAKE_MS) {                      // active brake
+        if (el < MOVE_BRAKE_MS ||
+            (mv.brakeAt > 0.0f && (cntL != 0 || cntR != 0) && el < 600)) {   // active brake (hard brake: until stopped)
             setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
             mv.stillLoops = 0;
             break;
@@ -640,6 +822,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
         if (mv.stillLoops >= MOVE_STILL_LOOPS || el > 700) {
             mv.resDist = dist;
             mv.resHead = headingDeg - (float)mv.heading0;   // final error vs target
+            exitV = 0.0f;                              // stopped: nothing to hand over
             mv.active = 0;
         }
         break;
@@ -655,6 +838,7 @@ static void straightRun(float distance_cm)
         Motion_ZeroHeading();                          // no ZH received - this is "north"
     }
     emergency_stop_requested = 0;                      // a '!' from before this move doesn't count
+    preSteerUs = 0;                                    // this straight steers for itself
 
     // Short servo settle if it is already near centre (including the
     // just-below-centre position a turn leaves it at), longer otherwise
@@ -666,6 +850,11 @@ static void straightRun(float distance_cm)
     mv.target    = fabsf(distance_cm);
     mv.settleA   = far ? 250 : SETTLE_NEAR_MS;
     mv.settleB   = far ? 200 : SETTLE_NEAR_MS;
+    if (mv.flyIn && exitV > 0.0f && exitDir == ((distance_cm > 0.0f) ? 1 : -1)) {
+        mv.settleA = mv.settleB = 0;                   // Banzai: already rolling, no settle
+    } else {
+        mv.flyIn = 0;
+    }
     mv.deadline  = HAL_GetTick() + mv.settleA + mv.settleB + 2000
                    + (uint32_t)(mv.target * 1000.0f / STRAIGHT_V_MIN);
     mv.timedOut  = 0;
@@ -707,6 +896,8 @@ static void straightRun(float distance_cm)
  * robot has stopped. Results: Motion_Reply() / Motion_LogText(). */
 void Motion_Straight(float distance_cm)
 {
+    mv.endSteerUs = takeEndSteer();                    // step 9 (dropped if this move doesn't run)
+    uint8_t fly   = takeFly();                         // Banzai (dropped likewise)
     if (Motion_IsBusy()) {
         setResults("BUSY", "BUSY");
         return;
@@ -717,7 +908,14 @@ void Motion_Straight(float distance_cm)
     }
     mv.vCap  = STRAIGHT_V_MAX;
     mv.until = 0;                                      // plain straight: no sensors
+    mv.flyIn = fly & 1; mv.flyOut = (fly >> 1) & 1;
+#ifdef T2B_FLY_V
+    mv.vExit = T2B_FLY_V;
+#endif
+    mv.brakeAt = 0.0f;
+    mv.vmaxTest = 0;
     straightRun(distance_cm);
+    lastRes.watchSpan = lastRes.watchMean = 0.0f;
 }
 
 void Motion_UntilInit(Until_t *o)
@@ -727,6 +925,7 @@ void Motion_UntilInit(Until_t *o)
     o->edgeSide  = -1;
     o->guardSide = -1;
     o->vSlow     = STRAIGHT_V_MIN;
+    o->watchSide = -1;
 }
 
 /* Straight (forward, or backward with o->reverse) whose stop point comes from the sensors (see Until_t and
@@ -738,6 +937,8 @@ void Motion_UntilInit(Until_t *o)
  *        G guard IR / ultrasonic emergency */
 void Motion_StraightOpts(const Until_t *o)
 {
+    mv.endSteerUs = takeEndSteer();                    // step 9 (dropped if this move doesn't run)
+    uint8_t fly   = takeFly();                         // Banzai (dropped likewise)
     if (Motion_IsBusy()) {
         setResults("BUSY", "BUSY");
         return;
@@ -764,10 +965,18 @@ void Motion_StraightOpts(const Until_t *o)
         mv.opt.usStop = 0.0f;                          // the ultrasonic looks forward
         mv.opt.usEmergCm = 0.0f;
     }
+    mv.wRun = mv.wMiss = 0; mv.wBest = mv.wBestMean = 0.0f; mv.wN = 0;
+    mv.flyIn  = fly & 1; mv.flyOut = (fly >> 1) & 1;
+#ifdef T2B_FLY_V
+    mv.vExit  = T2B_FLY_V;
+#endif
+    mv.brakeAt  = mv.opt.brakeAtCm;
+    mv.vmaxTest = 0;
     mv.stopBy = 'C';
     mv.until  = 1;
     straightRun(mv.opt.reverse ? -far : far);          // the sensors set the real target each loop
     mv.until  = 0;
+    mv.brakeAt = 0.0f;
 
     float u = (mv.opt.usStop > 0.0f && mv.nEst >= 3) ? (mv.usAt - mv.resDist + mv.opt.usStop) : -1.0f;
     const char *end = mv.aborted ? " ABORT" : (mv.timedOut ? " TO" : "");
@@ -782,6 +991,53 @@ void Motion_StraightOpts(const Until_t *o)
     lastRes.stopBy = mv.stopBy;
     lastRes.faceSeen = mv.faceSeen;
     lastRes.target = mv.target;
+    lastRes.watchSpan = mv.wBest;
+    lastRes.watchMean = mv.wBestMean;
+}
+
+/* VMAX?: straight on a long clear floor. The target speed ramps up slowly
+ * (VMAX_RAMP) with the normal wheel and heading control, until a wheel sits
+ * at MOTOR_PWM_MAX (P), a wheel falls behind the target (L), the heading can't
+ * be held (Y), or the floor runs out (D). Then it slows down and stops.
+ * Reply: "VM v=<cm/s at the trip> by=<P|L|Y|D> vl= vr= (wheel speeds) pl= pr=
+ * (wheel PWM) e=<heading err> s=<steering offset us> d=<cm at the trip>". */
+void Motion_VmaxTest(float maxCm, char *reply, unsigned len)
+{
+    flyNext = 0;
+    mv.endSteerUs = 0;
+    if (Motion_IsBusy()) {
+        snprintf(reply, len, "VM BUSY");
+        return;
+    }
+    mv.vCap = VMAX_V_CAP;                              // no STRAIGHT_V_ABS_MAX here: that is what we measure
+    mv.until = 0;
+    mv.flyIn = mv.flyOut = 0;
+    mv.brakeAt = 0.0f;
+    mv.vmaxTest = 1;
+    mv.vTrip = 0;
+    mv.vRamp = 30.0f;
+    mv.satCount = mv.lagCount = 0;
+    mv.tripV = mv.tripVL = mv.tripVR = mv.tripErr = mv.tripServo = mv.tripDist = 0.0f;
+    mv.tripPL = mv.tripPR = 0;
+    straightRun((maxCm > 50.0f) ? maxCm : VMAX_TEST_CM);
+    mv.vmaxTest = 0;
+    snprintf(reply, len, "VM v=%.0f by=%c vl=%.0f vr=%.0f pl=%u pr=%u e=%+.1f s=%+.0f d=%.0f%s",
+             mv.tripV, mv.vTrip ? mv.vTrip : '-', mv.tripVL, mv.tripVR, (unsigned)mv.tripPL, (unsigned)mv.tripPR,
+             mv.tripErr, mv.tripServo, mv.tripDist, mv.aborted ? " ABORT" : "");
+}
+
+/* VB<v>: 100 cm at v cm/s, then the Banzai hard brake exactly at 100 cm (no
+ * slow-down). Tape where the robot stops: skid = stop - 100 cm. Use that as
+ * T2B_BRAKE_CM for T2B_ENTRY_V = v. Reply: the usual "d= ..." (encoder travel,
+ * which misses any sliding). */
+void Motion_BrakeTest(float v)
+{
+    Until_t o;
+    Motion_UntilInit(&o);
+    o.maxCm     = 100.0f;
+    o.vCap      = (v > 15.0f) ? v : 15.0f;
+    o.brakeAtCm = 0.1f;
+    Motion_StraightOpts(&o);
 }
 
 /* SU / SW (see motion.h). */
@@ -824,7 +1080,7 @@ static void turnStep(int16_t cntL, int16_t cntR)
     switch (tn.phase) {
 
     case TN_SETTLE:                                    // wheels to full lock, motors off
-        setMotorPwm(0, 0, 0, 0);
+        if (!tn.flyIn) setMotorPwm(0, 0, 0, 0);
         writeServo(tn.lockUs);
         if (el >= tn.settleMs) {
             tn.heading0 = headingDeg;
@@ -832,6 +1088,13 @@ static void turnStep(int16_t cntL, int16_t cntR)
             tn.wl.integ = tn.wr.integ = 0.0f;
             tn.wl.filt  = tn.wr.filt  = 0.0f;
             tn.wl.still = tn.wr.still = KICK_AFTER_LOOPS;   // start burst from the first loop
+            if (tn.flyIn) {                            // Banzai: carry on at the handed-over speed
+                tn.v  = fmaxf(TURN_V_MIN, exitV);
+                tn.wl = exitWL;
+                tn.wr = exitWR;
+                tn.wl.still = tn.wr.still = 0;
+            }
+            exitV = 0.0f;
             tn.wFilt = 0.0f;
             tn.phase = TN_DRIVE;
             tn.phaseTick = now;
@@ -852,7 +1115,23 @@ static void turnStep(int16_t cntL, int16_t cntR)
         // Capped at the final approach zone (2 cm of arc).
         float approachDeg = TURN_APPROACH_CM / tn.radius / DEG2RAD;
         float stopDeg     = fminf(TURN_STOP_T * wNow, approachDeg);
-        if (remaining <= stopDeg || now > tn.deadline) {
+#ifdef T2B_FLY_LEAD_S
+        if (tn.flyOut && remaining <= wNow * T2B_FLY_LEAD_S && now <= tn.deadline) {
+            // Banzai: hand over at speed. The wheels swing back to straight while
+            // the robot rolls on, so let go this much early; the next straight's
+            // heading hold takes out what is left.
+            writeServo(SERVO_TRUE_CENTRE + servoTrim - SERVO_APPROACH_US);
+            preSteerUs  = 0;
+            tn.resAngle = turned;
+            tn.resErr   = headingDeg - tn.targetAbs;
+            tn.wBrake   = wNow;
+            tn.vBrake   = 0.5f * (tn.wl.filt + tn.wr.filt) * 100.0f / TICKS_PER_CM;
+            handOver(tn.vBrake, tn.dir, &tn.wl, &tn.wr, tn.lastPL, tn.lastPR);
+            tn.active   = 0;
+            break;
+        }
+#endif
+        if ((!tn.flyOut && remaining <= stopDeg) || now > tn.deadline) {
             tn.timedOut = (remaining > stopDeg);
             tn.wBrake = wNow;
             tn.vBrake = 0.5f * (tn.wl.filt + tn.wr.filt) * 100.0f / TICKS_PER_CM;
@@ -866,6 +1145,7 @@ static void turnStep(int16_t cntL, int16_t cntR)
         float remCm  = remaining * DEG2RAD * tn.radius;
         float slowTo = sqrtf(2.0f * TURN_DECEL *
                        fmaxf(remCm - TURN_APPROACH_CM, 0.0f)) + TURN_V_MIN;
+        if (tn.flyOut) slowTo = sqrtf(2.0f * TURN_DECEL * fmaxf(remCm, 0.0f)) + tn.vExit;
         float upTo   = fminf(tn.v + TURN_ACCEL * 0.01f, TURN_V_MAX);
         int slowing  = (slowTo < upTo);
         tn.v = fminf(upTo, slowTo);
@@ -885,6 +1165,8 @@ static void turnStep(int16_t cntL, int16_t cntR)
         uint16_t pR = wheelControl(&tn.wr, vR, cntR, (tn.dir > 0) ? GAIN_R_FWD : GAIN_R_REV, brakeBoth);
         driveWheel(1, tn.dir, pL, brakeBoth);
         driveWheel(0, tn.dir, pR, brakeBoth);
+        tn.lastPL = pL;
+        tn.lastPR = pR;
         writeServo(tn.lockUs);
         break;
     }
@@ -899,11 +1181,17 @@ static void turnStep(int16_t cntL, int16_t cntR)
         setMotorPwm(0, 0, 0, 0);
         tn.stillLoops = (cntL == 0 && cntR == 0) ? (uint8_t)(tn.stillLoops + 1) : 0;
         if (tn.stillLoops >= MOVE_STILL_LOOPS || el > 700) {
+            exitV = 0.0f;                              // stopped: nothing to hand over
             tn.resAngle = turned;
             tn.resErr   = headingDeg - tn.targetAbs;
-            // Start bringing the wheels back towards straight (from below, like
-            // a straight's settle does) so the next straight can start sooner.
-            writeServo(SERVO_TRUE_CENTRE + servoTrim - SERVO_APPROACH_US);
+            if (tn.endSteerUs && !tn.aborted) {
+                preSteer(tn.endSteerUs);               // step 9: the next turn uses this lock too
+            } else {
+                // Start bringing the wheels back towards straight (from below, like
+                // a straight's settle does) so the next straight can start sooner.
+                writeServo(SERVO_TRUE_CENTRE + servoTrim - SERVO_APPROACH_US);
+                preSteerUs = 0;
+            }
             tn.active = 0;
         }
         break;
@@ -918,6 +1206,8 @@ static void turnStep(int16_t cntL, int16_t cntR)
  * Blocks until the robot has stopped. Results: Motion_Reply() / Motion_LogText(). */
 void Motion_Turn(int left, int dir, float angleDeg)
 {
+    uint16_t endSteer = takeEndSteer();                // step 9 (dropped if this move doesn't run)
+    uint8_t  fly      = takeFly();                     // Banzai (dropped likewise)
     if (tn.active || mv.active) {
         setResults("BUSY", "BUSY");
         return;
@@ -955,6 +1245,23 @@ void Motion_Turn(int left, int dir, float angleDeg)
 #else
     tn.settleMs  = (swing > 20) ? TURN_SETTLE_MS : 60;
 #endif
+    if (preSteerUs == tn.lockUs && swing <= 20) {      // step 9: the last move already swung the servo here
+        uint32_t need = swingSettleMs(preSteerSwing);  // ... so only wait for what is left of that swing
+        uint32_t el   = HAL_GetTick() - preSteerTick;
+        tn.settleMs   = (el + 60u >= need) ? 60u : (uint16_t)(need - el);
+    }
+    preSteerUs    = 0;
+    tn.endSteerUs = endSteer;
+    tn.flyIn  = fly & 1;
+    tn.flyOut = (fly >> 1) & 1;
+#ifdef T2B_FLY_V
+    tn.vExit  = T2B_FLY_V;
+#endif
+    if (tn.flyIn && exitV > 0.0f && exitDir == ((dir > 0) ? 1 : -1)) {
+        tn.settleMs = 0;                               // Banzai: already rolling; the servo swings on the move
+    } else {
+        tn.flyIn = 0;
+    }
     tn.deadline  = HAL_GetTick() + tn.settleMs + 2000
                    + (uint32_t)(angleDeg * DEG2RAD * tn.radius * 1000.0f / TURN_V_MIN);
     tn.timedOut  = 0;
@@ -1017,7 +1324,22 @@ void Motion_Step(int16_t cntL, int16_t cntR)
     }
 
     // Idle: motors off. A '!' while idle also straightens the wheels.
-    setMotorPwm(0, 0, 0, 0);
+    // Banzai: right after a flying hand-over, keep driving for a moment so the
+    // robot doesn't coast while the command task sets up the next move.
+    if (exitV > 0.0f) {
+        if ((int32_t)(flyHoldUntil - HAL_GetTick()) > 0 && !emergency_stop_requested) {
+            driveWheel(1, exitDir, holdPL, 0);
+            driveWheel(0, exitDir, holdPR, 0);
+            return;
+        }
+        exitV = 0.0f;                                  // no move followed (abort / stop): brake, don't coast
+        flyBrakeUntil = HAL_GetTick() + 300;
+    }
+    if ((int32_t)(flyBrakeUntil - HAL_GetTick()) > 0) {
+        setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
+    } else {
+        setMotorPwm(0, 0, 0, 0);
+    }
     if (emergency_stop_requested) {
         writeServo(SERVO_TRUE_CENTRE);
         emergency_stop_requested = 0;

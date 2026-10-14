@@ -25,6 +25,14 @@ void Motion_Turn(int left, int dir, float angleDeg);   // left: 1/0, dir: +1 fwd
 void Motion_ZeroHeading(void);                    // "ZH": the current direction becomes north, pose back to the start
 void Motion_GetPose(float *x, float *y, float *h); // tracked rear-axle pose (cm, cm, deg); any task, never waits
 uint8_t Motion_IsBusy(void);
+void Motion_EndSteer(int lock);                   // step 9: the NEXT move ends with the servo at this lock
+                                                  // (1 left, 0 right, -1 none), ready for the turn after it
+void Motion_Fly(int flyIn, int flyOut);           // Banzai: the NEXT move starts at the speed the last one handed
+                                                  // over (no stop, no settle) and/or ends at speed (no brake)
+
+/* ---- Calibration tests (floor) --------------------------------------------- */
+void Motion_VmaxTest(float maxCm, char *reply, unsigned len);   // VMAX?: ramp until a wheel saturates or it yaws
+void Motion_BrakeTest(float v);                   // VB<v>: 100 cm at v, hard brake at 100 (reply: Motion_Reply)
 
 /* ---- Sensor-ended straights (forward). The sensors decide WHERE to stop;
  *      the encoders still do the stopping. All distances are cm of travel. --- */
@@ -46,6 +54,9 @@ typedef struct {
     float  slowZoneCm;  // Drive the last slowZoneCm at no more than vSlow; 0 = off
     float  vSlow;
     int8_t reverse;     // 1 = drive backwards (the ultrasonic stop is then ignored: it looks forward)
+    float  brakeAtCm;   // Banzai: no slow-down; hard brake when this close to the stop point (cm); 0 = normal stop
+    int8_t watchSide;   // Banzai: IR_LEFT / IR_RIGHT: report the longest steady stretch of this IR (MoveResult_t); -1 = off
+    float  watchTol;    // ... readings within this of the stretch's mean so far (cm; a few odd ones are skipped)
 } Until_t;
 
 void Motion_UntilInit(Until_t *o);                 // everything off, vCap = STRAIGHT_V_MAX
@@ -69,6 +80,8 @@ typedef struct {
     char    stopBy;               // sensor straights: U ultrasonic, E IR edge, C cap, F floor, G guard
     uint8_t faceSeen;             // sensor straights: the edge IR saw a face
     float   target;               // sensor straights: where the sensors said to stop (cm of travel)
+    float   watchSpan;            // watchSide: longest stretch of travel with a steady reading (cm), 0 = none
+    float   watchMean;            // ... its average reading (cm)
 } MoveResult_t;
 void Motion_LastResult(MoveResult_t *r);
 

@@ -151,7 +151,12 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
 /* USER CODE BEGIN 1 */
-#define configASSERT( x ) if ((x) == 0) {taskDISABLE_INTERRUPTS(); for( ;; );}
+/* 14 Oct: a failed assert stops the robot and reports it (main.c Fault_Stop)
+   instead of freezing silently with the motors on their last PWM. */
+#if defined(__ICCARM__) || defined(__CC_ARM) || defined(__GNUC__)
+void Fault_Stop(const char *what, const char *task);
+#endif
+#define configASSERT( x ) if ((x) == 0) {taskDISABLE_INTERRUPTS(); Fault_Stop("ASSERT", __FILE__); }
 /* USER CODE END 1 */
 
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
@@ -165,6 +170,10 @@ standard names. */
 
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
+/* 14 Oct: catch stack overflows (main.c vApplicationStackOverflowHook) and failed
+   allocations (vApplicationMallocFailedHook) instead of corrupting memory. */
+#define configCHECK_FOR_STACK_OVERFLOW           2
+#define configUSE_MALLOC_FAILED_HOOK             1
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */

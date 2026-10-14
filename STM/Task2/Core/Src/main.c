@@ -75,7 +75,7 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t communicateTaskHandle;
 const osThreadAttr_t communicateTask_attributes = {
   .name = "communicateTask",
-  .stack_size = 512 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for motorTask */
@@ -182,6 +182,93 @@ static void bootMessage(const char *msg);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/* "12.3" / "-0.45" with integer printf only (no newlib float formatting).
+ * decimals 1 or 2. Used by the OLED task. */
+static void fixed1(char *out, float v, int decimals)
+{
+    long scale = (decimals >= 2) ? 100 : 10;
+    long n = lroundf(v * (float)scale);
+    const char *sign = (n < 0) ? "-" : "";
+    if (n < 0) n = -n;
+    if (decimals >= 2) sprintf(out, "%s%ld.%02ld", sign, n / 100, n % 100);
+    else               sprintf(out, "%s%ld.%ld",   sign, n / 10,  n % 10);
+}
+
+/* ---- Crash reporting (14 Oct) -------------------------------------------------
+ * Any fault stops the robot and says what happened, instead of freezing silently:
+ *   - motors braked, LED3 blinks fast (~10 Hz; the normal heartbeat is 5 Hz),
+ *   - "A FAULT <what> <task>" sent to the Pi,
+ *   - "FAULT <what>" and the task name on the OLED.
+ * Called from: stack overflow hook, configASSERT (FreeRTOSConfig.h), HardFault /
+ * MemManage / BusFault / UsageFault (stm32f4xx_it.c). Interrupts are off and
+ * nothing here uses the RTOS, HAL timing or printf. Press reset to recover. */
+static void faultPutc(char c)
+{
+    while ((USART3->SR & USART_SR_TXE) == 0) { }
+    USART3->DR = (uint8_t)c;
+}
+
+static void faultPuts(const char *p)
+{
+    while (p && *p) faultPutc(*p++);
+}
+
+void Fault_Stop(const char *what, const char *task)
+{
+    __disable_irq();
+    // Motors: both pins high = AT8236 brake (the PWM timers keep running on their own)
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, PWM_BRAKE);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, PWM_BRAKE);
+    __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_1, PWM_BRAKE);
+    __HAL_TIM_SET_COMPARE(&htim9, TIM_CHANNEL_2, PWM_BRAKE);
+
+    faultPuts("A FAULT ");
+    faultPuts(what);
+    faultPutc(' ');
+    faultPuts((task && *task) ? task : "-");
+    faultPuts("\r\n");
+
+    char line[24] = "FAULT ";
+    strncat(line, what, sizeof(line) - strlen(line) - 1);
+    for (int y = 0; y < 64; y++) for (int x = 0; x < 128; x++) OLED_DrawPoint((uint8_t)x, (uint8_t)y, 0);
+    OLED_ShowString(0, 12, (const uint8_t *)line);
+    OLED_ShowString(0, 30, (const uint8_t *)((task && *task) ? task : "-"));
+    OLED_ShowString(0, 48, (const uint8_t *)"press RESET");
+    OLED_Refresh_Gram();
+
+    for (;;) {
+        HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+        for (volatile uint32_t i = 0; i < 1600000u; i++) { }   // ~50 ms at 168 MHz
+    }
+}
+
+/* FreeRTOS: a task ran past the end of its stack (configCHECK_FOR_STACK_OVERFLOW 2). */
+void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName)
+{
+    (void)xTask;
+    Fault_Stop("STACK", (const char *)pcTaskName);
+}
+
+/* FreeRTOS: pvPortMalloc found no room (only at start-up, when the tasks are created). */
+void vApplicationMallocFailedHook(void)
+{
+    Fault_Stop("HEAP", "");
+}
+
+/* newlib: malloc / free are used by printf's number formatting. Make them safe
+ * when two tasks format at once (newlib's default lock does nothing). */
+void __malloc_lock(struct _reent *r)
+{
+    (void)r;
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) vTaskSuspendAll();
+}
+
+void __malloc_unlock(struct _reent *r)
+{
+    (void)r;
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) (void)xTaskResumeAll();
+}
 
 /* USER CODE END 0 */
 
@@ -1218,6 +1305,9 @@ void StartCommunicateTask(void *argument)
    *   GO / AL / AR             Task 2 sequencer (task2.h)               -> "A S1 ..", "A S2 ..", "A FIN .."
    *   SEL / SER                one "along obstacle 2's face" leg, next turn left / right
    *   ST?                      free stack per task (bytes, lowest seen) -> "A ST c= m= s= o= g= d="
+   *   VMAX? / VMAX<cm>         Banzai calibration: top stable straight speed (stops within 250 cm, or <cm>)
+   *                            -> "A VM v=<cm/s> by=<P|L|Y|D> vl= vr= pl= pr= e= s= d="
+   *   VB<v>                    Banzai calibration: 100 cm at v cm/s, hard brake at 100 (tape the skid)
    *   ZH                       this direction is "north" (send once before the first move)
    *   D                        task done (shown on the OLED)
    *   TD / TV<us>              field tools (FIELD_TOOLS = 1 only)
@@ -1386,6 +1476,19 @@ void StartCommunicateTask(void *argument)
 				}
 				break;
 
+			case 'V':                                   // Banzai calibration tests
+				if (c2 == 'M' && strncmp(cmdBuffer, "VMAX", 4) == 0) {
+					int cm = 0;
+					sscanf(cmdBuffer + 4, "%d", &cm);       // "VMAX?" -> 0 -> default length
+					Motion_VmaxTest((float)cm, replyText, sizeof(replyText));
+				} else if (c2 == 'B' && value > 0) {
+					Motion_BrakeTest((float)value);         // VB<v>
+					isMove = 1;
+				} else {
+					unknown = 1;
+				}
+				break;
+
 			case 'D':                                   // task done
 				strcpy(oled_status_msg, "TASK A.5 DONE!");
 				break;
@@ -1515,16 +1618,23 @@ void StartOledTask(void *argument)
 
 		// Line 2: Gyroscope Angle & Ultrasonic Distance ("--" = stale / no echo)
 		Ultra_Get(&u);
-		if (u > 0.0f) sprintf(textBuffer, "G: %.1f D: %.1fcm", headingDeg - headingZero, u);   // heading relative to "north"
-		else          sprintf(textBuffer, "G: %.1f D: --", headingDeg - headingZero);
+		// Integer formatting only (14 Oct): float printf (%f) here could run at the same
+		// time as the command task's replies, and newlib's float formatting is not
+		// safe in two tasks at once (shared buffers, malloc).
+		char gTxt[12], dTxt[12];
+		fixed1(gTxt, (float)(headingDeg - headingZero), 1);
+		if (u > 0.0f) { fixed1(dTxt, u, 1); sprintf(textBuffer, "G: %s D: %scm", gTxt, dTxt); }   // heading relative to "north"
+		else          sprintf(textBuffer, "G: %s D: --", gTxt);
 		OLED_ShowString(0, 12, (uint8_t*) textBuffer);
 
 #if OLED_SHOW_IR
 		// Lines 3-4: IR sensors, cm from the lens ("--" = clear / over 60 cm)
 		for (int s = 0; s < 2; s++) {
 			float d = irCm[s];
-			if (d < IR_CLEAR) sprintf(textBuffer, "IR%d %.2fV %4.1fcm", s + 1, irVolts[s], d);
-			else              sprintf(textBuffer, "IR%d %.2fV  --   ", s + 1, irVolts[s]);
+			char vTxt[12], cTxt[12];
+			fixed1(vTxt, irVolts[s], 2);
+			if (d < IR_CLEAR) { fixed1(cTxt, d, 1); sprintf(textBuffer, "IR%d %sV %scm", s + 1, vTxt, cTxt); }
+			else              sprintf(textBuffer, "IR%d %sV  --   ", s + 1, vTxt);
 			OLED_ShowString(0, 24 + 12 * s, (uint8_t *) textBuffer);
 		}
 #else

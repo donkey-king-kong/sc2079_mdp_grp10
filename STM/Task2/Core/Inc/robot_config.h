@@ -18,17 +18,16 @@
 /* Which floor the robot runs on. Set on task day, once the arena is announced.
  *   0 = indoor  (lab floor)            - calibrated
  *   1 = outdoor (tiled corridor)       - NOT calibrated yet, see section 2   */
-#define ARENA_OUTDOOR       0
+#define ARENA_OUTDOOR 0
 
 /* Knob-and-button test modes (SD straights, TN turns) and the TD / TV serial
  * commands. Needed for calibration. Set to 0 for the actual task run, so the
  * user button can never start a test move.                                 */
-#define FIELD_TOOLS         0
+#define FIELD_TOOLS 0
 
 /* Replies to the RPi. 0 = short ("A d=99.9 e=+0.4"), 1 = full diagnostics.
  * The TD log always has the full diagnostics either way.                   */
-#define DEBUG_REPLIES       1
-
+#define DEBUG_REPLIES 1
 
 /* ==========================================================================
  *  2. FLOOR-DEPENDENT VALUES  - one set per arena type
@@ -36,53 +35,51 @@
  * ========================================================================== */
 #if ARENA_OUTDOOR == 0
 /* ---- INDOOR (lab floor) ---- */
-  #define TICKS_PER_CM        75.5f   // [CAL] Encoder ticks per cm (measured by tape)
-  #define STOP_T              0.050f  // [CAL] Straights: robot rolls this many seconds after deciding to stop
-  #define TURN_STOP_T         0.075f  // [CAL] Turns: robot keeps rotating this many seconds after deciding to stop
-  #define TURN_RADIUS_L       19.6f   // [CAL] Left-lock turning radius at the rear-axle centre (cm). 12 Oct: LF090 moved
-                                      //       the rear axle 19.6 forward and 19.6 left (was 20.2 from LF180)
-  #define TURN_RADIUS_R       36.2f   // [CAL] Right-lock turning radius (cm), RF180 diameter
-  #define SERVO_TRUE_CENTRE   1504    // [CAL] Servo value for straight ahead (approached from below)
-  #define MOTOR_FF_BASE       2100.0f // [CAL] PWM that just keeps the robot rolling (Phase 2 floor test)
-  #define MOTOR_KICK_PWM      3300.0f // [CAL] Start burst; must beat the worst start seen (3205)
-  #define SPEED_PROFILE       2       // [CAL] See section 4
+#define TICKS_PER_CM 75.5f     // [CAL] Encoder ticks per cm (measured by tape)
+#define STOP_T 0.050f          // [CAL] Straights: robot rolls this many seconds after deciding to stop
+#define TURN_STOP_T 0.075f     // [CAL] Turns: robot keeps rotating this many seconds after deciding to stop
+#define TURN_RADIUS_L 19.6f    // [CAL] Left-lock turning radius at the rear-axle centre (cm). 12 Oct: LF090 moved
+                               //       the rear axle 19.6 forward and 19.6 left (was 20.2 from LF180)
+#define TURN_RADIUS_R 36.2f    // [CAL] Right-lock turning radius (cm), RF180 diameter
+#define SERVO_TRUE_CENTRE 1504 // [CAL] Servo value for straight ahead (approached from below)
+#define MOTOR_FF_BASE 2100.0f  // [CAL] PWM that just keeps the robot rolling (Phase 2 floor test)
+#define MOTOR_KICK_PWM 3300.0f // [CAL] Start burst; must beat the worst start seen (3205)
+#define SPEED_PROFILE 2        // [CAL] See section 4
 #else
 /* ---- OUTDOOR (tiled corridor) ----
  * Calibrated 1 Oct 2026 on the corridor tiles: all values as indoors, except
  * the radii (measured 20.0 / 35.9) and the centre (1500 tested straight).
  * Expect 1-3 cm/m of sideways drift from the slope and grout lines.         */
-  #define TICKS_PER_CM        75.5f
-  #define STOP_T              0.050f
-  #define TURN_STOP_T         0.075f
-  #define TURN_RADIUS_L       20.0f
-  #define TURN_RADIUS_R       35.9f
-  #define SERVO_TRUE_CENTRE   1500
-  #define MOTOR_FF_BASE       2100.0f
-  #define MOTOR_KICK_PWM      3300.0f
-  #define SPEED_PROFILE       2
+#define TICKS_PER_CM 75.5f
+#define STOP_T 0.050f
+#define TURN_STOP_T 0.075f
+#define TURN_RADIUS_L 20.0f
+#define TURN_RADIUS_R 35.9f
+#define SERVO_TRUE_CENTRE 1500
+#define MOTOR_FF_BASE 2100.0f
+#define MOTOR_KICK_PWM 3300.0f
+#define SPEED_PROFILE 2
 #endif
-
 
 /* ==========================================================================
  *  3. ROBOT GEOMETRY AND STEERING  - the same on every floor
  * ========================================================================== */
-#define TRACK_CM            15.7f   // Rear track, wheel centre to wheel centre (cm)
-#define DEG2RAD             0.0174533f
+#define TRACK_CM 15.7f // Rear track, wheel centre to wheel centre (cm)
+#define DEG2RAD 0.0174533f
 
-#define SERVO_LEFT_LOCK     940     // Full left lock (us), 25 us clear of the 915 mechanical limit
-#define SERVO_RIGHT_LOCK    2080    // Full right lock (us), 20 us clear of the 2100 limit
-#define SERVO_APPROACH_US   40      // Centre is always approached from this far below (servo slack)
-#define TURN_IO_L           0.50f   // Inner / outer rear wheel speed ratio at the left lock (measured)
-#define TURN_IO_R           0.67f   // ... at the right lock
+#define SERVO_LEFT_LOCK 940   // Full left lock (us), 25 us clear of the 915 mechanical limit
+#define SERVO_RIGHT_LOCK 2080 // Full right lock (us), 20 us clear of the 2100 limit
+#define SERVO_APPROACH_US 40  // Centre is always approached from this far below (servo slack)
+#define TURN_IO_L 0.50f       // Inner / outer rear wheel speed ratio at the left lock (measured)
+#define TURN_IO_R 0.67f       // ... at the right lock
 
-#define STEER_RIGHT_GAIN    1.3f    // [CAL] Right steering is weaker per us than left, so heading
-                                    //       corrections to the right are scaled up by this much.
-                                    //       x1.0 drifted left (+1.7 deg), x1.6 drifted right (-1.55).
-#define STEER_PLAY_US       15.0f   // [CAL] Steering play compensation: when a correction reverses,
-                                    //       the servo jumps this far across the play (0 = off).
-                                    //       Real play ~20-40 us. MUST stay below the real play,
-                                    //       or the wheels start hopping back and forth.
-
+#define STEER_RIGHT_GAIN 1.3f // [CAL] Right steering is weaker per us than left, so heading
+                              //       corrections to the right are scaled up by this much.
+                              //       x1.0 drifted left (+1.7 deg), x1.6 drifted right (-1.55).
+#define STEER_PLAY_US 15.0f   // [CAL] Steering play compensation: when a correction reverses,
+                              //       the servo jumps this far across the play (0 = off).
+                              //       Real play ~20-40 us. MUST stay below the real play,
+                              //       or the wheels start hopping back and forth.
 
 /* ==========================================================================
  *  4. SPEEDS
@@ -93,241 +90,331 @@
  * path symmetric. Measured: a 180 deg turn ends within ~1-3 cm of its start
  * line (measure axle to axle - a tyre's back edge moves 6.7 cm after 180). */
 #if SPEED_PROFILE == 0
-  #define STRAIGHT_V_MAX    35.0f   // Straight cruise speed (cm/s)
-  #define TURN_V_MAX        25.0f   // Turn cruise speed at the rear-axle centre (cm/s)
-  #define STRAIGHT_ACCEL    60.0f   // Straights: speeding up (cm/s per second)
-  #define STRAIGHT_DECEL    50.0f   // Straights: slowing down (cm/s per second)
-  #define TURN_ACCEL        50.0f   // Turns: speeding up and ...
-  #define TURN_DECEL        50.0f   // ... slowing down - keep these equal
+#define STRAIGHT_V_MAX 35.0f // Straight cruise speed (cm/s)
+#define TURN_V_MAX 25.0f     // Turn cruise speed at the rear-axle centre (cm/s)
+#define STRAIGHT_ACCEL 60.0f // Straights: speeding up (cm/s per second)
+#define STRAIGHT_DECEL 50.0f // Straights: slowing down (cm/s per second)
+#define TURN_ACCEL 50.0f     // Turns: speeding up and ...
+#define TURN_DECEL 50.0f     // ... slowing down - keep these equal
 #elif SPEED_PROFILE == 1
-  #define STRAIGHT_V_MAX    50.0f
-  #define TURN_V_MAX        35.0f
-  #define STRAIGHT_ACCEL    80.0f
-  #define STRAIGHT_DECEL    70.0f
-  #define TURN_ACCEL        70.0f
-  #define TURN_DECEL        70.0f
-#else  /* 2 = fastest with no accuracy loss in simulation */
-  #define STRAIGHT_V_MAX    65.0f
-  #define TURN_V_MAX        45.0f
-  #define STRAIGHT_ACCEL    100.0f
-  #define STRAIGHT_DECEL    60.0f   // [CAL] was 90: tyres skidded ~1 cm while slowing from 65 cm/s (Step 2)
-  #define TURN_ACCEL        60.0f   // [CAL] equal to TURN_DECEL (symmetric turns)
-  #define TURN_DECEL        60.0f   // [CAL]
+#define STRAIGHT_V_MAX 50.0f
+#define TURN_V_MAX 35.0f
+#define STRAIGHT_ACCEL 80.0f
+#define STRAIGHT_DECEL 70.0f
+#define TURN_ACCEL 70.0f
+#define TURN_DECEL 70.0f
+#else /* 2 = fastest with no accuracy loss in simulation */
+#define STRAIGHT_V_MAX 65.0f
+#define TURN_V_MAX 45.0f
+#define STRAIGHT_ACCEL 100.0f
+#define STRAIGHT_DECEL 60.0f // [CAL] was 90: tyres skidded ~1 cm while slowing from 65 cm/s (Step 2)
+#define TURN_ACCEL 60.0f     // [CAL] equal to TURN_DECEL (symmetric turns)
+#define TURN_DECEL 60.0f     // [CAL]
 #endif
-#define STRAIGHT_V_MIN      12.0f   // Slowest speed used: above the stick-slip region
-#define STRAIGHT_APPROACH   2.0f    // Last few cm of a straight are driven at STRAIGHT_V_MIN
-#define TURN_V_MIN          14.0f   // Slowest turn speed: keeps the inner wheel above stick-slip
-#define TURN_APPROACH_CM    4.0f    // Last few cm of arc of a turn are driven at TURN_V_MIN
-#define TURN_SETTLE_MS      300     // Time for the servo to swing lock to lock (centre to lock: QUICK_STOPS scales it)
-#define STRAIGHT_V_ABS_MAX  85.0f   // No straight may ask for more: the right motor tops out ~86 cm/s at
-                                    // MOTOR_PWM_MAX (2100 + v / 0.0196), and it needs PI headroom
+#define STRAIGHT_V_MIN 12.0f     // Slowest speed used: above the stick-slip region
+#define STRAIGHT_APPROACH 2.0f   // Last few cm of a straight are driven at STRAIGHT_V_MIN
+#define TURN_V_MIN 14.0f         // Slowest turn speed: keeps the inner wheel above stick-slip
+#define TURN_APPROACH_CM 4.0f    // Last few cm of arc of a turn are driven at TURN_V_MIN
+#define TURN_SETTLE_MS 300       // Time for the servo to swing lock to lock (centre to lock: QUICK_STOPS scales it)
+#define STRAIGHT_V_ABS_MAX 85.0f // No straight may ask for more: the right motor tops out ~86 cm/s at
+                                 // MOTOR_PWM_MAX (2100 + v / 0.0196), and it needs PI headroom
 
+/* Step 9: less waiting between moves. 0 = step 8 timing.
+ *  - PRESTEER: when the sequencer knows a turn comes next (Motion_EndSteer), the
+ *    servo swings to that lock as soon as the straight starts braking (robot
+ *    almost stopped, < 1 cm left to roll), so the turn starts after the 60 ms
+ *    minimum settle instead of ~180 ms. A turn followed by a turn on the same
+ *    lock keeps the lock.
+ *  - Straights start 40 ms sooner after a turn (SETTLE_NEAR_MS 70: the wheels
+ *    are still finishing the swing to centre as the robot pulls away). */
+#define FLOW_MOVES 1
 /* Shorter stops and servo waits between moves (12 Oct). 0 = the old values. */
-#define QUICK_STOPS         1
+#define QUICK_STOPS 1
 #if QUICK_STOPS
-  #define MOVE_BRAKE_MS     120     // [CAL] active brake at the end of a move (was 200)
-  #define MOVE_STILL_LOOPS  3       // [CAL] 10 ms loops without a tick = stopped (was 5)
-  #define SETTLE_NEAR_MS    90      // [CAL] straight servo settle, each of 2 steps, servo near centre (was 120)
-  #define TURN_SETTLE_PROP  1       // turn servo settle in proportion to the swing (centre-lock ~190 ms, lock-lock 300)
+#define MOVE_BRAKE_MS 120                     // [CAL] active brake at the end of a move (was 200)
+#define MOVE_STILL_LOOPS 3                    // [CAL] 10 ms loops without a tick = stopped (was 5)
+#define SETTLE_NEAR_MS (FLOW_MOVES ? 70 : 90) // [CAL] straight servo settle, each of 2 steps, servo near centre (was 120)
+#define TURN_SETTLE_PROP 1                    // turn servo settle in proportion to the swing (centre-lock ~190 ms, lock-lock 300)
 #else
-  #define MOVE_BRAKE_MS     200
-  #define MOVE_STILL_LOOPS  5
-  #define SETTLE_NEAR_MS    120
-  #define TURN_SETTLE_PROP  0
+#define MOVE_BRAKE_MS 200
+#define MOVE_STILL_LOOPS 5
+#define SETTLE_NEAR_MS 120
+#define TURN_SETTLE_PROP 0
 #endif
-
 
 /* ==========================================================================
  *  5. MOTOR SPEED CONTROL
  * ========================================================================== */
 /* Speed per PWM for each wheel and direction (cm/s per PWM, Phase 2) */
-#define GAIN_L_FWD          0.0226f
-#define GAIN_R_FWD          0.0196f
-#define GAIN_L_REV          0.0179f
-#define GAIN_R_REV          0.0193f
-#define KICK_AFTER_LOOPS    3       // Start burst if a wheel hasn't turned for this many 10 ms loops
-#define MOTOR_PWM_MAX       6500.0f // Stay below the non-linear top end (ARR is 7199)
-#define PWM_BRAKE           7200    // Compare value above ARR = pin held high; both pins high = brake
-#define WHEEL_KP            120.0f  // PWM per (tick / 10 ms) of speed error
-#define WHEEL_KI            3.0f    // PWM added per tick of error, every 10 ms
-#define WHEEL_I_LIMIT       1500.0f // Integral term limit (PWM)
-#define BRAKE_ASSIST_TICKS  5.0f    // Straights, while slowing: brake both wheels if this much too fast
-#define TURN_ASSIST_TICKS   3.0f    // Turns, while slowing: brake both wheels if this much too fast
-
+#define GAIN_L_FWD 0.0226f
+#define GAIN_R_FWD 0.0196f
+#define GAIN_L_REV 0.0179f
+#define GAIN_R_REV 0.0193f
+#define KICK_AFTER_LOOPS 3      // Start burst if a wheel hasn't turned for this many 10 ms loops
+#define MOTOR_PWM_MAX 6500.0f   // Stay below the non-linear top end (ARR is 7199)
+#define PWM_BRAKE 7200          // Compare value above ARR = pin held high; both pins high = brake
+#define WHEEL_KP 120.0f         // PWM per (tick / 10 ms) of speed error
+#define WHEEL_KI 3.0f           // PWM added per tick of error, every 10 ms
+#define WHEEL_I_LIMIT 1500.0f   // Integral term limit (PWM)
+#define BRAKE_ASSIST_TICKS 5.0f // Straights, while slowing: brake both wheels if this much too fast
+#define TURN_ASSIST_TICKS 3.0f  // Turns, while slowing: brake both wheels if this much too fast
 
 /* ==========================================================================
  *  6. HEADING CONTROL
  * ========================================================================== */
-#define HEADING_KP_US       11.0f   // Servo us per degree of heading error
-#define HEADING_MAX_US      60.0f   // Largest heading correction (us)
-#define SERVO_RATE_US       4.0f    // Largest servo change per 10 ms (keeps it smooth)
-#define HEADING_KI_US       0.01f   // Centre learning: us per degree of error, per 10 ms
-#define SERVO_TRIM_MAX      30.0f   // Learned centre may move at most this far from SERVO_TRUE_CENTRE
-#define STRAIGHT_KY         0.9f    // Line holding: degrees of correction per cm of sideways drift
-#define STRAIGHT_KY_FADE    25.0f   // Line holding fades out over the last this-many cm
-#define TURN_W_ALPHA        0.4f    // Yaw-rate smoothing for the turn stop decision (1 = none)
-#define GYRO_STILL_BAND     1.0     // deg/s. Below this, a still robot's gyro reading is treated as zero drift
-
+#define HEADING_KP_US 11.0f    // Servo us per degree of heading error
+#define HEADING_MAX_US 60.0f   // Largest heading correction (us)
+#define SERVO_RATE_US 4.0f     // Largest servo change per 10 ms (keeps it smooth)
+#define HEADING_KI_US 0.01f    // Centre learning: us per degree of error, per 10 ms
+#define SERVO_TRIM_MAX 30.0f   // Learned centre may move at most this far from SERVO_TRUE_CENTRE
+#define STRAIGHT_KY 0.9f       // Line holding: degrees of correction per cm of sideways drift
+#define STRAIGHT_KY_FADE 25.0f // Line holding fades out over the last this-many cm
+#define TURN_W_ALPHA 0.4f      // Yaw-rate smoothing for the turn stop decision (1 = none)
+#define GYRO_STILL_BAND 1.0    // deg/s. Below this, a still robot's gyro reading is treated as zero drift
 
 /* ==========================================================================
  *  7. FIELD TOOLS (only used when FIELD_TOOLS = 1)
  * ========================================================================== */
-#define KNOB_US_MIN         900     // Knob fully clockwise
-#define KNOB_US_MAX         2200    // Knob fully anticlockwise
-#define TEST_LOG_SIZE       40      // Results kept for the TD command
-#define BTN_LONG_MS         800     // Hold the button this long to switch SD / TN
-#define TV_MIN              800     // Allowed range for the TV command
-#define TV_MAX              2200
-
+#define KNOB_US_MIN 900  // Knob fully clockwise
+#define KNOB_US_MAX 2200 // Knob fully anticlockwise
+#define TEST_LOG_SIZE 40 // Results kept for the TD command
+#define BTN_LONG_MS 800  // Hold the button this long to switch SD / TN
+#define TV_MIN 800       // Allowed range for the TV command
+#define TV_MAX 2200
 
 /* ==========================================================================
  *  7b. ULTRASONIC SENSOR (HC-SR04) - calibrated with the 10x10 cm obstacle block
  * ========================================================================== */
-#define ULTRA_CM_PER_US     0.017673f // [CAL] cm per microsecond of echo (speed of sound + clock)
-#define ULTRA_OFFSET_CM     0.65f     // [CAL] fixed offset (cm), measured from the sensor face
-#define ULTRA_VALID_MS      100       // A reading older than this is stale (no echo came back)
-#define ULTRA_MAX_CM        300.0f    // Longer than this = no echo (HC-SR04 gives ~38 ms then)
-#define ULTRA_LAG_S         0.010f    // [CAL] An echo is this old when the motor task uses it
-#define ULTRA_BLIND_V       35.0f     // SU / SW speed cap until 3 good echoes are in (test T1)
-#define ULTRA_HARD_STOP_CM  10.0f     // An SW travel floor never overrides an echo this close
-#define US_QUERY_PINGS      5         // US?: median of this many fresh pings (~0.3 s)
-
+#define ULTRA_CM_PER_US 0.017673f // [CAL] cm per microsecond of echo (speed of sound + clock)
+#define ULTRA_OFFSET_CM 0.65f     // [CAL] fixed offset (cm), measured from the sensor face
+#define ULTRA_VALID_MS 100        // A reading older than this is stale (no echo came back)
+#define ULTRA_MAX_CM 300.0f       // Longer than this = no echo (HC-SR04 gives ~38 ms then)
+#define ULTRA_LAG_S 0.010f        // [CAL] An echo is this old when the motor task uses it
+#define ULTRA_BLIND_V 35.0f       // SU / SW speed cap until 3 good echoes are in (test T1)
+#define ULTRA_HARD_STOP_CM 10.0f  // An SW travel floor never overrides an echo this close
+#define US_QUERY_PINGS 5          // US?: median of this many fresh pings (~0.3 s)
 
 /* ==========================================================================
  *  7c. SENSOR-ENDED STRAIGHTS (SU, SW)
  *      The ultrasonic decides WHERE to stop; the encoders still do the
  *      stopping, so the stop is as precise as a plain straight.
  * ========================================================================== */
-#define SU_MAX_CM           200.0f  // SU: stop here if the ultrasonic never sees the target
-#define FACE_V_MAX          25.0f   // SW (and SE later): speed cap along obstacle 2 / into the carpark
-#define SW_MAX_CM_DEFAULT   35.0f   // SW with no arguments: travel cap  (lane cap,   computed by the sequencer later)
-#define SW_MIN_CM_DEFAULT   0.0f    // SW with no arguments: travel floor (lane floor, computed by the sequencer later)
-
+#define SU_MAX_CM 200.0f        // SU: stop here if the ultrasonic never sees the target
+#define FACE_V_MAX 25.0f        // SW (and SE later): speed cap along obstacle 2 / into the carpark
+#define SW_MAX_CM_DEFAULT 35.0f // SW with no arguments: travel cap  (lane cap,   computed by the sequencer later)
+#define SW_MIN_CM_DEFAULT 0.0f  // SW with no arguments: travel floor (lane floor, computed by the sequencer later)
 
 /* ==========================================================================
  *  8. IR DISTANCE SENSORS (Sharp GP2Y0A21YK0F)
  *     Power them from 5 V (4.5-5.5 V). Output is ~0.2 V (nothing) to ~2.4 V (10 cm).
  *     Read by the sensor task (main.c) every IR_PERIOD_MS.
  * ========================================================================== */
-#define OLED_SHOW_IR        1       // 1 = OLED shows the IR sensors instead of the encoder totals
-#define IR1_ADC_CHANNEL     ADC_CHANNEL_14   // IR1 = LEFT,  PC4 (ADC1 channel 14)
-#define IR2_ADC_CHANNEL     ADC_CHANNEL_5    // IR2 = RIGHT, PA5 (ADC1 channel 5)
-#define IR_SAMPLES          8       // ADC readings averaged per update (the output is noisy)
-#define IR_PERIOD_MS        20      // IR update period: 0.5 cm of travel at 25 cm/s
+#define OLED_SHOW_IR 1                 // 1 = OLED shows the IR sensors instead of the encoder totals
+#define IR1_ADC_CHANNEL ADC_CHANNEL_14 // IR1 = LEFT,  PC4 (ADC1 channel 14)
+#define IR2_ADC_CHANNEL ADC_CHANNEL_5  // IR2 = RIGHT, PA5 (ADC1 channel 5)
+#define IR_SAMPLES 8                   // ADC readings averaged per update (the output is noisy)
+#define IR_PERIOD_MS 20                // IR update period: 0.5 cm of travel at 25 cm/s
 
 /* Volts -> cm from the lens: lookup table from the 11 Oct sweep (flat board,
  * square to each lens, mean of 3 IR? readings). Between points the distance
  * is interpolated in 1/volts, which follows the Sharp curve. To recalibrate,
  * redo the sweep and replace the volts. Volts must keep falling left to right.
  * IR2 is weak at 40-50 cm (40 and 45 read almost the same), +-3 cm there.  */
-#define IR_TABLE_N          12
-#define IR_TABLE_CM         { 10.0f,  15.0f,  20.0f,  25.0f,  30.0f,  35.0f,  40.0f,  45.0f,  50.0f,  55.0f,  60.0f,  70.0f }
-#define IR1_TABLE_V         { 2.247f, 1.517f, 1.217f, 1.017f, 0.827f, 0.760f, 0.660f, 0.633f, 0.573f, 0.547f, 0.503f, 0.447f }
-#define IR2_TABLE_V         { 2.413f, 1.707f, 1.387f, 1.090f, 1.013f, 0.847f, 0.760f, 0.750f, 0.703f, 0.573f, 0.477f, 0.423f }
+#define IR_TABLE_N 12
+#define IR_TABLE_CM {10.0f, 15.0f, 20.0f, 25.0f, 30.0f, 35.0f, 40.0f, 45.0f, 50.0f, 55.0f, 60.0f, 70.0f}
+#define IR1_TABLE_V {2.247f, 1.517f, 1.217f, 1.017f, 0.827f, 0.760f, 0.660f, 0.633f, 0.573f, 0.547f, 0.503f, 0.447f}
+#define IR2_TABLE_V {2.413f, 1.707f, 1.387f, 1.090f, 1.013f, 0.847f, 0.760f, 0.750f, 0.703f, 0.573f, 0.477f, 0.423f}
 
-#define IR_MIN_CM           10.0f   // Closer -> reported as IR_MIN_CM (the Sharp output folds back below ~10 cm)
-#define IR_MAX_CM           70.0f   // Farther -> IR_CLEAR (= the table's last point; "nothing" reads 0.19-0.29 V,
-                                    // 70 cm 0.42-0.45 V). Was 60: a wall at ~84 cm then read "none" (run 3, 12 Oct)
-#define IR_CLEAR            999.0f  // "Path clear / > 60 cm"
-#define IR_V_NOSIG          0.10f   // Below this the sensor is unplugged -> IR_CLEAR
+#define IR_MIN_CM 10.0f  // Closer -> reported as IR_MIN_CM (the Sharp output folds back below ~10 cm)
+#define IR_MAX_CM 70.0f  // Farther -> IR_CLEAR (= the table's last point; "nothing" reads 0.19-0.29 V,
+                         // 70 cm 0.42-0.45 V). Was 60: a wall at ~84 cm then read "none" (run 3, 12 Oct)
+#define IR_CLEAR 999.0f  // "Path clear / > 60 cm"
+#define IR_V_NOSIG 0.10f // Below this the sensor is unplugged -> IR_CLEAR
 
 /* IR edge detection (SE: the end of obstacle 2's face) */
-#define IR_FACE_CM          50.0f   // 3 readings in a row under this = the IR is on a face
-#define IR_EDGE_JUMP_CM     12.0f   // then 2 in a row this far above the face reading = past its end ...
-#define IR_EDGE_FAR_CM      50.0f   // ... with 2 of them at least this far ("nothing there"). Step 7: a card edge, seam
-                                    //     or dark patch on a face 15-30 cm away can jump 12 cm, but not to 50+
-#define IR_EDGE_HOLD_N      4       // a jump that stays under IR_EDGE_FAR_CM this many updates = still the face
-#define IR_EDGE_CONFIRM_CM  4.0f    // face back (2 readings) within this after an edge, still driving = not the end
-#define IR_EDGE_LAG_CM      1.2f    // [CAL] the edge is first seen this far after the sensor passes it, at FACE_V_MAX
-                                    //       (scaled with speed). 12 Oct SEL: rear axle 3.1 past the box end, 3.4 expected
+#define IR_FACE_CM 50.0f        // 3 readings in a row under this = the IR is on a face
+#define IR_EDGE_JUMP_CM 12.0f   // then 2 in a row this far above the face reading = past its end ...
+#define IR_EDGE_FAR_CM 50.0f    // ... with 2 of them at least this far ("nothing there"). Step 7: a card edge, seam
+                                //     or dark patch on a face 15-30 cm away can jump 12 cm, but not to 50+
+#define IR_EDGE_HOLD_N 4        // a jump that stays under IR_EDGE_FAR_CM this many updates = still the face
+#define IR_EDGE_CONFIRM_CM 4.0f // face back (2 readings) within this after an edge, still driving = not the end
+#define IR_EDGE_LAG_CM 1.2f     // [CAL] the edge is first seen this far after the sensor passes it, at FACE_V_MAX
+                                //       (scaled with speed). 12 Oct SEL: rear axle 3.1 past the box end, 3.4 expected
 
 /* Where the lenses are (calipers, 10 Oct) */
-#define IR_LENS_FROM_CL_CM  5.35f   // Lens to the robot centreline, sideways (53.5 mm)
-#define IR_AHEAD_CM         14.72f  // Lens ahead of the rear axle (147.2 mm)
-
-
+#define IR_LENS_FROM_CL_CM 5.35f // Lens to the robot centreline, sideways (53.5 mm)
+#define IR_AHEAD_CM 14.72f       // Lens ahead of the rear axle (147.2 mm)
 
 /* ==========================================================================
  *  9. TRACKED POSE (rear-axle centre)
  *     Frame: origin at the centre of the carpark opening, x forward along the
  *     start heading, y to the robot's left, h in degrees (CCW +). ZH resets it.
  * ========================================================================== */
-#define POSE_START_X_CM     (-30.0f) // [CAL] rear-axle x at the marked start. -30 = nose 8 cm inside the
-                                     //       opening line, as task2_sim.py assumes. MARK THIS ON THE FLOOR.
-#define POSE_SLIDE_CM_PER_M 0.5f     // [CAL] sideways slide the gyro can't see, forward straights,
-                                     //       cm to the RIGHT per metre. SF100 / SF170 x6 (11-12 Oct): 0.1-0.6
-#define POSE_TURN_FROM_RADIUS 1      // 1 = in turns, arc = calibrated radius x gyro angle (wheels scrub:
-                                     //     LF090 read R 18.1 from the encoders). 0 = encoders
-
-
+#define POSE_START_X_CM (-30.0f) // [CAL] rear-axle x at the marked start. -30 = nose 8 cm inside the
+                                 //       opening line, as task2_sim.py assumes. MARK THIS ON THE FLOOR.
+#define POSE_SLIDE_CM_PER_M 0.5f // [CAL] sideways slide the gyro can't see, forward straights,
+                                 //       cm to the RIGHT per metre. SF100 / SF170 x6 (11-12 Oct): 0.1-0.6
+#define POSE_TURN_FROM_RADIUS 1  // 1 = in turns, arc = calibrated radius x gyro angle (wheels scrub:
+                                 //     LF090 read R 18.1 from the encoders). 0 = encoders
 
 /* ==========================================================================
  *  10. TASK 2 ROUTE (task2.c). Values from TASK2_DESIGN.md / task2_sim.py.
  *      Distances in cm; "travel" = along the robot's heading.
  * ========================================================================== */
-#define ROBOT_FRONT_CM      22.0f   // front of the robot ahead of the rear axle
+#define ROBOT_FRONT_CM 22.0f // front of the robot ahead of the rear axle
 
-#define T2_D1               30.0f   // GO: stop with the front this far from obstacle 1 (scan 1)
-#define T2_IGN_BELOW_CM     45.0f   // GO: ignore echoes shorter than this ...
-#define T2_IGN_PAST_CM      10.0f   // ... until the nose is this far past the opening line
-#define T2_SU1_MAX_CM       160.0f  // GO: travel cap (obstacle 1 never seen)
-#define T2_DODGE_LANE       23.5f   // dodge obstacle 1 into this lane (cm off the centreline, rear axle). Was 21.4:
-                                    // 5.7 cm from obstacle 1, which AL/AL at d1 150 lost to drift. Now 7.8 cm, and
-                                    // the dodge also corrects the drift the tracker saw on the way to scan 1
-#define T2_TH1_MIN          40.0f   // dodge arc limits (deg)
-#define T2_TH1_MAX          75.0f
-#define T2_RSCAN            41.0f   // stop with the front this far from obstacle 2 (scan 2)
-#define T2_SU2_MAX_CM       140.0f  // travel cap to scan 2
-#define T2_SCAN2_AIM        1       // Step 8: at the scan 2 stop, turn toward the arrow card at obstacle 2's centre so the
+#define T2_D1 30.0f           // GO: stop with the front this far from obstacle 1 (scan 1)
+#define T2_IGN_BELOW_CM 45.0f // GO: ignore echoes shorter than this ...
+#define T2_IGN_PAST_CM 10.0f  // ... until the nose is this far past the opening line
+#define T2_SU1_MAX_CM 160.0f  // GO: travel cap (obstacle 1 never seen)
+#define T2_DODGE_LANE 23.5f   // dodge obstacle 1 into this lane (cm off the centreline, rear axle). Was 21.4:
+                              // 5.7 cm from obstacle 1, which AL/AL at d1 150 lost to drift. Now 7.8 cm, and
+                              // the dodge also corrects the drift the tracker saw on the way to scan 1
+#define T2_TH1_MIN 40.0f      // dodge arc limits (deg)
+#define T2_TH1_MAX 75.0f
+#define T2_RSCAN 41.0f              // stop with the front this far from obstacle 2 (scan 2)
+#define T2_SU2_MAX_CM 140.0f        // travel cap to scan 2
+#define T2_SCAN2_AIM 1              // Step 8: at the scan 2 stop, turn toward the arrow card at obstacle 2's centre so the
                                     //   camera sees it square (from the 23.5 lane it was ~30 deg off-axis). Undone by the
                                     //   same arc in reverse before arrow 2's moves. 0 = off (step 7 behaviour)
-#define T2_CAM_AHEAD_CM     18.0f   // [MEASURE] camera lens ahead of the rear axle (cm). The aim hardly depends on it:
+#define T2_CAM_AHEAD_CM 18.0f       // [MEASURE] camera lens ahead of the rear axle (cm). The aim hardly depends on it:
                                     //   22 deg (AR lane) / 23 deg (AL lane) for anything from 10 to 22
-#define T2_AIM_MAX          35.0f   // aim turn limit (deg)
-#define T2_OB_DEPTH         10.0f   // obstacle 2 front face to back face
-#define T2_XPASS            11.0f   // R then L only: straight before the crossing left turn
-#define T2_PAST             8.35f   // rear axle this far past obstacle 2's back face before the loop turn
-#define T2_GAP_L            23.0f   // SE: lane = obstacle end + this when the next turn is left ...
-#define T2_GAP_R            25.0f   // ... or right
-#define T2_DW_L             25.0f   // SE: ultrasonic wall stop before a left 90 ...
-#define T2_DW_R             39.0f   // ... or a right 90
-#define T2_LANE_CAP         50.0f   // SE: lane used when the IR never sees the face
-#define T2_LANE_FLOOR       38.0f   // SE: never a lane closer than this to the centreline
-#define T2_LANE_HARD        90.0f   // SE: never a lane farther than this from the centreline (even if the IR edge is missed)
-#define T2_LOOP_V           45.0f   // SE behind obstacle 2: speed (cm/s); an overshoot past the edge stop is backed off
+#define T2_AIM_MAX 35.0f            // aim turn limit (deg)
+#define T2_OB_DEPTH 10.0f           // obstacle 2 front face to back face
+#define T2_XPASS 11.0f              // R then L only: straight before the crossing left turn
+#define T2_PAST 8.35f               // rear axle this far past obstacle 2's back face before the loop turn
+#define T2_GAP_L 23.0f              // SE: lane = obstacle end + this when the next turn is left ...
+#define T2_GAP_R 25.0f              // ... or right
+#define T2_DW_L 25.0f               // SE: ultrasonic wall stop before a left 90 ...
+#define T2_DW_R 39.0f               // ... or a right 90
+#define T2_LANE_CAP 50.0f           // SE: lane used when the IR never sees the face
+#define T2_LANE_FLOOR 38.0f         // SE: never a lane closer than this to the centreline
+#define T2_LANE_HARD 90.0f          // SE: never a lane farther than this from the centreline (even if the IR edge is missed)
+#define T2_LOOP_V 55.0f             // SE behind obstacle 2: speed (cm/s); an overshoot past the edge stop is backed off
 #define T2_OVERSHOOT_FIX_CM 1.5f    // SE: back off an overshoot past the IR edge stop point larger than this
-#define T2_GAP_REV          25.0f   // same side, no wall seen: lane = obstacle end + this (entered by a reversing turn)
+#define T2_GAP_REV 25.0f            // same side, no wall seen: lane = obstacle end + this (entered by a reversing turn)
 #define T2_SAME_SIDE_USE_WALL 0     // 0 = same-side arrows ALWAYS find obstacle 2's end by reversing along its face.
                                     // 1 = use the two-arc route when the side IR sees "a wall" at scan 2 (faster,
                                     //     but anything within 70 cm beside the robot - a person, a bag - counts)
-#define T2_FAST_V           80.0f   // [CAL] clear straights: past obstacle 2, the return lane, the carpark entry
+#define T2_FAST_V 80.0f             // [CAL] clear straights: past obstacle 2, the return lane, the carpark entry
                                     //       (before its slow last 45 cm). Lower to 75 if the robot curves on them
-#define T2_REV_MAX_CM       100.0f  // same side, no wall seen: longest reverse along the face looking for its end
-#define T2_EDGE_MIN_Y       15.0f   // Step 7: an IR "end" of obstacle 2's front face counts only once the lens is this far
+#define T2_REV_MAX_CM 100.0f        // same side, no wall seen: longest reverse along the face looking for its end
+#define T2_REV_V 45.0f              // Step 9: speed of that reverse (cm/s; was FACE_V_MAX 25). The IR lag scales with
+                                    //   speed and the stop is 5 cm past the end, so the end is placed the same
+#define T2_EDGE_MIN_Y 15.0f         // Step 7: an IR "end" of obstacle 2's front face counts only once the lens is this far
                                     //   past the centreline on the pass side. Obstacle 2 is >= 30 cm long and centred, and
                                     //   its image card sits at the centre: 13 Oct AR/AR stopped at the card's edge (lens
                                     //   ~5 cm off centre), entered a lane in front of obstacle 2 and drove into it
-#define T2_REV_PAST_CM      5.0f    // Step 7, same side: reverse this far past the end before stopping (> IR_EDGE_CONFIRM_CM)
-#define T2_END_CHECK_N      5       // Step 7: stopped past an end, IR updates in the "nothing there" check
-#define T2_BLOCKED_CM       60.0f   // Step 7, same side: after the reversing turn an echo under this = obstacle 2 is ahead:
+#define T2_REV_PAST_CM 5.0f         // Step 7, same side: reverse this far past the end before stopping (> IR_EDGE_CONFIRM_CM)
+#define T2_END_CHECK_N 5            // Step 7: stopped past an end, IR updates in the "nothing there" check
+#define T2_BLOCKED_CM 60.0f         // Step 7, same side: after the reversing turn an echo under this = obstacle 2 is ahead:
                                     //   retrace the turn and search further along the face
-#define T2_EDGE_RETRY_CM    3.0f    // ... the next end must be at least this far past the rejected one
-#define T2_REV_TRIES        4       // ... searches in all (either check); then stop (FIN ABORT at BLOCK), never drive into it
-#define T2_WALL_L           26.7f   // same side, wall seen at scan 2: lane = wall - this (last arc left) ...
-#define T2_WALL_R           24.6f   // ... or (last arc right)
-#define T2_WALL_MARGIN      3.0f    // ... and this much more: the IR reads +-3-5 cm at 55-70 cm, so lean toward obstacle 2
+#define T2_EDGE_RETRY_CM 3.0f       // ... the next end must be at least this far past the rejected one
+#define T2_REV_TRIES 4              // ... searches in all (either check); then stop (FIN ABORT at BLOCK), never drive into it
+#define T2_RECHECK_CM 10.0f         // Step 9: after the standing check rejects an end, search on at most this far unless the
+                                    //   face reappears (else the rejected end was real: used). Was the full 100 cm: a person
+                                    //   behind obstacle 2 could have sent the reverse into a side wall
+#define T2_RECHECK_RETRACE_CM 40.0f // Step 9: same after a retrace (the lens starts back on the face)
+#define T2_WALL_L 26.7f             // same side, wall seen at scan 2: lane = wall - this (last arc left) ...
+#define T2_WALL_R 24.6f             // ... or (last arc right)
+#define T2_WALL_MARGIN 3.0f         // ... and this much more: the IR reads +-3-5 cm at 55-70 cm, so lean toward obstacle 2
                                     //     (wall 9 -> 12 cm, obstacle 2 12.6 -> 9.6 cm nominal)
-#define T2_ALPHA            20.0f   // carpark entry angle (steepened only if there is no room)
-#define T2_ALPHA_MAX        35.0f
-#define T2_M_IN             7.0f    // tail this far inside the opening when parked
-#define T2_REAR_CM          3.35f   // robot outline behind the rear axle
-#define T2_HALFW_CM         10.7f   // robot half width
-#define T2_TURN_LEAD        4.0f    // the entry turn must start at least this far ahead
-#define T2_ENTRY_DRIFT_CM   0.0f    // [CAL] parked rear axle ends this far to the robot's RIGHT of the carpark
-                                    //       centreline (measure it, cm); the entry aims this much left to cancel it
-#define T2_WALL_QUERY_N     11      // scan 2: IR updates (20 ms each) in the outer-wall median
-#define T2_ENTRY_SLOW_CM    45.0f   // last part of the entry driven at <= FACE_V_MAX
-#define T2_GUARD_CM         13.0f   // entry: far-side IR under this = stop at once
-#define T2_US_EMERG_CM      8.0f    // entry: ultrasonic under this = stop at once
+#define T2_ALPHA 20.0f              // carpark entry angle (steepened only if there is no room)
+#define T2_ALPHA_MAX 35.0f
+#define T2_M_IN 7.0f           // tail this far inside the opening when parked
+#define T2_REAR_CM 3.35f       // robot outline behind the rear axle
+#define T2_HALFW_CM 10.7f      // robot half width
+#define T2_TURN_LEAD 4.0f      // the entry turn must start at least this far ahead
+#define T2_ENTRY_DRIFT_CM 0.0f // [CAL] parked rear axle ends this far to the robot's RIGHT of the carpark
+                               //       centreline (measure it, cm); the entry aims this much left to cancel it
+#define T2_WALL_QUERY_N 11     // scan 2: IR updates (20 ms each) in the outer-wall median
+#define T2_ENTRY_SLOW_CM 30.0f // Step 9: last part of the entry driven at <= T2_ENTRY_V (was 45 cm at 25 cm/s)
+#define T2_ENTRY_V 40.0f       // Step 9: speed in that last part (cm/s; was FACE_V_MAX 25)
+#define T2_GUARD_FROM_CM 45.0f // entry: the far-side IR guard is armed for the last this-many cm (unchanged)
+#define T2_GUARD_CM 13.0f      // entry: far-side IR under this = stop at once
+#define T2_US_EMERG_CM 8.0f    // entry: ultrasonic under this = stop at once
+#define T2_FACE_V 35.0f   // opposite side: SE along obstacle 2's front face (cm/s)
+
+/* ==========================================================================
+ *  11. TASK 2 BANZAI MODE (experimental, 13 Oct). TASK2_BANZAI_MODE 0 = step 9.
+ *      Each part has its own switch so they can be tried one at a time.
+ *      Calibrate first: VMAX? (top straight speed) and VB<v> (hard-brake skid).
+ * ========================================================================== */
+#define TASK2_BANZAI_MODE 1
+#if TASK2_BANZAI_MODE
+#define BZ_FAST 1        // faster turns, straights, SE legs and stops (values below)
+#define BZ_FLY 1         // no stop between: pass straight -> loop turn, loop turn 2 -> return straight
+                         //   -> entry turn -> entry straight (the "sweeping return")
+#define BZ_ENTRY_BRAKE 1 // entry at T2B_ENTRY_V, hard brake T2B_BRAKE_CM before the parked point (no creep)
+#define BZ_WALL_SLALOM 1 // same side: forward two-arc slalom when a FULL wall is confirmed beside the approach
+                         //   to scan 2; otherwise the step 9 reverse route (see README: why not "no wall")
+#else
+#define BZ_FAST 0
+#define BZ_FLY 0
+#define BZ_ENTRY_BRAKE 0
+#define BZ_WALL_SLALOM 0
+#endif
+
+/* Calibration tests (compiled in always; bench / floor commands only) */
+#define VMAX_TEST_CM 250.0f // VMAX?: the robot stops within this (VMAX<cm> overrides); clear this much floor + 30 cm
+#define VMAX_RAMP 40.0f     // VMAX?: target speed rises this fast (cm/s per s) once above 30 cm/s
+#define VMAX_V_CAP 150.0f   // VMAX?: never ask for more than this
+#define VMAX_SAT_LOOPS 5    // VMAX?: a wheel at MOTOR_PWM_MAX this many 10 ms loops in a row = saturated (by=P)
+#define VMAX_LAG_CMS 6.0f   // VMAX?: a wheel this far below the target speed ...
+#define VMAX_LAG_LOOPS 10   // ... for this many loops = can't keep up (by=L)
+#define VMAX_YAW_DEG 3.0f   // VMAX?: heading error over this = the steering can't hold it straight (by=Y)
+
+#if BZ_FAST
+// [CAL] after VMAX?: T2B_VMAX = about 90% of the reported v (PI headroom); T2B_FAST_V <= T2B_VMAX
+#define T2B_VMAX 85.0f   // replaces STRAIGHT_V_ABS_MAX for every sensor straight
+#define T2B_FAST_V 80.0f // clear straights (was T2_FAST_V 80)
+#undef STRAIGHT_V_ABS_MAX
+#define STRAIGHT_V_ABS_MAX T2B_VMAX
+#undef T2_FAST_V
+#define T2_FAST_V T2B_FAST_V
+#undef TURN_V_MAX
+#define TURN_V_MAX 55.0f // was 45
+#undef TURN_ACCEL
+#define TURN_ACCEL 80.0f // was 60 (keep equal to TURN_DECEL: symmetric turns)
+#undef TURN_DECEL
+#define TURN_DECEL 80.0f
+#undef STRAIGHT_ACCEL
+#define STRAIGHT_ACCEL 140.0f // was 100 (DECEL stays 60: faster slowing skidded, step 2)
+#undef MOVE_BRAKE_MS
+#define MOVE_BRAKE_MS 80 // was 120: every stop ends from 12-14 cm/s
+#undef MOVE_STILL_LOOPS
+#define MOVE_STILL_LOOPS 2 // was 3
+#undef T2_LOOP_V
+#define T2_LOOP_V 60.0f // SE behind obstacle 2 (was 45; an overshoot is backed off)
+#undef T2_REV_V
+#define T2_REV_V 40.0f // same-side reverse along the face (was 35)
+#undef T2_FACE_V
+#define T2_FACE_V 30.0f // opposite side: SE along the front face (was 25; FACE_V_MAX stays the IR lag reference)
+#endif
+
+#if BZ_FLY
+#define T2B_FLY_V 40.0f       // speed handed from one move to the next (cm/s)
+#define T2B_FLY_LEAD_S 0.075f // [CAL] a flying turn hands over this many seconds of yaw early: the robot keeps
+                              //   turning while the servo swings back to centre (~150 ms lock -> centre)
+#define T2B_FLY_SWING_CM 3.0f // a flying turn starts this much later than a standing one (servo still swinging):
+                              //   the entry turn is started this much earlier to keep the same line
+#define T2B_FLY_ENTRY 0       // 14 Oct: 0 = the return straight stops before the carpark entry turn (standing turn,
+                              //   as step 9). 1 = fly it too (needs T2B_FLY_LEAD_S calibrated: at d1 = 60 the entry
+                              //   diagonal passes obstacle 1 with only ~8 cm, so a few degrees off hits it)
+#endif
+
+#if BZ_ENTRY_BRAKE
+#define T2B_ENTRY_V 60.0f // [CAL] entry straight speed (cm/s), no slow zone
+#define T2B_BRAKE_CM 8.0f // [CAL] hard brake this far before the parked point = measured skid at T2B_ENTRY_V (VB60)
+#endif
+
+#if BZ_WALL_SLALOM
+#define T2B_WALL_TOL 5.0f         // outer IR within this of the stretch's mean so far = the same wall
+#define T2B_WALL_MISS_N 3         // ... this many odd readings in a row (10 ms loops) are ignored
+#define T2B_WALL_CONFIRM_CM 40.0f // ... over at least this much of the SU041 approach = a full wall (a person, bag or
+                                  //   table leg is not 40 cm long; short boards beside obstacle 2 are not seen there,
+                                  //   so they never trigger the slalom)
+#define T2B_WALL_MIN_Y 65.0f      // a wall is >= 50 cm past obstacle 2's end, and the end is >= 15 cm out
+#endif
 
 #endif /* ROBOT_CONFIG_H */
