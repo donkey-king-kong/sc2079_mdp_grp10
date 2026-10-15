@@ -848,7 +848,7 @@ static int arrow2Moves(int a2)
     float al = T2_ALPHA, x0, Lh;
     entryPlan(al, fabsf(y), R, ya, &x0, &Lh);
 #if BZ_FLY
-    const float swing = T2B_FLY_SWING_CM;                // flown turns bite this much late: keep step 9's entry room
+    const float swing = T2B_FLY_SWING_CM + ((s > 0) ? T2B_ENTRY_LATE_L : 0.0f);  // 15 Oct: left entry turn bites ~40 cm late
 #else
     const float swing = 0.0f;
 #endif
@@ -879,7 +879,7 @@ static int arrow2Moves(int a2)
 #endif
     if (!fastStraight(x - x0)) return 0;                 // heading 180: forward = toward -x
 #if BZ_FLY && T2B_FLY_ENTRY
-    Motion_Fly(1, 1);
+    Motion_Fly(1, 0);
 #endif
     if (!turn(s > 0, al)) return 0;
 
@@ -890,6 +890,15 @@ static int arrow2Moves(int a2)
         Motion_GetPose(&px, &py, &ph);
         float a  = al * DEG2RAD;
         float xa = -(T2_M_IN + T2_REAR_CM * cosf(a) + T2_HALFW_CM * sinf(a));
+        float hT  = 180.0f * roundf(h / 180.0f) + (float)s * al;   // entry turn's target heading (unwrapped)
+		float brg = atan2f(-T2_ENTRY_DRIFT_CM - py, xa - px) / DEG2RAD;
+		float d   = brg - hT;
+		d -= 360.0f * roundf(d / 360.0f);                           // + = more to the left
+		if (fabsf(d) >= T2_AIM_FIX_DEG) {                           // 15 Oct: re-aim at the parked point
+			d = fminf(fmaxf(d, -T2_AIM_FIX_MAX), T2_AIM_FIX_MAX);
+			if (!turn(d > 0.0f, fabsf(d))) return 0;
+			Motion_GetPose(&px, &py, &ph);
+		}
         Lh = (xa - px) * cosf(ph * DEG2RAD) + (-T2_ENTRY_DRIFT_CM - py) * sinf(ph * DEG2RAD);
     }
 #endif
@@ -910,7 +919,7 @@ static int arrow2Moves(int a2)
 #if BZ_FLY && T2B_FLY_ENTRY
     Motion_Fly(1, 0);
 #endif
-#if !BZ_NO_CHECKS
+#if 1
     o.guardSide  = (s > 0) ? IR_LEFT : IR_RIGHT;         // far-side IR: the other arm
     o.guardCm    = T2_GUARD_CM;
     o.guardFromCm = fmaxf(0.0f, Lh - T2_GUARD_FROM_CM);  // only near the arms (it would see obstacle 2 earlier)

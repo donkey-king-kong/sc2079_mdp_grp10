@@ -471,6 +471,9 @@
                               //   the entry turn is started this much earlier to keep the same line
 #define T2B_FLY_ENTRY 1       // 1 = the return straight flies into the carpark entry turn and the entry straight
                               //   (T2_OB1_MIN_CM keeps obstacle 1 clear). 0 = stop before the entry turn
+#define T2B_ENTRY_LATE_L 40.0f // 15 Oct: +y returns: command the left entry turn this much earlier (it bites late)
+#define T2_AIM_FIX_DEG 2.0f    // after the entry turn: re-aim at the parked point if off by >= this (deg)
+#define T2_AIM_FIX_MAX 10.0f   //   ... by at most this
 #endif
 
 #if BZ_ENTRY_BRAKE
