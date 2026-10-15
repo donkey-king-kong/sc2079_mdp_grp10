@@ -215,6 +215,8 @@ static int alongFace(int turnLeft, float capLane, int useEdge, float vCap, float
     float dw     = turnLeft ? T2_DW_L : T2_DW_R;
     int   side   = turnLeft ? IR_LEFT : IR_RIGHT;
     float minLens = T2_EDGE_MIN_Y;                       // no end of obstacle 2 nearer the centreline than this
+    if (expectEnd > 0.0f)                                // 15 Oct: obstacle 2 is centred, so the far end mirrors the measured
+        minLens = fmaxf(minLens, expectEnd - T2_END_TOL_CM);   // one: a gap between boxes short of it is not the end (80 cm hit)
 
 #if !BZ_NO_CHECKS
     int n;
@@ -232,6 +234,8 @@ static int alongFace(int turnLeft, float capLane, int useEdge, float vCap, float
         Motion_GetPose(&x, &y, &h);
         float dCap   = (capLane - R) - dirn * y;         // travel to the cap lane
         float dFloor = (T2_LANE_FLOOR - R) - dirn * y;   // travel to the floor lane
+        if (expectEnd > 0.0f)                            // 15 Oct: and never short of the mirrored end: an early echo
+            dFloor = fmaxf(dFloor, (expectEnd + (turnLeft ? T2_GAP_L : T2_GAP_R) - T2_END_TOL_CM - R) - dirn * y);   // (80 cm hit)
         float dHard  = (T2_LANE_HARD - R) - dirn * y;    // travel to the hard lane cap
 
         Until_t o;

@@ -243,7 +243,8 @@
 #define IR_EDGE_FAR_CM 50.0f    // ... with 2 of them at least this far ("nothing there"). Step 7: a card edge, seam
                                 //     or dark patch on a face 15-30 cm away can jump 12 cm, but not to 50+
 #define IR_EDGE_HOLD_N 4        // a jump that stays under IR_EDGE_FAR_CM this many updates = still the face
-#define IR_EDGE_CONFIRM_CM 4.0f // face back (2 readings) within this after an edge, still driving = not the end
+#define IR_EDGE_CONFIRM_CM 10.0f // face back (2 readings) within this after an edge, still driving = not the end
+                                 //   (15 Oct: was 4; gaps between obstacle 2's boxes read as ends: 80 cm hit)
 #define IR_EDGE_LAG_CM 1.2f     // [CAL] the edge is first seen this far after the sensor passes it, at FACE_V_MAX
                                 //       (scaled with speed). 12 Oct SEL: rear axle 3.1 past the box end, 3.4 expected
 
@@ -313,7 +314,9 @@
                                     //   past the centreline on the pass side. Obstacle 2 is >= 30 cm long and centred, and
                                     //   its image card sits at the centre: 13 Oct AR/AR stopped at the card's edge (lens
                                     //   ~5 cm off centre), entered a lane in front of obstacle 2 and drove into it
-#define T2_REV_PAST_CM 5.0f         // Step 7, same side: reverse this far past the end before stopping (> IR_EDGE_CONFIRM_CM)
+#define T2_END_TOL_CM 6.0f          // 15 Oct: behind obstacle 2, ignore an IR "end" more than this short of the mirror of the
+                                    //   end already measured (a gap between boxes 12+ cm from the end hit the back corner, 80 cm)
+#define T2_REV_PAST_CM 11.0f       // Step 7, same side: reverse this far past the end before stopping (> IR_EDGE_CONFIRM_CM; was 5)
 #define T2_END_CHECK_N 5            // Step 7: stopped past an end, IR updates in the "nothing there" check
 #define T2_BLOCKED_CM 60.0f         // Step 7, same side: after the reversing turn an echo under this = obstacle 2 is ahead:
                                     //   retrace the turn and search further along the face
@@ -460,7 +463,8 @@
 
 #if BZ_NO_CHECKS
 #undef T2_REV_PAST_CM
-#define T2_REV_PAST_CM 4.0f     // same side: reverse this far past the end (was 5; = IR_EDGE_CONFIRM_CM, no standing check)
+#define T2_REV_PAST_CM 11.0f    // same side: reverse this far past the end (> IR_EDGE_CONFIRM_CM: a gap between boxes is
+                                //   rejected while still reversing; was 4. 15 Oct)
 #endif
 
 #if BZ_FLY
