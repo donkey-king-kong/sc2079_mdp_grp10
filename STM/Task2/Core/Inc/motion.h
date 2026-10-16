@@ -33,6 +33,25 @@ void Motion_Fly(int flyIn, int flyOut);           // Banzai: the NEXT move start
 /* ---- Calibration tests (floor) --------------------------------------------- */
 void Motion_VmaxTest(float maxCm, char *reply, unsigned len);   // VMAX?: ramp until a wheel saturates or it yaws
 void Motion_BrakeTest(float v);                   // VB<v>: 100 cm at v, hard brake at 100 (reply: Motion_Reply)
+void Motion_Stunt(char kind, int value, char *reply, unsigned len);   // X<k><n>: team-video stunts (STUNTS)
+
+/* What the OLED shows during a stunt (STUNTS) */
+typedef struct {
+    uint8_t  state;          // 0 none, 1 countdown, 2 running, 3 result card
+    char     kind;           // 'H', 'F', 'P', 'T', 'D', 'J', 'W'
+    uint8_t  seg, nSeg;      // segment running / segments in the program
+    uint8_t  sat, aborted;
+    int32_t  countdownMs;    // state 1: ms left
+    int32_t  yawDeg;         // turned since the stunt began (+ = left)
+    int32_t  rateDps;        // yaw rate now (deg/s, signed)
+    int32_t  rateMax;        // largest |yaw rate| so far
+    int32_t  distCm;         // wheel travel
+    uint32_t ms;             // running: since the start; result card: the stunt's length
+    uint32_t sinceEnd;       // result card: ms since the stunt ended
+    float    relHeading;     // heading now minus heading at the start (deg), for the car icon
+} StuntStatus_t;
+void Motion_StuntStatus(StuntStatus_t *o);
+void OLED_StuntScreen(const StuntStatus_t *s, uint32_t frame);   // oled.c: one frame into OLED_GRAM
 
 /* ---- Sensor-ended straights (forward). The sensors decide WHERE to stop;
  *      the encoders still do the stopping. All distances are cm of travel. --- */

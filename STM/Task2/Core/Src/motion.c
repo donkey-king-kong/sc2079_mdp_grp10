@@ -158,6 +158,44 @@ typedef struct {
 static Move_t mv = {0};
 static Turn_t tn = {0};
 
+/* ---- Stunts (team video, STUNTS = 1) ----------------------------------------
+ * A stunt is a short program of segments. Each segment sets the steering and
+ * the two rear wheels (open-loop PWM, short brake, or closed-loop speed with
+ * heading hold) and ends on time, on heading turned (gyro), or on distance. */
+#if STUNTS
+#define STUNT_MAX_SEGS 16
+#define SV_HOLD   0          // servo: hold the heading the segment began with (closed-loop segments)
+#define SV_CENTRE 1          // servo: straight ahead
+#define PW_BRAKE  30000      // wheel: short brake (both driver pins high)
+
+typedef struct {
+    int16_t  servo;          // us, or SV_HOLD / SV_CENTRE
+    int16_t  pl, pr;         // open loop: signed PWM per rear wheel (+ = forward), or PW_BRAKE
+    float    v;              // != 0: closed loop instead, both wheels at this speed (cm/s, - = reverse)
+    uint16_t ms;             // ends after this long at the latest (every segment has a cap)
+    float    deg;            // > 0: ... or once the heading has turned this much in this segment
+    float    cm;             // > 0: ... or once the wheels have rolled this far in this segment
+    uint8_t  aimOn;          // 1 = aim segment: rotate on the spot until the heading is hStart + aim (gyro)
+    float    aim;
+} StuntSeg_t;
+
+static struct {
+    volatile uint8_t active;
+    uint8_t  n, i, aborted, sat, closedPrev;
+    int8_t   vdir;
+    StuntSeg_t seg[STUNT_MAX_SEGS];
+    uint32_t t0, tStart, tEnd;
+    float    h0, hStart, hLast, dist, distAll, v, wMax;
+    WheelCtl_t wl, wr;
+    char     kind;           // for the OLED (Motion_StuntStatus)
+    volatile uint32_t cdUntil;   // countdown running until this tick, 0 = none
+    float    wNow, yawEnd;
+} st;
+#define STUNT_ACTIVE (st.active)
+#else
+#define STUNT_ACTIVE 0
+#endif
+
 /* ---- Heading ---------------------------------------------------------------- */
 volatile float   headingDeg    = 0.0f;   // gyro heading (written by the gyro task)
 float            headingZero   = 0.0f;   // gyro heading at the last ZH ("north")
@@ -211,7 +249,7 @@ static void setLastEnd(uint8_t aborted, uint8_t timedOut)
 
 uint8_t Motion_IsBusy(void)
 {
-    return (uint8_t)(mv.active || tn.active);
+    return (uint8_t)(mv.active || tn.active || STUNT_ACTIVE);
 }
 
 /* ==========================================================================
@@ -1372,6 +1410,332 @@ void Motion_Turn(int left, int dir, float angleDeg)
     lastRes.target = 0.0f;
 }
 
+#if STUNTS
+/* ==========================================================================
+ *  Stunts (team video only; Task 1 / Task 2 never use them)
+ * ========================================================================== */
+
+static void stuntAdd(int servo, int pl, int pr, float v, int ms, float deg, float cm)
+{
+    if (st.n >= STUNT_MAX_SEGS) return;
+    StuntSeg_t *s = &st.seg[st.n++];
+    s->servo = (int16_t)servo;
+    s->pl = (int16_t)pl;
+    s->pr = (int16_t)pr;
+    s->v = v;
+    s->ms = (uint16_t)((ms > 0) ? ms : 1);
+    s->deg = deg;
+    s->cm = cm;
+    s->aimOn = 0;
+    s->aim = 0.0f;
+}
+
+/* Rotate on the spot (rear wheels opposite ways, steering at lock) until the
+ * heading is the stunt's start heading + aimDeg, within STUNT_AIM_TOL_DEG. */
+__attribute__((unused)) static void stuntAddAim(float aimDeg, int ms)   // used when STUNT_R_AIM = 1
+{
+    stuntAdd(SV_CENTRE, 0, 0, 0.0f, ms, 0.0f, 0.0f);
+    if (st.n > 0) {
+        st.seg[st.n - 1].aimOn = 1;
+        st.seg[st.n - 1].aim = aimDeg;
+    }
+}
+
+static void stuntWheel(int left, int p)
+{
+    if (p == PW_BRAKE) {
+        driveWheel(left, 1, 0, 1);
+    } else {
+        driveWheel(left, (p >= 0) ? 1 : -1, (uint16_t)clampf(fabsf((float)p), 0.0f, MOTOR_PWM_MAX), 0);
+    }
+}
+
+static float stuntServo(int servo)
+{
+    return (servo == SV_HOLD || servo == SV_CENTRE) ? SERVO_TRUE_CENTRE + servoTrim : (float)servo;
+}
+
+/* Motor task, every 10 ms while a stunt runs */
+static void stuntStep(int16_t cntL, int16_t cntR)
+{
+    float h = headingDeg;
+    float w = (h - st.hLast) * 100.0f;                 // yaw rate, deg/s
+    st.hLast = h;
+    st.wNow = 0.7f * st.wNow + 0.3f * w;               // smoothed for the OLED
+    if (fabsf(w) > st.wMax) st.wMax = fabsf(w);
+    if (fabsf(w) > STUNT_GYRO_SAT_DPS) st.sat = 1;    // gyro near its +-500 deg/s limit: heading no longer trusted
+    float ds = 0.5f * (float)(abs((int)cntL) + abs((int)cntR)) / TICKS_PER_CM;
+    st.dist += ds;
+    st.distAll += ds;
+
+    if (st.i < st.n && (abortReq || emergency_stop_requested)) {
+        st.aborted = 1;
+        st.i = st.n;                                   // straight to the stop
+        st.t0 = HAL_GetTick();
+    }
+    if (st.i >= st.n) {                                // end: wheels straight, brake, done
+        writeServo(SERVO_TRUE_CENTRE + servoTrim);
+        if (HAL_GetTick() - st.t0 < STUNT_STOP_MS) {
+            setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
+        } else {
+            setMotorPwm(0, 0, 0, 0);
+            st.yawEnd = h - st.hStart;
+            st.wNow = 0.0f;
+            st.tEnd = HAL_GetTick();
+            st.active = 0;
+        }
+        return;
+    }
+
+    StuntSeg_t *s = &st.seg[st.i];
+    uint32_t el = HAL_GetTick() - st.t0;
+    if (s->aimOn) {                                    // aim: turn on the spot to an exact heading
+        float err = (st.hStart + s->aim) - h;          // + = still has to turn left
+        if (fabsf(err) < STUNT_AIM_TOL_DEG || el >= s->ms) {
+            st.i++;
+            st.t0 = HAL_GetTick();
+            st.h0 = h;
+            st.dist = 0.0f;
+            return;
+        }
+        int left = (err > 0.0f);
+        int p = (fabsf(err) > 20.0f) ? STUNT_AIM_PWM : STUNT_AIM_PWM_FINE;
+        st.closedPrev = 0;
+        writeServo(left ? SERVO_LEFT_LOCK : SERVO_RIGHT_LOCK);
+        stuntWheel(1, left ? -p : p);                  // turning left: left wheel back, right wheel forward
+        stuntWheel(0, left ? p : -p);
+        return;
+    }
+    if (el >= s->ms || (s->deg > 0.0f && fabsf(h - st.h0) >= s->deg) || (s->cm > 0.0f && st.dist >= s->cm)) {
+        st.i++;                                        // next segment (applied from the next loop)
+        st.t0 = HAL_GetTick();
+        st.h0 = h;
+        st.dist = 0.0f;
+        return;
+    }
+
+    if (s->v != 0.0f) {                                // closed loop: both wheels at speed, heading held
+        int8_t dir = (s->v > 0.0f) ? 1 : -1;
+        if (!st.closedPrev || dir != st.vdir) {        // (re)entering: start from the speed the wheels have now
+            st.v = 0.5f * (float)(abs((int)cntL) + abs((int)cntR)) * 100.0f / TICKS_PER_CM;
+            st.vdir = dir;
+            st.wl.integ = st.wr.integ = 0.0f;
+        }
+        st.closedPrev = 1;
+        float vt = fabsf(s->v);
+        st.v = (st.v < vt) ? fminf(st.v + STUNT_ACCEL * 0.01f, vt) : fmaxf(st.v - STUNT_ACCEL * 0.01f, vt);
+        if (s->servo == SV_HOLD) {
+            float err = h - st.h0;                     // + = turned left; steering works backwards in reverse
+            writeServo(SERVO_TRUE_CENTRE + servoTrim + clampf(HEADING_KP_US * err, -HEADING_MAX_US, HEADING_MAX_US) * (float)dir);
+        } else {
+            writeServo(stuntServo(s->servo));
+        }
+        ffAccel = 0.0f;
+        uint16_t pL = wheelControl(&st.wl, st.v, cntL, (dir > 0) ? GAIN_L_FWD : GAIN_L_REV, 0);
+        uint16_t pR = wheelControl(&st.wr, st.v, cntR, (dir > 0) ? GAIN_R_FWD : GAIN_R_REV, 0);
+        driveWheel(1, dir, pL, 0);
+        driveWheel(0, dir, pR, 0);
+    } else {                                           // open loop: steering and raw wheel power
+        st.closedPrev = 0;
+        writeServo(stuntServo(s->servo));
+        stuntWheel(1, s->pl);
+        stuntWheel(0, s->pr);
+    }
+}
+
+/* X<k><n>: build a stunt program, run it, block until the robot has stopped.
+ * + n = to the left (counter-clockwise), - n = to the right. n = 0: defaults.
+ * Reply: "XS <k> t=<ms> yaw=<deg> d=<cm rolled> wmax=<deg/s>" [+ SAT] [+ ABORT]. */
+void Motion_Stunt(char kind, int value, char *reply, unsigned len)
+{
+    if (Motion_IsBusy()) {
+        snprintf(reply, len, "XS BUSY");
+        return;
+    }
+    flyNext = 0;
+    exitV = 0.0f;
+    st.n = st.i = 0;
+    st.aborted = st.sat = st.closedPrev = 0;
+    st.vdir = 0;
+    st.v = st.wMax = st.dist = st.distAll = st.wNow = st.yawEnd = 0.0f;
+    st.tEnd = 0;
+    st.kind = kind;
+    st.wl.integ = st.wr.integ = st.wl.filt = st.wr.filt = 0.0f;
+    st.wl.still = st.wr.still = 0;
+
+    int side    = (value < 0) ? -1 : 1;                // + = left (CCW)
+    int mag     = abs(value);
+    int lock    = (side > 0) ? SERVO_LEFT_LOCK : SERVO_RIGHT_LOCK;
+    int counter = (side > 0) ? SERVO_RIGHT_LOCK : SERVO_LEFT_LOCK;
+    float v     = clampf((mag > 0) ? (float)mag : STUNT_V, 30.0f, STUNT_V_MAX);
+    // Turning to this side, the rear wheel on the outside of the turn: left turn -> right wheel
+#define OUTER_INNER(o, i, pl, pr) do { if (side > 0) { pl = (i); pr = (o); } else { pl = (o); pr = (i); } } while (0)
+    int pl, pr;
+
+    switch (kind) {
+    case 'H':                                          // handbrake drift: run up, yank to lock, lock the rear wheels
+    case 'F':                                          // Scandinavian flick: same, with a feint the other way first
+        stuntAdd(SV_HOLD, 0, 0, v, 4000, 0.0f, STUNT_RUNUP_CM);
+        if (kind == 'F') {
+            stuntAdd(counter, STUNT_FEINT_PWM, STUNT_FEINT_PWM, 0.0f, STUNT_FEINT_MS, 0.0f, 0.0f);
+        }
+        // Turn in under power first: braking straight away stopped the robot before the servo
+        // reached lock (XH80 turned 13 deg, XF90 -17). Power at lock lets the tail step out ...
+        OUTER_INNER(STUNT_TURNIN_OUT_PWM, STUNT_TURNIN_IN_PWM, pl, pr);
+        stuntAdd(lock, pl, pr, 0.0f, STUNT_TURNIN_MS, 0.0f, 0.0f);
+        // ... then the "handbrake": rear wheels braked, steering held at lock
+        stuntAdd(lock, PW_BRAKE, PW_BRAKE, 0.0f, STUNT_SLIDE_MS, STUNT_HB_DEG, 0.0f);
+        break;
+
+    case 'P':                                          // power slide: lock + outer wheel flat out, then catch it
+        stuntAdd(SV_HOLD, 0, 0, v, 4000, 0.0f, STUNT_RUNUP_CM);
+        OUTER_INNER((int)MOTOR_PWM_MAX, STUNT_PS_IN_PWM, pl, pr);
+        stuntAdd(lock, pl, pr, 0.0f, STUNT_PS_MS, STUNT_PS_DEG, 0.0f);
+        stuntAdd((SERVO_TRUE_CENTRE + counter) / 2, STUNT_PS_CATCH_PWM, STUNT_PS_CATCH_PWM, 0.0f, STUNT_PS_CATCH_MS, 0.0f, 0.0f);
+        break;
+
+    case 'R':                                          // reveal: power slide, then aim exactly 180 deg round (the camera
+        stuntAdd(SV_HOLD, 0, 0, (mag > 0) ? v : STUNT_R_V, 4000, 0.0f, STUNT_RUNUP_CM);   //   faces the team sign)
+        OUTER_INNER((int)MOTOR_PWM_MAX, STUNT_PS_IN_PWM, pl, pr);
+        stuntAdd(lock, pl, pr, 0.0f, STUNT_PS_MS, STUNT_R_SLIDE_DEG, 0.0f);
+        stuntAdd(SV_CENTRE, PW_BRAKE, PW_BRAKE, 0.0f, 350, 0.0f, 0.0f);                  // let the slide die
+#if STUNT_R_AIM
+        stuntAddAim(180.0f * (float)side, STUNT_AIM_MS);                                  // optional: spin on the spot to exactly 180
+#endif
+        break;
+
+    case 'T':                                          // tornado drift: at speed, rear wheels flat out opposite ways
+        stuntAdd(SV_HOLD, 0, 0, v, 4000, 0.0f, STUNT_RUNUP_CM);
+        OUTER_INNER((int)MOTOR_PWM_MAX, -(int)MOTOR_PWM_MAX, pl, pr);
+        stuntAdd(lock, pl, pr, 0.0f, STUNT_T_MS, STUNT_T_DEG, 0.0f);
+        stuntAdd(SV_CENTRE, (int)MOTOR_PWM_MAX, (int)MOTOR_PWM_MAX, 0.0f, STUNT_T_EXIT_MS, 0.0f, 0.0f);   // drive out of it
+        break;
+
+    case 'V': {                                        // pivot: front wheels straight (they grip sideways and stay put),
+        float deg = (mag > 0) ? fminf((float)mag, 1080.0f) : 180.0f;   // rear wheels flat out opposite ways:
+        OUTER_INNER((int)MOTOR_PWM_MAX, -(int)MOTOR_PWM_MAX, pl, pr);  //   the tail swings round the nose
+        stuntAdd(SV_CENTRE, pl, pr, 0.0f, (int)fminf(800.0f + 8.0f * deg, 9000.0f),
+                 fmaxf(deg - STUNT_PIVOT_LEAD_DEG, 5.0f), 0.0f);      // cut early: it carries on while braking
+        break;
+    }
+
+    case 'O': {                                        // drift donut: full lock, both rear wheels driving hard:
+        float deg = (mag > 0) ? fminf((float)mag, 1440.0f) : 720.0f;   // the (taped) tail slides out and the
+        stuntAdd(lock, STUNT_O_LAUNCH_PWM, STUNT_O_LAUNCH_PWM, 0.0f, STUNT_O_LAUNCH_MS, 0.0f, 0.0f);   // robot circles
+        OUTER_INNER((int)MOTOR_PWM_MAX, STUNT_O_IN_PWM, pl, pr);
+        stuntAdd(lock, pl, pr, 0.0f, (int)fminf(1000.0f + 10.0f * deg, 15000.0f), deg, 0.0f);
+        break;
+    }
+
+    case 'D': {                                        // donut: lock, rear wheels turning opposite ways
+        float deg = (mag > 0) ? fminf((float)mag, 1080.0f) : 360.0f;
+        OUTER_INNER(STUNT_DONUT_OUT_PWM, -STUNT_DONUT_IN_PWM, pl, pr);
+        stuntAdd(lock, pl, pr, 0.0f, (int)fminf(800.0f + 8.0f * deg, 9000.0f), deg, 0.0f);
+        break;
+    }
+
+    case 'J': {                                        // J-turn: reverse fast, whip the nose round, drive off forward
+        float vj = (mag > 0) ? clampf((float)mag, 30.0f, STUNT_J_V_MAX) : STUNT_J_V;
+        int jlock = (side > 0) ? SERVO_RIGHT_LOCK : SERVO_LEFT_LOCK;   // reversing: right lock swings the nose left (CCW)
+        stuntAdd(SV_HOLD, 0, 0, -vj, 4000, 0.0f, STUNT_J_RUNUP_CM);
+        stuntAdd(jlock, 0, 0, 0.0f, STUNT_J_SPIN_MS, STUNT_J_DEG, 0.0f);   // wheels coast, steering at lock
+        stuntAdd(SV_CENTRE, PW_BRAKE, PW_BRAKE, 0.0f, 80, 0.0f, 0.0f);
+        stuntAdd(SV_CENTRE, (int)MOTOR_PWM_MAX, (int)MOTOR_PWM_MAX, 0.0f, 300, 0.0f, 25.0f);   // punch out
+        stuntAdd(SV_HOLD, 0, 0, STUNT_J_EXIT_V, 2000, 0.0f, STUNT_J_EXIT_CM);
+        break;
+    }
+
+    case 'W': {                                        // shimmy: rock back and forth, wheels waving lock to lock
+        int n = (mag > 0) ? ((mag > 12) ? 12 : mag) : 6;
+        for (int k = 0; k < n; k++) {
+            int p = (k & 1) ? -STUNT_W_PWM : STUNT_W_PWM;
+            stuntAdd(((k & 1) ^ (side < 0)) ? SERVO_RIGHT_LOCK : SERVO_LEFT_LOCK, p, p, 0.0f, STUNT_W_MS, 0.0f, 0.0f);
+        }
+        break;
+    }
+
+    default:
+        snprintf(reply, len, "XS ERR use XH XF XP XR XT XV XO XD XJ XW");
+        return;
+    }
+#undef OUTER_INNER
+
+    if (!headingSet) {
+        Motion_ZeroHeading();
+    }
+    emergency_stop_requested = 0;
+    abortReq = 0;
+    preSteerUs = 0;
+#if STUNT_COUNTDOWN_MS > 0
+    // 3-2-1-GO on the OLED (and a sync point for the video). '!' or the button cancels.
+    st.cdUntil = HAL_GetTick() + STUNT_COUNTDOWN_MS;
+    while ((int32_t)(st.cdUntil - HAL_GetTick()) > 0) {
+        if (emergency_stop_requested || HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+            st.cdUntil = 0;
+            emergency_stop_requested = 0;
+            snprintf(reply, len, "XS %c ABORT (countdown)", kind);
+            return;
+        }
+        osDelay(10);
+    }
+    st.cdUntil = 0;
+#endif
+    st.tStart = st.t0 = HAL_GetTick();
+    st.h0 = st.hStart = st.hLast = headingDeg;
+    st.active = 1;                                     // motor task takes over
+    while (st.active) {
+        if (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0) == GPIO_PIN_RESET) {
+            abortReq = 1;                              // user button: stop now
+        }
+        osDelay(10);
+    }
+    abortReq = 0;
+    snprintf(reply, len, "XS %c t=%lu yaw=%+.0f d=%.0f wmax=%.0f%s%s", kind,
+             (unsigned long)(st.tEnd - st.tStart), headingDeg - st.hStart, st.distAll, st.wMax,
+             st.sat ? " SAT" : "", st.aborted ? " ABORT" : "");
+}
+
+/* For the OLED task: what to show (countdown / live / result card / nothing). */
+void Motion_StuntStatus(StuntStatus_t *o)
+{
+    uint32_t now = HAL_GetTick();
+    uint32_t cd = st.cdUntil;
+    o->kind = st.kind;
+    o->seg = st.i;
+    o->nSeg = st.n;
+    o->sat = st.sat;
+    o->aborted = st.aborted;
+    o->countdownMs = 0;
+    o->rateDps = (int32_t)st.wNow;
+    o->rateMax = (int32_t)st.wMax;
+    o->distCm = (int32_t)st.distAll;
+    o->sinceEnd = 0;
+    if (cd != 0 && (int32_t)(cd - now) > 0) {
+        o->state = 1;
+        o->countdownMs = (int32_t)(cd - now);
+        o->yawDeg = 0;
+        o->ms = 0;
+        o->relHeading = 0.0f;
+    } else if (st.active) {
+        o->state = 2;
+        o->relHeading = headingDeg - st.hStart;
+        o->yawDeg = (int32_t)lroundf(o->relHeading);
+        o->ms = now - st.tStart;
+    } else if (st.tEnd != 0 && now - st.tEnd < STUNT_CARD_MS) {
+        o->state = 3;
+        o->relHeading = st.yawEnd;
+        o->yawDeg = (int32_t)lroundf(st.yawEnd);
+        o->ms = st.tEnd - st.tStart;
+        o->sinceEnd = now - st.tEnd;
+    } else {
+        o->state = 0;
+        o->yawDeg = 0;
+        o->ms = 0;
+        o->relHeading = 0.0f;
+    }
+}
+#endif
+
 /* ==========================================================================
  *  Motor task entry point
  * ========================================================================== */
@@ -1383,7 +1747,7 @@ void Motion_Step(int16_t cntL, int16_t cntR)
     // The robot can't rotate if neither wheel has turned for 0.5 s.
     // The gyro task uses this to keep its zero-rate offset up to date.
     static uint16_t stillCount = 0;
-    if (cntL == 0 && cntR == 0 && !mv.active && !tn.active) {
+    if (cntL == 0 && cntR == 0 && !mv.active && !tn.active && !STUNT_ACTIVE) {   // a stunt can spin on locked wheels
         if (stillCount < 1000) stillCount++;
     } else {
         stillCount = 0;
@@ -1391,6 +1755,13 @@ void Motion_Step(int16_t cntL, int16_t cntR)
     robotStill = (stillCount >= 50);
 
     poseStep(cntL, cntR);                            // tracked x, y, every 10 ms, moving or not
+
+#if STUNTS
+    if (st.active) {
+        stuntStep(cntL, cntR);
+        return;
+    }
+#endif
 
     if (tn.active) {
         turnStep(cntL, cntR);

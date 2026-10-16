@@ -47,5 +47,30 @@ void OLED_ShowString(u8 x,u8 y,const u8 *p);
 void OLED_ShowString16(u8 x,u8 y,const u8 *p);
 void OLED_Refresh_Line(void);
 
+// Drawing into OLED_GRAM only (call OLED_Refresh_Gram once per frame). Off-screen parts are clipped.
+void OLED_ClearGram(void);
+void OLED_Pixel(int x, int y, u8 t);
+void OLED_FillRect(int x0, int y0, int x1, int y1, u8 t);
+void OLED_Line(int x0, int y0, int x1, int y1, u8 t);
+void OLED_Circle(int cx, int cy, int r, u8 t);
+int  OLED_Text(int x, int y, const char *s, u8 size);        // size 12 (6x12) or 16 (8x16); returns the x after it
+void OLED_TextBig(int x, int y, const char *s, u8 scale);    // 8x16 font, each pixel scale x scale
+void OLED_Invert(u8 on);                                      // whole panel inverted (hardware, instant)
+
+// Robot eyes (OLED_EYES): idle screen that looks at what the sensors see
+typedef struct {
+	float irL, irR;      // side IRs, cm from the lens (>= 900 = nothing there)
+	float us;            // ultrasonic, cm ahead (<= 0 = no echo)
+	float yawRate;       // deg/s, + = turning left
+	u8    awake;         // something just happened (a command): no dozing off
+	u8    happy;         // just finished a stunt
+	u8    dizzy;         // ... a big spin
+} EyesInput_t;
+void OLED_Eyes(const EyesInput_t *in, uint32_t nowMs);   // one frame into OLED_GRAM
+
+// Stunt screens (STUNTS): OLED_StuntScreen() is declared in motion.h (it takes a StuntStatus_t);
+// ScreenOff undoes the result card's flash
+void OLED_StuntScreenOff(void);
+
 #endif  
 	 

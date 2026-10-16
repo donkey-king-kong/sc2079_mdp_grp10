@@ -356,7 +356,7 @@
  *      Banzai 3 (14 Oct evening): no standing checks or retries, every move that
  *      keeps its direction flies into the next, steep accel / decel.
  * ========================================================================== */
-#define TASK2_BANZAI_MODE 1
+#define TASK2_BANZAI_MODE 0
 #if TASK2_BANZAI_MODE
 #define BZ_FAST 1         // faster turns, straights, SE legs and stops (values below)
 #define BZ_FLY 1          // no stop between: dodge -> scan 2 approach, pass -> loop turn, loop turn 2 -> return
@@ -502,6 +502,80 @@
                                   //   A board beside obstacle 2 may stand 50 cm past its end (65 cm out for L 30),
                                   //   unseen from scan 2. Simulator: >= 6.7 cm from it, >= 6.8 cm from an obstacle end
                                   //   at 23 cm (the widest one that gives no echo). +1 cm here = 1 cm from one to the other
+#endif
+
+/* ==========================================================================
+ *  12. STUNTS (team video only; Task 1 / Task 2 never use them). 0 = left out.
+ *      X<k><n> from the Pi, + n = left (counter-clockwise), - n = right, n = 0 defaults:
+ *        XH<v>   handbrake drift: run up to v cm/s, full lock + rear wheels braked, the tail slides out
+ *        XF<v>   Scandinavian flick: as XH, with a short steer the other way first
+ *        XP<v>   power slide: run up, full lock with the outer rear wheel flat out, then counter-steer
+ *        XD<deg> donut on the spot, rear wheels turning opposite ways (default 360, max 1080)
+ *        XT<v>   tornado drift: run up to v, full lock, rear wheels flat out opposite ways, drive out
+ *        XR<v>   reveal: power slide, then aim exactly 180 deg from the start (camera faces the team sign)
+ *        XV<deg> pivot: front wheels straight and planted, the tail swings round them (default 180)
+ *        XO<deg> drift donut: full lock, both rear wheels driving hard, circles with the tail out (default 720)
+ *        XJ<v>   J-turn: reverse at v, swing the nose round ~180, drive off forward
+ *        XW<n>   shimmy: n rocks back and forth with the wheels waving lock to lock (default 6)
+ *      Needs ~2.5 x 2.5 m of clear floor. '!' or the button stops it (brake, wheels straight).
+ *      Reply "A XS <k> t=<ms> yaw=<deg> d=<cm> wmax=<deg/s>"; SAT = the gyro hit its 500 deg/s
+ *      limit (yaw no longer right). Tape on the rear tyres makes everything slide more.
+ * ========================================================================== */
+#define OLED_EYES 1                // idle OLED: robot eyes that look at what the sensors see (0 = the numbers)
+#define OLED_DASH_HOLD_MS 8000     // ... the numbers come back this long after every command
+
+#define STUNTS 1
+#if STUNTS
+#define STUNT_V 90.0f              // run-up speed for XH / XF / XP when n = 0 (cm/s)
+#define STUNT_V_MAX 110.0f         // ... never more (top speed ~112)
+#define STUNT_ACCEL 250.0f         // run-up speed-up (cm/s^2)
+#define STUNT_RUNUP_CM 90.0f       // run-up length (cm)
+#define STUNT_SLIDE_MS 900         // XH / XF: longest slide with the rear wheels braked (ms) ...
+#define STUNT_HB_DEG 120.0f        // ... or until the robot has turned this much (deg). 160-170 = a "bootleg" 180
+#define STUNT_TURNIN_MS 200        // XH / XF: turn in at full lock under power this long before braking ...
+#define STUNT_TURNIN_OUT_PWM 7199  // ... outer rear wheel ...
+#define STUNT_TURNIN_IN_PWM 4000   // ... inner rear wheel (braking at once stopped it before the servo reached lock)
+#define STUNT_FEINT_MS 160         // XF: the feint the other way (ms) ...
+#define STUNT_FEINT_PWM 6000       // ... with both rear wheels at this power
+#define STUNT_PS_IN_PWM -4000      // XP: inner rear wheel power, - = backwards (outer = MOTOR_PWM_MAX) ...
+#define STUNT_PS_MS 1500           // ... for at most this long ...
+#define STUNT_PS_DEG 150.0f        // ... or this much turn (deg)
+#define STUNT_PS_CATCH_MS 350      // XP: counter-steer (half lock the other way) to catch the slide ...
+#define STUNT_PS_CATCH_PWM 4500    // ... with both wheels at this power
+#define STUNT_R_V 80.0f            // XR reveal: run-up speed (the 80 cm/s power slide turned 182 deg) ...
+#define STUNT_R_SLIDE_DEG 157.0f   // ... power slide this far, then brake: the slide carries on ~23 deg (170 -> 192, 194)
+#define STUNT_R_AIM 0              // ... 1 = then spin on the spot to exactly 180 (the team found the wheel spin ugly)
+#define STUNT_AIM_TOL_DEG 4.0f     // aim: done within this of the target heading ...
+#define STUNT_AIM_PWM 5200         // ... rear wheels opposite ways at this power while > 20 deg off ...
+#define STUNT_AIM_PWM_FINE 4300    // ... then gently (a wheel needs ~3300 to start)
+#define STUNT_AIM_MS 3000          // ... give up after this long
+#define STUNT_PIVOT_LEAD_DEG 12.0f // XV pivot: cut the power this much before the target (it carries on while braking)
+#define STUNT_O_LAUNCH_MS 250      // XO drift donut: pull away at full lock this long ...
+#define STUNT_O_LAUNCH_PWM 6000    // ... at this power (both rear wheels) ...
+#define STUNT_O_IN_PWM 5000        // ... then outer rear wheel flat out, inner at this: the tail slides out, it circles
+#define STUNT_DONUT_OUT_PWM 7199   // XD: outer rear wheel forward ...
+#define STUNT_DONUT_IN_PWM 7199    // ... inner rear wheel backwards (was 2800: under the ~3300 a wheel needs to start)
+#define STUNT_T_DEG 200.0f         // XT: spin this far (deg) ...
+#define STUNT_T_MS 1500            // ... or for at most this long, outer wheel flat out forward, inner flat out back
+#define STUNT_T_EXIT_MS 400        // XT: then wheels straight, both flat out forward: drive out of it
+#define STUNT_GYRO_2000 1          // gyro range 2000 deg/s in the stunt build (spins pass 500); 0 = 500 as Task 2
+#define STUNT_J_V 70.0f            // XJ: reverse run-up speed when n = 0 (cm/s) ...
+#define STUNT_J_V_MAX 95.0f        // ... never more
+#define STUNT_J_RUNUP_CM 80.0f     // ... over this far
+#define STUNT_J_SPIN_MS 1200       // XJ: coast at lock for at most this long ...
+#define STUNT_J_DEG 150.0f         // ... or until the nose has swung this far (the rest comes while braking)
+#define STUNT_J_EXIT_V 70.0f       // XJ: drive off forward at this speed ...
+#define STUNT_J_EXIT_CM 60.0f      // ... this far
+#define STUNT_W_PWM 5500           // XW: rocking power (3600 moved it 4 cm in 6 rocks: barely over the start-up PWM)
+#define STUNT_W_MS 220             // XW: each rock (ms)
+#define STUNT_STOP_MS 300          // brake this long at the end of every stunt
+#define STUNT_COUNTDOWN_MS 1500    // OLED 3-2-1-GO before every stunt (a sync point for the video); 0 = none
+#define STUNT_CARD_MS 4000         // OLED result card this long after a stunt
+#if STUNT_GYRO_2000
+#define STUNT_GYRO_SAT_DPS 1900.0f // yaw rate taken as gyro saturation (range +-2000 deg/s)
+#else
+#define STUNT_GYRO_SAT_DPS 480.0f  // yaw rate taken as gyro saturation (range +-500 deg/s)
+#endif
 #endif
 
 #endif /* ROBOT_CONFIG_H */

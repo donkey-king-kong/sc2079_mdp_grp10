@@ -20,10 +20,19 @@ extern I2C_HandleTypeDef hi2c2; // from main.c
 HAL_StatusTypeDef ret; // to store return status
 uint8_t dat;
 
+#include "robot_config.h"
+#if STUNTS && STUNT_GYRO_2000
+gyro_range GYRO_RANGE_VALUE = _gyro_2000dps;	// Stunt build: full-power spins pass 500 deg/s
+#else
 gyro_range GYRO_RANGE_VALUE = _gyro_500dps;		// Gyro range
+#endif
 accel_range ACCEL_RANGE_VALUE = _accel_4g;		// Acc range
 
+#if STUNTS && STUNT_GYRO_2000
+float GYRO_SCALE = 64.95f / 4.0f;				// same calibration as 64.95 at 500 deg/s, 4x the range
+#else
 float GYRO_SCALE = 64.95;
+#endif
 float ACCEL_SCALE = 8192.0;
 
 void ICM_SelBank(uint8_t bank);

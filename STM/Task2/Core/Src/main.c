@@ -133,6 +133,7 @@ volatile float dash_gyroRate = 0.0f;            // Yaw rate in deg/s (CCW positi
 /* --- OLED display dashboard --- */
 char oled_status_msg[32] = "Booting...";        // When not empty, shown instead of the dashboard
 char dash_lastCmd[15] = "None";                 // "CMD:" line: last command, or test-mode info
+volatile uint32_t dash_lastCmdTick = 0;          // when the last command finished (OLED_EYES: numbers come back)
 volatile float dash_ultraDist = 0.0f;           // Ultrasonic distance (cm), last echo (check age with Ultra_Get)
 int dash_encoderL = 0;                          // Left encoder total
 int dash_encoderR = 0;                          // Right encoder total
@@ -1333,6 +1334,8 @@ void StartCommunicateTask(void *argument)
    *   ZH                       this direction is "north" (send once before the first move)
    *   D                        task done (shown on the OLED)
    *   TD / TV<us>              field tools (FIELD_TOOLS = 1 only)
+   *   XH XF XP XD XJ XW<n>     team-video stunts (STUNTS = 1 only; robot_config.h section 12)
+   *                            -> "A XS <k> t=<ms> yaw=<deg> d=<cm> wmax=<deg/s>"
    * Anything else              -> "A ERR <command>"
    * Moves stopped by '!' or the button end in " ABORT", timeouts in " TO". */
   char cmdBuffer[15];                             // command being received, e.g. "SF050"
@@ -1525,6 +1528,12 @@ void StartCommunicateTask(void *argument)
 				strcpy(oled_status_msg, "TASK A.5 DONE!");
 				break;
 
+#if STUNTS
+			case 'X':                                   // X<k><n>: team-video stunts (robot_config.h section 12)
+				Motion_Stunt(c2, value, replyText, sizeof(replyText));
+				break;
+#endif
+
 #if FIELD_TOOLS
 			case 'T':                                   // TD / TV
 				if (!FieldTools_Command(c2, value, replyText, sizeof(replyText))) {
@@ -1558,6 +1567,7 @@ void StartCommunicateTask(void *argument)
 
 	// 4. DASHBOARD
 	strcpy(dash_lastCmd, cmdBuffer);
+	dash_lastCmdTick = HAL_GetTick();
   }
   /* USER CODE END StartCommunicateTask */
 }
@@ -1640,7 +1650,55 @@ void StartOledTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	OLED_Clear();
+#if STUNTS
+	static uint32_t cardSeen = 0;                    // last tick the stunt result card was up
+	static int32_t  cardYaw = 0;                     // ... and that stunt's spin
+	{   // A stunt is on (countdown, running, result card): its own screen at 25 frames/s
+		static uint32_t stuntFrame = 0;
+		StuntStatus_t ss;
+		Motion_StuntStatus(&ss);
+		if (ss.state != 0) {
+			if (ss.state == 3) { cardSeen = HAL_GetTick(); cardYaw = ss.yawDeg; }
+			OLED_StuntScreen(&ss, stuntFrame++);
+			OLED_Refresh_Gram();
+			osDelay(40);
+			continue;
+		}
+		OLED_StuntScreenOff();
+	}
+#endif
+#if OLED_EYES
+	{   // Idle: robot eyes (the numbers come back for OLED_DASH_HOLD_MS after each command)
+		static float hPrev = 0.0f;
+		static uint32_t tPrev = 0;
+		uint32_t now = HAL_GetTick();
+		float h = headingDeg;
+		float rate = (tPrev != 0 && now != tPrev) ? (h - hPrev) * 1000.0f / (float)(now - tPrev) : 0.0f;
+		hPrev = h; tPrev = now;
+		if (oled_status_msg[0] == '\0' && !Motion_IsBusy() && now - dash_lastCmdTick > OLED_DASH_HOLD_MS) {
+			EyesInput_t ei;
+			Ultra_Get(&u);
+			ei.us = u;
+			ei.irL = irCm[IR_LEFT];
+			ei.irR = irCm[IR_RIGHT];
+			ei.yawRate = rate;
+			ei.awake = (now - dash_lastCmdTick < OLED_DASH_HOLD_MS + 3000u);
+#if STUNTS
+			int recent = (cardSeen != 0 && now - cardSeen < 3000u);
+			ei.dizzy = recent && (cardYaw >= 300 || cardYaw <= -300);
+			ei.happy = recent && !ei.dizzy;
+#else
+			ei.happy = ei.dizzy = 0;
+#endif
+			OLED_ClearGram();
+			OLED_Eyes(&ei, now);
+			OLED_Refresh_Gram();
+			osDelay(40);                             // 25 frames/s
+			continue;
+		}
+	}
+#endif
+	OLED_ClearGram();   // buffer only: OLED_Clear() also sent a blank frame to the panel every 100 ms (blinking)
 
 	// If an overarching system status exists (like boot up or test mode), show it exclusively
 	if (strlen(oled_status_msg) > 0) {
