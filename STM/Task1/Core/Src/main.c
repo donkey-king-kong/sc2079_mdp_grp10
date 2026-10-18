@@ -217,23 +217,23 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  // 1. Initialize OLED and Show Boot Message
+  // 1. Initialise OLED and Show Boot Message
   OLED_Init();
   bootMessage("Booting...");
 
-  // 2. Initialize IMU (Gyroscope)
+  // 2. Initialise IMU (Gyroscope)
   if (ICM20948_Init() == HAL_OK) {
-	  bootMessage("IMU Found");
-	  HAL_Delay(300);         // long enough to read; the RTOS isn't running yet
+      bootMessage("IMU Found");
+      HAL_Delay(300);         // long enough to read; the RTOS isn't running yet
   } else {
-	  bootMessage("IMU ERROR!");
-	  while(1); // Halt execution if IMU fails (the message stays on screen)
+      bootMessage("IMU ERROR!");
+      while(1); // Halt execution if IMU fails (the message stays on screen)
   }
 
   // 3. Start UART Interrupt Listener
   HAL_UART_Receive_IT(&huart3, &rxByte, 1);
 #if FIELD_TOOLS
-  FieldTools_Init();        // PB1 knob as analog input
+  FieldTools_Init();        // PB1 knob as analogue input
 #endif
 
   // 4. Start Ultrasonic Timers
@@ -903,19 +903,19 @@ static void MX_GPIO_Init(void)
  */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	if (huart -> Instance == USART3) {
-		// Intercept emergency stop ('!') immediately so it bypasses queues
-		if (rxByte == '!') {
-			emergency_stop_requested = 1;
-		} else {
-			// Every other character goes to the command task. '!' is not queued:
-			// it would otherwise end up at the front of the next command.
-			osMessageQueuePut(uartQueueHandle, &rxByte, 0U, 0U);
-		}
+    if (huart -> Instance == USART3) {
+        // Intercept emergency stop ('!') immediately so it bypasses queues
+        if (rxByte == '!') {
+            emergency_stop_requested = 1;
+        } else {
+            // Every other character goes to the command task. '!' is not queued:
+            // it would otherwise end up at the front of the next command.
+            osMessageQueuePut(uartQueueHandle, &rxByte, 0U, 0U);
+        }
 
-		// Re-arm the interrupt to listen for the next byte
-		HAL_UART_Receive_IT(&huart3, &rxByte, 1);
-	}
+        // Re-arm the interrupt to listen for the next byte
+        HAL_UART_Receive_IT(&huart3, &rxByte, 1);
+    }
 }
 
 /**
@@ -924,8 +924,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
  */
 void delay_us(uint16_t us)
 {
-	__HAL_TIM_SET_COUNTER(&htim6, 0);
-	while(__HAL_TIM_GET_COUNTER(&htim6) < us);
+    __HAL_TIM_SET_COUNTER(&htim6, 0);
+    while(__HAL_TIM_GET_COUNTER(&htim6) < us);
 }
 
 /**
@@ -934,33 +934,33 @@ void delay_us(uint16_t us)
  */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM5 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
-		if (first_captured == 0) {
-			// Rising edge detected: start timer capture
-			tc1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
-			first_captured = 1;
-			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_FALLING);
-		} else if (first_captured == 1) {
-			// Falling edge detected: stop timer and calculate delta
-			tc2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
-			__HAL_TIM_SET_COUNTER(htim, 0);
+    if (htim->Instance == TIM5 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
+        if (first_captured == 0) {
+            // Rising edge detected: start timer capture
+            tc1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
+            first_captured = 1;
+            __HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_FALLING);
+        } else if (first_captured == 1) {
+            // Falling edge detected: read the end time, reset the counter, calculate delta
+            tc2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
+            __HAL_TIM_SET_COUNTER(htim, 0);
 
-			// Handle timer overflow
-			if (tc2 > tc1) {
-				echo = tc2 - tc1;
-			} else {
-				echo = (65535 - tc1) + tc2;
-			}
+            // Handle timer overflow
+            if (tc2 > tc1) {
+                echo = tc2 - tc1;
+            } else {
+                echo = (65535 - tc1) + tc2;
+            }
 
-			// Convert raw timer ticks to centimeters
-			dash_ultraDist = (float)echo * ULTRA_CM_PER_US + ULTRA_OFFSET_CM;   // calibrated: see robot_config.h
+            // Convert raw timer ticks to centimetres
+            dash_ultraDist = (float)echo * ULTRA_CM_PER_US + ULTRA_OFFSET_CM;   // calibrated: see robot_config.h
 
-			// Reset state machine for the next reading
-			first_captured = 0;
-			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
-			__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3);
-		}
-	}
+            // Reset state machine for the next reading
+            first_captured = 0;
+            __HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+            __HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3);
+        }
+    }
 }
 
 /* Re-arms UART3 reception after a line error (noise, a cable being
@@ -1082,120 +1082,120 @@ void StartCommunicateTask(void *argument)
 
   for(;;)
   {
-	// Block until a character arrives from the UART interrupt
-	if (osMessageQueueGet(uartQueueHandle, &receivedChar, NULL, osWaitForever) != osOK) {
-		continue;
-	}
+    // Block until a character arrives from the UART interrupt
+    if (osMessageQueueGet(uartQueueHandle, &receivedChar, NULL, osWaitForever) != osOK) {
+        continue;
+    }
 
-	// Collect characters until the end of the line
-	if (receivedChar != '\n' && receivedChar != '\r') {
-		if (cmdIndex < 14) {
-			cmdBuffer[cmdIndex] = receivedChar;
-			cmdIndex++;
-		}
-		continue;
-	}
-	if (cmdIndex == 0) {
-		continue;                                   // empty line (e.g. the \n after a \r)
-	}
-	cmdBuffer[cmdIndex] = '\0';
-	cmdIndex = 0;
+    // Collect characters until the end of the line
+    if (receivedChar != '\n' && receivedChar != '\r') {
+        if (cmdIndex < 14) {
+            cmdBuffer[cmdIndex] = receivedChar;
+            cmdIndex++;
+        }
+        continue;
+    }
+    if (cmdIndex == 0) {
+        continue;                                   // empty line (e.g. the \n after a \r)
+    }
+    cmdBuffer[cmdIndex] = '\0';
+    cmdIndex = 0;
 
-	// 1. PARSE: one or two letters then a number ("SF050", "LB090", "ZH", "S50")
-	char c1 = ' ';
-	char c2 = ' ';
-	int value = 0;
-	int parsed;
-	if ((cmdBuffer[1] >= 'A' && cmdBuffer[1] <= 'Z') ||
-		(cmdBuffer[1] >= 'a' && cmdBuffer[1] <= 'z')) {
-		parsed = sscanf(cmdBuffer, "%c%c%d", &c1, &c2, &value);
-	} else {
-		parsed = sscanf(cmdBuffer, "%c%d", &c1, &value);
-	}
+    // 1. PARSE: one or two letters then a number ("SF050", "LB090", "ZH", "S50")
+    char c1 = ' ';
+    char c2 = ' ';
+    int value = 0;
+    int parsed;
+    if ((cmdBuffer[1] >= 'A' && cmdBuffer[1] <= 'Z') ||
+        (cmdBuffer[1] >= 'a' && cmdBuffer[1] <= 'z')) {
+        parsed = sscanf(cmdBuffer, "%c%c%d", &c1, &c2, &value);
+    } else {
+        parsed = sscanf(cmdBuffer, "%c%d", &c1, &value);
+    }
 
-	// 2. EXECUTE and prepare the reply text (without the leading "A")
-	char replyText[64] = "";
-	int isMove  = 0;                                 // reply with the move's result
-	int unknown = 0;                                 // reply "A ERR <command>"
+    // 2. EXECUTE and prepare the reply text (without the leading "A")
+    char replyText[64] = "";
+    int isMove  = 0;                                 // reply with the move's result
+    int unknown = 0;                                 // reply "A ERR <command>"
 
-	if (parsed <= 0) {
-		unknown = 1;
-	} else {
-		switch (c1) {
-			case 'S':                                   // straight: SF / SB / S
-				if (c2 == 'B') {
-					Motion_Straight(-(float)value);
-					isMove = 1;
-				} else if (c2 == 'L' || c2 == 'R') {
-					unknown = 1;                        // old slide commands: removed
-				} else {
-					Motion_Straight((float)value);
-					isMove = 1;
-				}
-				break;
+    if (parsed <= 0) {
+        unknown = 1;
+    } else {
+        switch (c1) {
+            case 'S':                                   // straight: SF / SB / S
+                if (c2 == 'B') {
+                    Motion_Straight(-(float)value);
+                    isMove = 1;
+                } else if (c2 == 'L' || c2 == 'R') {
+                    unknown = 1;                        // SL / SR (slide moves): not supported
+                } else {
+                    Motion_Straight((float)value);
+                    isMove = 1;
+                }
+                break;
 
-			case 'F':                                   // forward (alias)
-				Motion_Straight((float)value);
-				isMove = 1;
-				break;
+            case 'F':                                   // forward (alias)
+                Motion_Straight((float)value);
+                isMove = 1;
+                break;
 
-			case 'B':                                   // backward (alias)
-				Motion_Straight(-(float)value);
-				isMove = 1;
-				break;
+            case 'B':                                   // backward (alias)
+                Motion_Straight(-(float)value);
+                isMove = 1;
+                break;
 
-			case 'L':                                   // left turn: LF / LB / L
-				Motion_Turn(1, (c2 == 'B') ? -1 : 1, (float)value);
-				isMove = 1;
-				break;
+            case 'L':                                   // left turn: LF / LB / L
+                Motion_Turn(1, (c2 == 'B') ? -1 : 1, (float)value);
+                isMove = 1;
+                break;
 
-			case 'R':                                   // right turn: RF / RB / R
-				Motion_Turn(0, (c2 == 'B') ? -1 : 1, (float)value);
-				isMove = 1;
-				break;
+            case 'R':                                   // right turn: RF / RB / R
+                Motion_Turn(0, (c2 == 'B') ? -1 : 1, (float)value);
+                isMove = 1;
+                break;
 
-			case 'Z':                                   // ZH: zero heading
-				if (c2 == 'H') {
-					Motion_ZeroHeading();
-					strcpy(replyText, "ZH");
-				} else {
-					unknown = 1;
-				}
-				break;
+            case 'Z':                                   // ZH: zero heading
+                if (c2 == 'H') {
+                    Motion_ZeroHeading();
+                    strcpy(replyText, "ZH");
+                } else {
+                    unknown = 1;
+                }
+                break;
 
-			case 'D':                                   // task done
-				strcpy(oled_status_msg, "TASK A.5 DONE!");
-				break;
+            case 'D':                                   // task done
+                strcpy(oled_status_msg, "TASK A.5 DONE!");
+                break;
 
 #if FIELD_TOOLS
-			case 'T':                                   // TD / TV
-				if (!FieldTools_Command(c2, value, replyText, sizeof(replyText))) {
-					unknown = 1;
-				}
-				break;
+            case 'T':                                   // TD / TV
+                if (!FieldTools_Command(c2, value, replyText, sizeof(replyText))) {
+                    unknown = 1;
+                }
+                break;
 #endif
 
-			default:
-				unknown = 1;
-				break;
-		}
-	}
+            default:
+                unknown = 1;
+                break;
+        }
+    }
 
-	// 3. REPLY TO THE RPI
-	char ackMsg[96];
-	if (unknown) {
-		snprintf(ackMsg, sizeof(ackMsg), "A ERR %s\n", cmdBuffer);
-	} else if (isMove) {
-		snprintf(ackMsg, sizeof(ackMsg), "A %s\n", Motion_Reply());
-	} else if (replyText[0] != '\0') {
-		snprintf(ackMsg, sizeof(ackMsg), "A %s\n", replyText);
-	} else {
-		snprintf(ackMsg, sizeof(ackMsg), "A\n");
-	}
-	HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
+    // 3. REPLY TO THE RPI
+    char ackMsg[96];
+    if (unknown) {
+        snprintf(ackMsg, sizeof(ackMsg), "A ERR %s\n", cmdBuffer);
+    } else if (isMove) {
+        snprintf(ackMsg, sizeof(ackMsg), "A %s\n", Motion_Reply());
+    } else if (replyText[0] != '\0') {
+        snprintf(ackMsg, sizeof(ackMsg), "A %s\n", replyText);
+    } else {
+        snprintf(ackMsg, sizeof(ackMsg), "A\n");
+    }
+    HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
 
-	// 4. DASHBOARD
-	strcpy(dash_lastCmd, cmdBuffer);
+    // 4. DASHBOARD
+    strcpy(dash_lastCmd, cmdBuffer);
   }
   /* USER CODE END StartCommunicateTask */
 }
@@ -1241,23 +1241,23 @@ void StartMotorTask(void *argument)
   /* Infinite loop: 100 Hz */
   for(;;)
   {
-	// 1. Encoder ticks since the last loop
-	cnt_L = (int16_t)__HAL_TIM_GET_COUNTER(&htim2);
-	cnt_R = (int16_t)__HAL_TIM_GET_COUNTER(&htim3);
-	__HAL_TIM_SET_COUNTER(&htim2, 0);
-	__HAL_TIM_SET_COUNTER(&htim3, 0);
+    // 1. Encoder ticks since the last loop
+    cnt_L = (int16_t)__HAL_TIM_GET_COUNTER(&htim2);
+    cnt_R = (int16_t)__HAL_TIM_GET_COUNTER(&htim3);
+    __HAL_TIM_SET_COUNTER(&htim2, 0);
+    __HAL_TIM_SET_COUNTER(&htim3, 0);
 
-	left_encoder_val += cnt_L;
-	right_encoder_val += cnt_R;
+    left_encoder_val += cnt_L;
+    right_encoder_val += cnt_R;
 
-	dash_encoderL = left_encoder_val;
-	dash_encoderR = right_encoder_val;
-	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
+    dash_encoderL = left_encoder_val;
+    dash_encoderR = right_encoder_val;
+    dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
 
-	// 2. Drive the active move, or keep the motors off (motion.c)
-	Motion_Step(cnt_L, cnt_R);
+    // 2. Drive the active move, or keep the motors off (motion.c)
+    Motion_Step(cnt_L, cnt_R);
 
-	osDelay(10);
+    osDelay(10);
   }
   /* USER CODE END StartMotorTask */
 }
@@ -1272,49 +1272,49 @@ void StartMotorTask(void *argument)
 void StartOledTask(void *argument)
 {
   /* USER CODE BEGIN StartOledTask */
-  char textBuffer[32];	// Temp buffer to format numbers into text
+  char textBuffer[32];  // Temp buffer to format numbers into text
 
   dash_battV = readBatteryVoltage();
 
   /* Infinite loop */
   for(;;)
   {
-	OLED_Clear();
+    OLED_Clear();
 
-	// If an overarching system status exists (like boot up or test mode), show it exclusively
-	if (strlen(oled_status_msg) > 0) {
-		OLED_ShowString(0, 24, (uint8_t*)oled_status_msg);
-	}
-	// Otherwise, paint the main telemetry dashboard
-	else {
-		// Line 1: Last received RPi Command
-		OLED_ShowString(0, 0, (uint8_t*) "CMD: ");
-		OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
+    // If an overarching system status exists (like boot up or test mode), show it exclusively
+    if (strlen(oled_status_msg) > 0) {
+        OLED_ShowString(0, 24, (uint8_t*)oled_status_msg);
+    }
+    // Otherwise, paint the main telemetry dashboard
+    else {
+        // Line 1: Last received RPi Command
+        OLED_ShowString(0, 0, (uint8_t*) "CMD: ");
+        OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
 
-		// Line 2: Gyroscope Angle & Ultrasonic Distance
-		sprintf(textBuffer, "G: %.1f D: %.1fcm", headingDeg - headingZero, dash_ultraDist);   // heading relative to "north"
-		OLED_ShowString(0, 12, (uint8_t*) textBuffer);
+        // Line 2: Gyroscope Angle & Ultrasonic Distance
+        sprintf(textBuffer, "G: %.1f D: %.1fcm", headingDeg - headingZero, dash_ultraDist);   // heading relative to "north"
+        OLED_ShowString(0, 12, (uint8_t*) textBuffer);
 
-		// Line 3: Accumulated Left Encoder
-		sprintf(textBuffer, "Enc L: %d", dash_encoderL);
-		OLED_ShowString(0, 24, (uint8_t *) textBuffer);
+        // Line 3: Accumulated Left Encoder
+        sprintf(textBuffer, "Enc L: %d", dash_encoderL);
+        OLED_ShowString(0, 24, (uint8_t *) textBuffer);
 
-		// Line 4: Accumulated Right Encoder
-		sprintf(textBuffer, "Enc R: %d", dash_encoderR);
-		OLED_ShowString(0, 36, (uint8_t *) textBuffer);
+        // Line 4: Accumulated Right Encoder
+        sprintf(textBuffer, "Enc R: %d", dash_encoderR);
+        OLED_ShowString(0, 36, (uint8_t *) textBuffer);
 
-		// Line 5: Raw Direction Indicator & Battery Percentage
-		dash_battV = dash_battV * 0.9f + readBatteryVoltage() * 0.1f;   // smooth out load sag
+        // Line 5: Raw Direction Indicator & Battery Percentage
+        dash_battV = dash_battV * 0.9f + readBatteryVoltage() * 0.1f;   // smooth out load sag
 #if FIELD_TOOLS
-		FieldTools_UpdateKnob();
+        FieldTools_UpdateKnob();
 #endif
-		dash_battPct = batteryPercent(dash_battV);
-		sprintf(textBuffer, "Dir:%d B:%d%%", dash_direction, dash_battPct);
-		OLED_ShowString(0, 48, (uint8_t *) textBuffer);
-	}
+        dash_battPct = batteryPercent(dash_battV);
+        sprintf(textBuffer, "Dir:%d B:%d%%", dash_direction, dash_battPct);
+        OLED_ShowString(0, 48, (uint8_t *) textBuffer);
+    }
 
-	OLED_Refresh_Gram();
-	osDelay(100); // UI Refresh rate 10Hz
+    OLED_Refresh_Gram();
+    osDelay(100); // UI Refresh rate 10Hz
   }
   /* USER CODE END StartOledTask */
 }
@@ -1335,22 +1335,22 @@ void StartGyroTask(void *argument)
   uint32_t tick = 0;
   int i = 0;
 
-  // Give sensor hardware time to stabilize on power up
+  // Give sensor hardware time to stabilise on power up
   strcpy(oled_status_msg, "Warmup IMU...");
   osDelay(2000);
 
   // ---------------------------------------------------------
-  // START-UP CALIBRATION PHASE (Robots must be kept still!)
+  // START-UP CALIBRATION (the robot must be kept still!)
   // ---------------------------------------------------------
   strcpy(oled_status_msg, "Calibrating Gyro...");
   osDelay(500);
 
   // Read 100 samples to establish natural zero-drift offset
   while (i < 100) {
-	  osDelay(30); // Get sample every 30ms
-	  ICM_ReadData(&IMU_Data);
-	  offset += (double)IMU_Data.z_gyro;
-	  i++;
+      osDelay(30); // Get sample every 30ms
+      ICM_ReadData(&IMU_Data);
+      offset += (double)IMU_Data.z_gyro;
+      i++;
   }
   offset = offset / 100.0;
 
@@ -1363,42 +1363,42 @@ void StartGyroTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	// High-frequency 100Hz loop essential for accurate Euler integration
+    // High-frequency 100Hz loop essential for accurate Euler integration
     osDelay(10);
 
-	// 1. Fetch IMU data
-	ICM_ReadData(&IMU_Data);
+    // 1. Fetch IMU data
+    ICM_ReadData(&IMU_Data);
 
-	// 2. Calculate true delta-time (dt) in seconds
-	uint32_t current_tick = HAL_GetTick();
-	double dt = (double)(current_tick - tick) / 1000.0;
-	tick = current_tick;
+    // 2. Calculate true delta-time (dt) in seconds
+    uint32_t current_tick = HAL_GetTick();
+    double dt = (double)(current_tick - tick) / 1000.0;
+    tick = current_tick;
 
-	// 3. Subtract baseline drift offset from angular velocity
-	double gz_raw = (double)IMU_Data.z_gyro;
-	double gz_corrected;
-	double dev = gz_raw - offset;
+    // 3. Subtract baseline drift offset from angular velocity
+    double gz_raw = (double)IMU_Data.z_gyro;
+    double gz_corrected;
+    double dev = gz_raw - offset;
 
-	if (robotStill && dev > -GYRO_STILL_BAND && dev < GYRO_STILL_BAND) {
-		// Wheels still and the gyro reads close to zero: the robot really is
-		// at rest. Track the zero-rate offset, which drifts as the sensor warms up.
-		offset += 0.002 * dev;
-		gz_corrected = 0.0;
-	} else if (robotStill) {
-		// Wheels still but the gyro reads a real rotation: the robot is being
-		// turned by hand. Count it as rotation and leave the offset alone.
-		gz_corrected = dev;
-	} else {
-		// No deadband: even slow drifts must be seen by the heading hold.
-		gz_corrected = gz_raw - offset;
-	}
+    if (robotStill && dev > -GYRO_STILL_BAND && dev < GYRO_STILL_BAND) {
+        // Wheels still and the gyro reads close to zero: the robot really is
+        // at rest. Track the zero-rate offset, which drifts as the sensor warms up.
+        offset += 0.002 * dev;
+        gz_corrected = 0.0;
+    } else if (robotStill) {
+        // Wheels still but the gyro reads a real rotation: the robot is being
+        // turned by hand. Count it as rotation and leave the offset alone.
+        gz_corrected = dev;
+    } else {
+        // No deadband: even slow drifts must be seen by the heading hold.
+        gz_corrected = gz_raw - offset;
+    }
 
-	// 4. Integrate the filtered velocity to get absolute heading
-	total_angle += gz_corrected * dt;
-	dash_gyroRate = (float)gz_corrected;   // yaw rate, used by turns
+    // 4. Integrate the filtered velocity to get absolute heading
+    total_angle += gz_corrected * dt;
+    dash_gyroRate = (float)gz_corrected;   // yaw rate, used by turns
 
-	// 5. Publish for the other tasks (float: a single 32-bit write, never torn)
-	headingDeg = (float)total_angle;
+    // 5. Publish for the other tasks (float: a single 32-bit write, never torn)
+    headingDeg = (float)total_angle;
   }
   /* USER CODE END StartGyroTask */
 }
@@ -1416,22 +1416,22 @@ void StartUltrasonicTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	// 1. Ensure trigger line is completely low before pulsing
-	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
-	delay_us(2);
+    // 1. Ensure trigger line is completely low before pulsing
+    HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+    delay_us(2);
 
-	// 2. Prime the input capture interrupt to wait for the rising edge
-	first_captured = 0;
-	__HAL_TIM_SET_CAPTUREPOLARITY(&htim5, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
-	__HAL_TIM_ENABLE_IT(&htim5, TIM_IT_CC3);
+    // 2. Prime the input capture interrupt to wait for the rising edge
+    first_captured = 0;
+    __HAL_TIM_SET_CAPTUREPOLARITY(&htim5, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+    __HAL_TIM_ENABLE_IT(&htim5, TIM_IT_CC3);
 
-	// 3. Send 10us HIGH acoustic pulse
-	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_SET);
-	delay_us(10); // Hardware blocking delay here is brief and safe
-	HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+    // 3. Send 10us HIGH acoustic pulse
+    HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_SET);
+    delay_us(10); // Hardware blocking delay here is brief and safe
+    HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
 
-	// 4. Yield task to allow echo interrupt processing
-	osDelay(60);
+    // 4. Yield task to allow echo interrupt processing
+    osDelay(60);
   }
   /* USER CODE END StartUltrasonicTask */
 }

@@ -14,6 +14,12 @@
  * Heading: absolute for the whole run. ZH sets "north"; every turn moves the
  * target by exactly the commanded angle and every straight holds it, so an
  * error in one move is corrected by the next instead of accumulating.
+ *
+ * Sensor straights (SU / SW / SE, carpark entry): the ultrasonic and IR move
+ * the stop point every loop; the encoders still do the stopping.
+ *
+ * Also the tracked pose (rear-axle x, y) and, in Banzai mode, the flying
+ * hand-over from one move to the next.
  */
 #include "main.h"
 #include "cmsis_os.h"
@@ -31,12 +37,12 @@
 #endif
 
 /* ---- Owned by main.c ------------------------------------------------------ */
-extern TIM_HandleTypeDef htim4;                 // left motor PWM
-extern TIM_HandleTypeDef htim9;                 // right motor PWM
-extern TIM_HandleTypeDef htim12;                // steering servo
-extern int32_t left_encoder_val;                // running encoder totals (motor task)
+extern TIM_HandleTypeDef htim4;                     // left motor PWM
+extern TIM_HandleTypeDef htim9;                     // right motor PWM
+extern TIM_HandleTypeDef htim12;                    // steering servo
+extern int32_t left_encoder_val;                    // running encoder totals (motor task)
 extern int32_t right_encoder_val;
-extern volatile float dash_gyroRate;            // yaw rate, deg/s, CCW positive (gyro task)
+extern volatile float dash_gyroRate;                // yaw rate, deg/s, CCW positive (gyro task)
 extern volatile uint8_t emergency_stop_requested;   // set by '!' on the UART
 
 /* ---- Button on PE0 (pressed = low) stops the current move ----------------- */
@@ -72,7 +78,7 @@ typedef struct {
     float    distPrev;            // Distance travelled at the previous loop (cm)
     float    servoCmd;            // Current servo command (us)
     uint16_t settleA, settleB;    // Servo settle times (ms): below-centre, then centre
-    uint16_t endSteerUs;          // Step 9: servo value to write when braking starts (next turn's lock), 0 = none
+    uint16_t endSteerUs;          // Pre-steer: servo value to write as the move ends (next turn's lock), 0 = none
     uint8_t  flyIn, flyOut;       // Banzai: start at the handed-over speed / end at speed without braking
     float    vExit;               // flyOut: speed to hand over (cm/s)
     float    brakeAt;             // Banzai entry / VB: no slow-down, hard brake this close to the target (cm); 0 = off
@@ -88,7 +94,7 @@ typedef struct {
     uint32_t deadline;            // Timeout tick
     uint8_t  timedOut;
     uint8_t  aborted;
-    uint8_t  stallLoops;          // 14 Oct: loops in a row driving with no encoder tick on either wheel
+    uint8_t  stallLoops;          // Loops in a row driving with no encoder tick on either wheel
     uint8_t  stillLoops;          // Used while waiting to stop after braking
     WheelCtl_t wl, wr;
     float    resDist, resHead;    // Results: distance travelled, final heading error
@@ -104,7 +110,7 @@ typedef struct {
     Until_t  opt;
     uint32_t usSeq;               // Last echo already used
     float    est[5];              // Last ultrasonic stop points (cm of travel), newest last
-    uint8_t  nEst;                // Good echoes used so far (saturates at 255)
+    uint8_t  nEst;                // Good echoes used so far (saturates at 200)
     float    usAt;                // Ultrasonic stop point (cm of travel), valid once usValid()
     uint8_t  usOk;                // US_PAIR_CONFIRM: a pair of echoes agreed (usAt = the nearest such pair)
     uint32_t irSeqSeen;           // Last IR update already used
@@ -117,7 +123,7 @@ typedef struct {
     float    edgeDist;            // Travel at the first reading past the edge
     float    edgeV;               // Speed then (cm/s): the detection lag grows with speed
     float    edgeAt;              // Stop point from the IR edge (cm of travel)
-    char     stopBy;              // U ultrasonic, E IR edge, C cap, F floor, G guard / emergency
+    char     stopBy;              // U ultrasonic, E IR edge, C cap, F floor, G guard / emergency, S stall
     uint8_t  slowSeen;            // Diagnostic: slowing for the stop has begun
     float    eSlow, ySlow;        // Diagnostic: heading error / sideways drift when slowing began
 } Move_t;
@@ -135,7 +141,7 @@ typedef struct {
     float    io;                  // Inner/outer wheel speed ratio for this lock
     uint16_t lockUs;              // Servo lock value
     uint16_t settleMs;            // Servo settle time before driving
-    uint16_t endSteerUs;          // Step 9: servo value to leave at the end (next turn's lock), 0 = centre
+    uint16_t endSteerUs;          // Pre-steer: servo value to leave at the end (next turn's lock), 0 = centre
     uint8_t  flyIn, flyOut;       // Banzai: start at the handed-over speed / end at speed without braking
     float    vExit;               // flyOut: speed to hand over (cm/s)
     float    v;                   // Current centre speed (cm/s)
@@ -143,7 +149,7 @@ typedef struct {
     uint32_t deadline;
     uint8_t  timedOut;
     uint8_t  aborted;
-    uint8_t  stallLoops;          // 14 Oct: loops in a row driving with no encoder tick on either wheel
+    uint8_t  stallLoops;          // Loops in a row driving with no encoder tick on either wheel
     uint8_t  stillLoops;
     WheelCtl_t wl, wr;
     float    resAngle;            // Heading change actually achieved (degrees)
@@ -170,7 +176,7 @@ static volatile uint8_t abortReq = 0;    // button pressed during a move
 /* ---- Results of the last move ----------------------------------------------- */
 static char replyShort[48] = "";
 static MoveResult_t lastRes = {0};      // for the Task 2 sequencer
-static char replyLong[92]  = "";     // fits the 96-byte reply buffer in main.c with "A " and "\n"
+static char replyLong[92]  = "";        // fits the 96-byte reply buffer in main.c with "A " and "\n"
 
 static void setResults(const char *shortText, const char *longText)
 {
@@ -252,16 +258,16 @@ static void driveWheel(int left, int dir, uint16_t pwm, int brake)
     }
 }
 
+#ifndef WHEEL_KA
+#define WHEEL_KA 0.0f          // BZ_PUNCH off: no acceleration feed-forward
+#endif
+static float ffAccel = 0.0f;   // Banzai: the straight profile's acceleration this loop (cm/s^2), for WHEEL_KA
+
 /* One wheel's speed controller. tgtCmS = wanted speed (cm/s, >= 0),
  * cnt = ticks this loop, gain = that wheel's cm/s per PWM in this direction.
  * Returns the PWM magnitude to apply. When braking = 1 the caller is braking
  * both wheels this loop: only the speed filter is updated, and the integral
  * is left alone so it doesn't wind down. */
-#ifndef WHEEL_KA
-#define WHEEL_KA 0.0f
-#endif
-static float ffAccel = 0.0f;   // Banzai 3: the straight profile's acceleration this loop (cm/s^2), for WHEEL_KA
-
 static uint16_t wheelControl(WheelCtl_t *w, float tgtCmS, int32_t cnt, float gain, int braking)
 {
     float meas = (float)abs((int)cnt);
@@ -282,7 +288,8 @@ static uint16_t wheelControl(WheelCtl_t *w, float tgtCmS, int32_t cnt, float gai
     }
     w->integ = clampf(w->integ + WHEEL_KI * e, -WHEEL_I_LIMIT, WHEEL_I_LIMIT);
 
-    // Feedforward from the Phase 2 model, then feedback for everything else
+    // Feedforward from the measured motor model (plus the WHEEL_KA punch), then
+    // feedback for everything else
     float pwm = MOTOR_FF_BASE + tgtCmS / gain + WHEEL_KP * e + w->integ + WHEEL_KA * ffAccel;
 
     // Starting takes about twice the power of keeping going: give a burst
@@ -299,7 +306,7 @@ static void writeServo(float us)
     __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, (uint16_t)(us + 0.5f));
 }
 
-/* ---- Step 9: steer for the next turn while this move stops ------------------
+/* ---- Pre-steer: steer for the next turn while this move stops ---------------
  * The sequencer calls Motion_EndSteer() just before a move that a turn will
  * follow. The move takes the request when it starts (any move: a skipped or
  * different move simply drops it) and, as it stops, writes that lock. The
@@ -350,9 +357,9 @@ static void preSteer(uint16_t us)
  * Motion_Fly() before a move: flyIn = start at the speed the last move handed
  * over (no stop, no servo settle: the servo swings while rolling); flyOut =
  * end at T2B_FLY_V without braking. While the command task sets up the next
- * move (up to ~20 ms; 120 ms allowed) the motors keep the last PWM (flyHold). If the last move
- * stopped normally, flyIn does nothing. Nothing here runs unless the sequencer
- * asks for it (BZ_FLY). */
+ * move (up to ~20 ms; 120 ms allowed) the motors keep the last PWM
+ * (flyHoldUntil). If the last move stopped normally, flyIn does nothing.
+ * Nothing here runs unless the sequencer asks for it (BZ_FLY). */
 static uint8_t  flyNext   = 0;        // bit 0 = flyIn, bit 1 = flyOut, for the next move
 static float    exitV     = 0.0f;     // speed handed over by the last move (cm/s), 0 = it stopped
 static int8_t   exitDir   = 1;
@@ -391,7 +398,7 @@ static void handOver(float v, int8_t dir, const WheelCtl_t *l, const WheelCtl_t 
     exitWR = *r;
     holdPL = pL;
     holdPR = pR;
-    flyHoldUntil = HAL_GetTick() + 120;          // Banzai 3: was 40 (room for the entry planning at -O0)
+    flyHoldUntil = HAL_GetTick() + 120;          // room for the carpark entry planning at -O0
 }
 
 /* ==========================================================================
@@ -399,7 +406,7 @@ static void handOver(float v, int8_t dir, const WheelCtl_t *l, const WheelCtl_t 
  * ========================================================================== */
 
 /* ==========================================================================
- *  Tracked pose (rear-axle centre). See robot_config.h section 9 for the frame.
+ *  Tracked pose (rear-axle centre). See robot_config.h section 11 for the frame.
  *  Written only by the motor task (poseStep), read by any task via
  *  Motion_GetPose(). The x, y pair is copied inside a critical section so a
  *  reader never gets x from one 10 ms step and y from the next.
@@ -426,12 +433,12 @@ static void poseStep(int16_t cntL, int16_t cntR)
 #if POSE_TURN_FROM_RADIUS
     if (tn.active) {
         // In a turn the rear wheels scrub, so their average under-reads the arc
-        // (LF090 read R = 18.1, not 20.2). Use the calibrated radius x the
-        // gyro's turn instead; the radius came from measured LF180 / RF180.
+        // (on LF090 the encoders give R = 18.1, the tape ~20). Use the calibrated
+        // radius x the gyro's turn instead; the radii are taped from LF090 / RF180.
         float dsArc = (float)tn.dir * tn.radius * fabsf(h - poseHPrev) * DEG2RAD;
-        // Banzai flown turn (14 Oct): while the servo is still swinging to the lock
-        // the robot rolls almost straight, which gyro x radius misses: take the
-        // larger. Standing turns (step 9) are unchanged.
+        // Banzai flown turn: while the servo is still swinging to the lock the
+        // robot rolls almost straight, which gyro x radius misses: take the
+        // larger. Standing turns are unchanged.
         if (tn.flyIn && fabsf(ds) > fabsf(dsArc)) dsArc = ds;
         ds = dsArc;
     }
@@ -479,30 +486,19 @@ void Motion_ZeroHeading(void)
  *  Straights
  * ========================================================================== */
 
-static float median3(float a, float b, float c)
+#if !US_PAIR_CONFIRM
+static float median3(float a, float b, float c)         // only the median-of-3 ultrasonic stop uses it
 {
     float lo = fminf(a, b), hi = fmaxf(a, b);
     return fmaxf(lo, fminf(hi, c));
 }
+#endif
 
 static uint8_t inc8(uint8_t n)
 {
     return (n < 200) ? (uint8_t)(n + 1) : n;
 }
 
-/* Sensor straights only (mv.until). Called every 10 ms from straightStep in
- * the motor task; never waits. Turns the sensors into a stop point (cm of
- * travel) and writes it to mv.target; the normal profile then stops there.
- *  - Ultrasonic: each echo -> stop point; median of the last 3, so one false
- *    echo can't move it.
- *  - IR edge: 3 readings in a row under IR_FACE_CM = a face; then 2 readings
- *    in a row more than IR_EDGE_JUMP_CM above it, 2 of them IR_EDGE_FAR_CM or
- *    more, = the edge; stop edgeExtra after where the edge was first seen.
- *    Jumps before edgeFromCm of travel are ignored; a jump that stays under
- *    IR_EDGE_FAR_CM is still the face (the face reading follows it). If the
- *    face comes back within IR_EDGE_CONFIRM_CM while still driving, that edge
- *    was a seam or the card's edge: dropped, the search goes on.
- *  - Guard IR / ultrasonic emergency: 2 readings in a row -> stop now. */
 /* A usable ultrasonic stop point (US_PAIR_CONFIRM: a pair agreed; else 3 echoes). */
 static inline int usValid(void)
 {
@@ -513,6 +509,22 @@ static inline int usValid(void)
 #endif
 }
 
+/* Sensor straights only (mv.until). Called every 10 ms from straightStep in
+ * the motor task; never waits. Turns the sensors into a stop point (cm of
+ * travel) and writes it to mv.target; the normal profile then stops there.
+ *  - Ultrasonic: each echo -> stop point. US_PAIR_CONFIRM: the nearest pair
+ *    (of the last 5) within US_PAIR_TOL_CM of each other; else the median of
+ *    the last 3. Either way one false echo can't move it.
+ *  - IR edge: 3 readings in a row under IR_FACE_CM = a face; then 2 readings
+ *    in a row more than IR_EDGE_JUMP_CM above it, 2 of them IR_EDGE_FAR_CM or
+ *    more, = the edge; stop edgeExtra after where the edge was first seen.
+ *    Jumps before edgeFromCm of travel are ignored; a jump that stays under
+ *    IR_EDGE_FAR_CM for IR_EDGE_HOLD_N readings is still the face (the face
+ *    reading follows it). If the face comes back within IR_EDGE_CONFIRM_CM
+ *    while still driving, that edge was a seam or the card's edge: dropped,
+ *    the search goes on.
+ *  - Guard IR / ultrasonic emergency: 2 readings in a row -> stop now.
+ *  - Banzai watchSide: the longest steady stretch of a side IR (reported only). */
 static void untilTrack(float dist, float vNow)
 {
     float r;
@@ -527,10 +539,10 @@ static void untilTrack(float dist, float vNow)
             !(r < mv.opt.ignBelow && dist < mv.opt.ignUntil)) {   // e.g. the carpark arms at the start
             float e = dist + (r - mv.opt.usStop) - vNow * ULTRA_LAG_S;
 #if US_PAIR_CONFIRM
-            // 14 Oct: a target = two echoes (of the last 5) that put the stop point
-            // within US_PAIR_TOL_CM of each other; the nearest such pair wins. A box
-            // corner that echoes only now and then is no longer outvoted by echoes
-            // from the room behind it (the median of 3 needed it 2 times in a row).
+            // A target = two echoes (of the last 5) that put the stop point within
+            // US_PAIR_TOL_CM of each other; the nearest such pair wins, so a box
+            // corner that echoes only now and then is not outvoted by echoes from
+            // the room behind it (a median of 3 needs it 2 times in a row).
             int nOld = (mv.nEst < 4) ? mv.nEst : 4;
             for (int k = 0; k < nOld; k++) {
                 float o = mv.est[4 - k];
@@ -660,7 +672,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
         el = 0;
     }
 #if MOVE_STALL_MS > 0
-    // 14 Oct: driving, but neither wheel has moved for MOVE_STALL_MS (motor / driver
+    // Driving, but neither wheel has moved for MOVE_STALL_MS (motor / driver
     // fault, wheels jammed against something): stop and fail the move at once
     // instead of pushing until the deadline.
     if (mv.phase == MV_DRIVE && el > MOVE_STALL_MS) {
@@ -743,7 +755,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
             mv.phase = MV_BRAKE;
             mv.phaseTick = now;
             setMotorPwm(PWM_BRAKE, PWM_BRAKE, PWM_BRAKE, PWM_BRAKE);
-            if (mv.endSteerUs) preSteer(mv.endSteerUs);  // step 9: the next turn's lock, while stopping
+            if (mv.endSteerUs) preSteer(mv.endSteerUs);  // pre-steer: the next turn's lock, while stopping
             break;
         }
 
@@ -775,7 +787,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
         float vWas   = mv.v;
         mv.v = fminf(upTo, slowTo);
         if (mv.v < STRAIGHT_V_MIN) mv.v = STRAIGHT_V_MIN;
-        ffAccel = (mv.v - vWas) * 100.0f;              // Banzai 3 punch (WHEEL_KA): the profile's acceleration
+        ffAccel = (mv.v - vWas) * 100.0f;              // Banzai punch (WHEEL_KA): the profile's acceleration
 
         // Heading hold through the servo (+ error = drifted left).
         // P term reacts; servoTrim slowly learns where "straight" really is
@@ -816,8 +828,8 @@ static void straightStep(int16_t cntL, int16_t cntR)
 
         if (STEER_PLAY_US > 0.0f) {
             // Backlash compensation. servoCmd is where we want the WHEELS.
-            // 1500 + trim was found approaching from below, so in wheel terms
-            // "straight" is half the play lower; shift the wheel target to match.
+            // SERVO_TRUE_CENTRE + trim is found approaching from below, so in wheel
+            // terms "straight" is half the play lower; shift the wheel target to match.
             float wheelWant = mv.servoCmd - 0.5f * STEER_PLAY_US;
             float half = 0.5f * STEER_PLAY_US;
             float servoOut;
@@ -840,7 +852,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
         // on a smooth floor. If the car as a whole is clearly too fast, brake
         // BOTH wheels for this loop: braking one side alone swings the robot.
         // Only while slowing down for the stop: during cruise, normal speed
-        // jiggle on an uneven floor must not trigger braking (that was jerky).
+        // jiggle on an uneven floor must not trigger braking (it makes the drive jerky).
         float tgtTicks  = mv.v * TICKS_PER_CM / 100.0f;
         int   brakeBoth = slowing &&
                           (0.5f * (mv.wl.filt + mv.wr.filt) > tgtTicks + BRAKE_ASSIST_TICKS);
@@ -961,7 +973,7 @@ static void straightRun(float distance_cm)
  * robot has stopped. Results: Motion_Reply() / Motion_LogText(). */
 void Motion_Straight(float distance_cm)
 {
-    mv.endSteerUs = takeEndSteer();                    // step 9 (dropped if this move doesn't run)
+    mv.endSteerUs = takeEndSteer();                    // pre-steer (dropped if this move doesn't run)
     uint8_t fly   = takeFly();                         // Banzai (dropped likewise)
     if (Motion_IsBusy()) {
         setResults("BUSY", "BUSY");
@@ -993,16 +1005,16 @@ void Motion_UntilInit(Until_t *o)
     o->watchSide = -1;
 }
 
-/* Straight (forward, or backward with o->reverse) whose stop point comes from the sensors (see Until_t and
- * untilTrack). Blocks until stopped.
- * Reply: "d=<travel> e=<heading err> u=<ultrasonic at the stop> by=<U|E|C|F|G>"
- *   u  = predicted from the tracked echoes and the encoders, -1 if fewer
- *        than 3 good echoes (or no ultrasonic stop)
+/* Straight (forward, or backward with o->reverse) whose stop point comes from
+ * the sensors (see Until_t and untilTrack). Blocks until stopped.
+ * Reply: "d=<travel> e=<heading err> u=<ultrasonic at the stop> by=<U|E|C|F|G|S>"
+ *   u  = predicted from the tracked echoes and the encoders, -1 if the echoes
+ *        never gave a stop point (see usValid) or there is no ultrasonic stop
  *   by = U ultrasonic, E IR edge, C cap, F floor overruled a short echo,
- *        G guard IR / ultrasonic emergency */
+ *        G guard IR / ultrasonic emergency, S stall (MOVE_STALL_MS) */
 void Motion_StraightOpts(const Until_t *o)
 {
-    mv.endSteerUs = takeEndSteer();                    // step 9 (dropped if this move doesn't run)
+    mv.endSteerUs = takeEndSteer();                    // pre-steer (dropped if this move doesn't run)
     uint8_t fly   = takeFly();                         // Banzai (dropped likewise)
     if (Motion_IsBusy()) {
         setResults("BUSY", "BUSY");
@@ -1143,7 +1155,7 @@ static void turnStep(int16_t cntL, int16_t cntR)
         el = 0;
     }
 #if MOVE_STALL_MS > 0
-    if (tn.phase == TN_DRIVE && el > MOVE_STALL_MS) {   // 14 Oct: no wheel movement at all: stop (see straightStep)
+    if (tn.phase == TN_DRIVE && el > MOVE_STALL_MS) {   // no wheel movement: stop and fail the move (see straightStep)
         tn.stallLoops = (cntL == 0 && cntR == 0) ? inc8(tn.stallLoops) : 0;
         if (tn.stallLoops * 10u >= MOVE_STALL_MS) {
             tn.aborted = 1;
@@ -1189,7 +1201,7 @@ static void turnStep(int16_t cntL, int16_t cntR)
 
         // Same idea as straights: the robot keeps turning for ~TURN_STOP_T s
         // after the decision, so brake earlier the faster it is turning.
-        // Capped at the final approach zone (2 cm of arc).
+        // Capped at the final approach zone (TURN_APPROACH_CM of arc).
         float approachDeg = TURN_APPROACH_CM / tn.radius / DEG2RAD;
         float stopDeg     = fminf(TURN_STOP_T * wNow, approachDeg);
 #ifdef T2B_FLY_LEAD_S
@@ -1262,7 +1274,7 @@ static void turnStep(int16_t cntL, int16_t cntR)
             tn.resAngle = turned;
             tn.resErr   = headingDeg - tn.targetAbs;
             if (tn.endSteerUs && !tn.aborted) {
-                preSteer(tn.endSteerUs);               // step 9: the next turn uses this lock too
+                preSteer(tn.endSteerUs);               // pre-steer: the next turn uses this lock too
             } else {
                 // Start bringing the wheels back towards straight (from below, like
                 // a straight's settle does) so the next straight can start sooner.
@@ -1283,7 +1295,7 @@ static void turnStep(int16_t cntL, int16_t cntR)
  * Blocks until the robot has stopped. Results: Motion_Reply() / Motion_LogText(). */
 void Motion_Turn(int left, int dir, float angleDeg)
 {
-    uint16_t endSteer = takeEndSteer();                // step 9 (dropped if this move doesn't run)
+    uint16_t endSteer = takeEndSteer();                // pre-steer (dropped if this move doesn't run)
     uint8_t  fly      = takeFly();                     // Banzai (dropped likewise)
     if (tn.active || mv.active) {
         setResults("BUSY", "BUSY");
@@ -1314,7 +1326,7 @@ void Motion_Turn(int left, int dir, float angleDeg)
     tn.radius    = left ? TURN_RADIUS_L : TURN_RADIUS_R;
     tn.io        = left ? TURN_IO_L : TURN_IO_R;
     tn.lockUs    = left ? SERVO_LEFT_LOCK : SERVO_RIGHT_LOCK;
-    int swing    = abs(cur - (int)tn.lockUs);           // servo travel needed (us)
+    int swing    = abs(cur - (int)tn.lockUs);          // servo travel needed (us)
 #if TURN_SETTLE_PROP
     // TURN_SETTLE_MS covers a full lock-to-lock swing; a shorter swing needs less
     tn.settleMs  = (swing > 20) ? (uint16_t)(60 + (TURN_SETTLE_MS - 60) * swing / (SERVO_RIGHT_LOCK - SERVO_LEFT_LOCK)) : 60;
@@ -1322,7 +1334,7 @@ void Motion_Turn(int left, int dir, float angleDeg)
 #else
     tn.settleMs  = (swing > 20) ? TURN_SETTLE_MS : 60;
 #endif
-    if (preSteerUs == tn.lockUs && swing <= 20) {      // step 9: the last move already swung the servo here
+    if (preSteerUs == tn.lockUs && swing <= 20) {      // pre-steer: the last move already swung the servo here
         uint32_t need = swingSettleMs(preSteerSwing);  // ... so only wait for what is left of that swing
         uint32_t el   = HAL_GetTick() - preSteerTick;
         tn.settleMs   = (el + 60u >= need) ? 60u : (uint16_t)(need - el);

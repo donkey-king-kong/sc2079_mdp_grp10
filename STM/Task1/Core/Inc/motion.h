@@ -1,7 +1,6 @@
 /*
  * motion.h
  *
- *  Created on: Sep 27, 2026
  *      Author: Ryan Tan
  *
  * Straights, turns and heading for the robot.

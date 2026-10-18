@@ -1,7 +1,6 @@
 /*
  * motion.h
  *
- *  Created on: Sep 27, 2026
  *      Author: Ryan Tan
  *
  * Straights, turns and heading for the robot.
@@ -25,7 +24,7 @@ void Motion_Turn(int left, int dir, float angleDeg);   // left: 1/0, dir: +1 fwd
 void Motion_ZeroHeading(void);                    // "ZH": the current direction becomes north, pose back to the start
 void Motion_GetPose(float *x, float *y, float *h); // tracked rear-axle pose (cm, cm, deg); any task, never waits
 uint8_t Motion_IsBusy(void);
-void Motion_EndSteer(int lock);                   // step 9: the NEXT move ends with the servo at this lock
+void Motion_EndSteer(int lock);                   // FLOW_MOVES: the NEXT move ends with the servo at this lock
                                                   // (1 left, 0 right, -1 none), ready for the turn after it
 void Motion_Fly(int flyIn, int flyOut);           // Banzai: the NEXT move starts at the speed the last one handed
                                                   // over (no stop, no settle) and/or ends at speed (no brake)
@@ -34,8 +33,8 @@ void Motion_Fly(int flyIn, int flyOut);           // Banzai: the NEXT move start
 void Motion_VmaxTest(float maxCm, char *reply, unsigned len);   // VMAX?: ramp until a wheel saturates or it yaws
 void Motion_BrakeTest(float v);                   // VB<v>: 100 cm at v, hard brake at 100 (reply: Motion_Reply)
 
-/* ---- Sensor-ended straights (forward). The sensors decide WHERE to stop;
- *      the encoders still do the stopping. All distances are cm of travel. --- */
+/* ---- Sensor-ended straights. The sensors decide WHERE to stop; the
+ *      encoders still do the stopping. All distances are cm of travel. ----- */
 typedef struct {
     float  maxCm;       // Stop here at the latest (the cap while no IR face has been seen)
     float  minCm;       // Never stop before this, unless an echo is under ULTRA_HARD_STOP_CM
@@ -47,7 +46,7 @@ typedef struct {
     float  edgeExtra;
     float  edgeMaxCm;   // Cap once that IR has seen a face (replaces maxCm)
     float  edgeFromCm;  // Ignore "ends" seen before this much travel (the image card at the face's centre); 0 = off
-    int8_t guardSide;   // IR_LEFT / IR_RIGHT: stop at once if it reads under guardCm; -1 = off
+    int8_t guardSide;   // IR_LEFT / IR_RIGHT: stop at once if 2 readings in a row are under guardCm; -1 = off
     float  guardCm;
     float  guardFromCm; // ... checked only after this much travel
     float  usEmergCm;   // Stop at once if two echoes in a row are under this; 0 = off
@@ -78,7 +77,8 @@ typedef struct {
     uint8_t end;                  // MOVE_OK / MOVE_ABORT / MOVE_TIMEOUT / MOVE_BUSY
     float   dist;                 // straights: cm travelled
     float   u;                    // sensor straights: ultrasonic at the stop, -1 if none
-    char    stopBy;               // sensor straights: U ultrasonic, E IR edge, C cap, F floor, G guard
+    char    stopBy;               // sensor straights: U ultrasonic, E IR edge, C cap, F floor, G guard,
+                                  // S stall; plain straights D, turns T
     uint8_t faceSeen;             // sensor straights: the edge IR saw a face
     float   target;               // sensor straights: where the sensors said to stop (cm of travel)
     float   watchSpan;            // watchSide: longest stretch of travel with a steady reading (cm), 0 = none
@@ -99,7 +99,7 @@ extern volatile uint8_t robotStill;   // 1 once the wheels haven't turned for 0.
 /* ---- Sensors, owned by main.c (sensor task + TIM5 echo interrupt) -------- */
 #define IR_LEFT   0                       // IR1
 #define IR_RIGHT  1                       // IR2
-extern volatile float    irCm[2];         // cm from the lens, IR_CLEAR if > 60 cm (median of 3 updates)
+extern volatile float    irCm[2];         // cm from the lens, IR_CLEAR beyond IR_MAX_CM (median of 3 updates)
 extern volatile float    irVolts[2];      // raw averaged volts
 extern volatile uint32_t irSeq;           // +1 per IR update (every IR_PERIOD_MS)
 uint32_t Ultra_Get(float *cm);            // latest echo: returns its sequence number; *cm < 0 if stale / no echo

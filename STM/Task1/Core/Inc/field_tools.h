@@ -1,13 +1,13 @@
 /*
  * field_tools.h
  *
- *  Created on: Sep 27, 2026
- *      Author: Ryan Tan
+ * Author: Ryan Tan
  *
  * Knob-and-button test modes for calibration, used without a cable:
  *   SD  straight drive: the knob picks -100..+100 cm, a tap drives it
  *   TN  turn:           the knob picks a turn (LF090, RB045, ...), a tap runs it
- *   Hold the button ~1 s to switch between SD and TN. Tap during a move to stop it.
+ *   Hold the button for BTN_LONG_MS (0.8 s) to switch between SD and TN.
+ *   Tap during a move to stop it.
  *
  * Serial commands (work whether or not the robot is being driven by hand):
  *   TD       print every result since power-up (last TEST_LOG_SIZE kept)

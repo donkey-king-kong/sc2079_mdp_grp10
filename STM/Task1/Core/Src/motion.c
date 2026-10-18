@@ -25,12 +25,12 @@
 #include "motion.h"
 
 /* ---- Owned by main.c ------------------------------------------------------ */
-extern TIM_HandleTypeDef htim4;                 // left motor PWM
-extern TIM_HandleTypeDef htim9;                 // right motor PWM
-extern TIM_HandleTypeDef htim12;                // steering servo
-extern int32_t left_encoder_val;                // running encoder totals (motor task)
+extern TIM_HandleTypeDef htim4;                     // left motor PWM
+extern TIM_HandleTypeDef htim9;                     // right motor PWM
+extern TIM_HandleTypeDef htim12;                    // steering servo
+extern int32_t left_encoder_val;                    // running encoder totals (motor task)
 extern int32_t right_encoder_val;
-extern volatile float dash_gyroRate;            // yaw rate, deg/s, CCW positive (gyro task)
+extern volatile float dash_gyroRate;                // yaw rate, deg/s, CCW positive (gyro task)
 extern volatile uint8_t emergency_stop_requested;   // set by '!' on the UART
 
 /* ---- Button on PE0 (pressed = low) stops the current move ----------------- */
@@ -212,7 +212,7 @@ static uint16_t wheelControl(WheelCtl_t *w, float tgtCmS, int32_t cnt, float gai
     }
     w->integ = clampf(w->integ + WHEEL_KI * e, -WHEEL_I_LIMIT, WHEEL_I_LIMIT);
 
-    // Feedforward from the Phase 2 model, then feedback for everything else
+    // Feedforward from the measured motor model, then feedback for everything else
     float pwm = MOTOR_FF_BASE + tgtCmS / gain + WHEEL_KP * e + w->integ;
 
     // Starting takes about twice the power of keeping going: give a burst
@@ -352,8 +352,8 @@ static void straightStep(int16_t cntL, int16_t cntR)
 
         if (STEER_PLAY_US > 0.0f) {
             // Backlash compensation. servoCmd is where we want the WHEELS.
-            // 1500 + trim was found approaching from below, so in wheel terms
-            // "straight" is half the play lower; shift the wheel target to match.
+            // SERVO_TRUE_CENTRE + trim is found approaching from below, so in wheel
+            // terms "straight" is half the play lower; shift the wheel target to match.
             float wheelWant = mv.servoCmd - 0.5f * STEER_PLAY_US;
             float half = 0.5f * STEER_PLAY_US;
             float servoOut;
@@ -376,7 +376,7 @@ static void straightStep(int16_t cntL, int16_t cntR)
         // on a smooth floor. If the car as a whole is clearly too fast, brake
         // BOTH wheels for this loop: braking one side alone swings the robot.
         // Only while slowing down for the stop: during cruise, normal speed
-        // jiggle on an uneven floor must not trigger braking (that was jerky).
+        // jiggle on an uneven floor must not trigger braking (it makes the drive jerky).
         float tgtTicks  = mv.v * TICKS_PER_CM / 100.0f;
         int   brakeBoth = slowing &&
                           (0.5f * (mv.wl.filt + mv.wr.filt) > tgtTicks + BRAKE_ASSIST_TICKS);
@@ -509,7 +509,7 @@ static void turnStep(int16_t cntL, int16_t cntR)
 
         // Same idea as straights: the robot keeps turning for ~TURN_STOP_T s
         // after the decision, so brake earlier the faster it is turning.
-        // Capped at the final approach zone (2 cm of arc).
+        // Capped at the final approach zone (TURN_APPROACH_CM of arc).
         float approachDeg = TURN_APPROACH_CM / tn.radius / DEG2RAD;
         float stopDeg     = fminf(TURN_STOP_T * wNow, approachDeg);
         if (remaining <= stopDeg || now > tn.deadline) {
