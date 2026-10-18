@@ -46,6 +46,7 @@ static void logResult(const char *line)
     if (logCount < TEST_LOG_SIZE) logCount++;
 }
 
+/* Knob position -> index into TURN_TESTS. */
 static int knobTurnIndex(uint16_t us)
 {
     int i = (int)(((float)us - (float)KNOB_US_MIN) * TURN_TEST_COUNT
@@ -137,7 +138,7 @@ int FieldTools_Command(char sub, int value, char *reply, size_t replyLen)
 /* Body of the default task. Never returns.
  *   Knob : picks the distance (SD) or the turn (TN); the OLED CMD line shows it
  *   Tap  : runs it after 1.5 s (time to let go); tap again during a move to stop
- *   Hold : ~1 s switches between SD and TN
+ *   Hold : BTN_LONG_MS (0.8 s) switches between SD and TN
  * Each run first makes the robot's current direction "north", because it has
  * been picked up and placed by hand. Every result goes into the TD log. */
 void FieldTools_Run(void)

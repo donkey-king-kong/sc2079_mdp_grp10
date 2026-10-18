@@ -195,9 +195,9 @@ static void fixed1(char *out, float v, int decimals)
     else               sprintf(out, "%s%ld.%ld",   sign, n / 10,  n % 10);
 }
 
-/* ---- Crash reporting (14 Oct) -------------------------------------------------
+/* ---- Crash reporting ----------------------------------------------------------
  * Any fault stops the robot and says what happened, instead of freezing silently:
- *   - motors braked, LED3 blinks fast (~10 Hz; the normal heartbeat is 5 Hz),
+ *   - motors braked, LED3 blinks slowly (~1 s on, ~1 s off; the heartbeat is 5 Hz),
  *   - "A FAULT <what> <task>" sent to the Pi,
  *   - "FAULT <what>" and the task name on the OLED.
  * Called from: stack overflow hook, configASSERT (FreeRTOSConfig.h), HardFault /
@@ -239,7 +239,7 @@ void Fault_Stop(const char *what, const char *task)
 
     for (;;) {
         HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-        for (volatile uint32_t i = 0; i < 1600000u; i++) { }   // ~50 ms at 168 MHz
+        for (volatile uint32_t i = 0; i < 1600000u; i++) { }   // ~1 s: the core runs at 16 MHz (HSI)
     }
 }
 
@@ -312,23 +312,23 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  // 1. Initialize OLED and Show Boot Message
+  // 1. Initialise OLED and Show Boot Message
   OLED_Init();
   bootMessage("Booting...");
 
-  // 2. Initialize IMU (Gyroscope)
+  // 2. Initialise IMU (Gyroscope)
   if (ICM20948_Init() == HAL_OK) {
-	  bootMessage("IMU Found");
-	  HAL_Delay(300);         // long enough to read; the RTOS isn't running yet
+      bootMessage("IMU Found");
+      HAL_Delay(300);         // long enough to read; the RTOS isn't running yet
   } else {
-	  bootMessage("IMU ERROR!");
-	  while(1); // Halt execution if IMU fails (the message stays on screen)
+      bootMessage("IMU ERROR!");
+      while(1); // Halt execution if IMU fails (the message stays on screen)
   }
 
   // 3. Start UART Interrupt Listener
   HAL_UART_Receive_IT(&huart3, &rxByte, 1);
 #if FIELD_TOOLS
-  FieldTools_Init();        // PB1 knob as analog input
+  FieldTools_Init();        // PB1 knob as analogue input
 #endif
 
   // 4. Start Ultrasonic Timers
@@ -999,19 +999,19 @@ static void MX_GPIO_Init(void)
  */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	if (huart -> Instance == USART3) {
-		// Intercept emergency stop ('!') immediately so it bypasses queues
-		if (rxByte == '!') {
-			emergency_stop_requested = 1;
-		} else {
-			// Every other character goes to the command task. '!' is not queued:
-			// it would otherwise end up at the front of the next command.
-			osMessageQueuePut(uartQueueHandle, &rxByte, 0U, 0U);
-		}
+    if (huart -> Instance == USART3) {
+        // Intercept emergency stop ('!') immediately so it bypasses queues
+        if (rxByte == '!') {
+            emergency_stop_requested = 1;
+        } else {
+            // Every other character goes to the command task. '!' is not queued:
+            // it would otherwise end up at the front of the next command.
+            osMessageQueuePut(uartQueueHandle, &rxByte, 0U, 0U);
+        }
 
-		// Re-arm the interrupt to listen for the next byte
-		HAL_UART_Receive_IT(&huart3, &rxByte, 1);
-	}
+        // Re-arm the interrupt to listen for the next byte
+        HAL_UART_Receive_IT(&huart3, &rxByte, 1);
+    }
 }
 
 /**
@@ -1020,8 +1020,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
  */
 void delay_us(uint16_t us)
 {
-	__HAL_TIM_SET_COUNTER(&htim6, 0);
-	while(__HAL_TIM_GET_COUNTER(&htim6) < us);
+    __HAL_TIM_SET_COUNTER(&htim6, 0);
+    while(__HAL_TIM_GET_COUNTER(&htim6) < us);
 }
 
 /**
@@ -1030,35 +1030,35 @@ void delay_us(uint16_t us)
  */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM5 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
-		if (first_captured == 0) {
-			// Rising edge detected: start timer capture
-			tc1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
-			first_captured = 1;
-			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_FALLING);
-		} else if (first_captured == 1) {
-			// Falling edge detected: stop timer and calculate delta
-			tc2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
-			__HAL_TIM_SET_COUNTER(htim, 0);
+    if (htim->Instance == TIM5 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
+        if (first_captured == 0) {
+            // Rising edge detected: start timer capture
+            tc1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
+            first_captured = 1;
+            __HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_FALLING);
+        } else if (first_captured == 1) {
+            // Falling edge detected: read the end time, reset the counter, calculate delta
+            tc2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
+            __HAL_TIM_SET_COUNTER(htim, 0);
 
-			// Handle timer overflow
-			if (tc2 > tc1) {
-				echo = tc2 - tc1;
-			} else {
-				echo = (65535 - tc1) + tc2;
-			}
+            // Handle timer overflow
+            if (tc2 > tc1) {
+                echo = tc2 - tc1;
+            } else {
+                echo = (65535 - tc1) + tc2;
+            }
 
-			// Convert raw timer ticks to centimeters
-			dash_ultraDist = (float)echo * ULTRA_CM_PER_US + ULTRA_OFFSET_CM;   // calibrated: see robot_config.h
-			ultraTick = HAL_GetTick();          // when it arrived (stale after ULTRA_VALID_MS)
-			ultraSeq++;                         // written last: readers check it to spot a new echo
+            // Convert raw timer ticks to centimetres
+            dash_ultraDist = (float)echo * ULTRA_CM_PER_US + ULTRA_OFFSET_CM;   // calibrated: see robot_config.h
+            ultraTick = HAL_GetTick();          // when it arrived (stale after ULTRA_VALID_MS)
+            ultraSeq++;                         // written last: readers check it to spot a new echo
 
-			// Reset state machine for the next reading
-			first_captured = 0;
-			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
-			__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3);
-		}
-	}
+            // Reset state machine for the next reading
+            first_captured = 0;
+            __HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+            __HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3);
+        }
+    }
 }
 
 /* Re-arms UART3 reception after a line error (noise, a cable being
@@ -1183,9 +1183,9 @@ float Ultra_Query(int pings, int *nGood)
     return (k > 0) ? r[(k - 1) / 2] : -1.0f; // even count: the shorter middle one
 }
 
-/* Banzai 3: how many echoes nearer than maxCm come back in about `pings` ping
- * periods (standing). Echoes from farther away (the room behind) don't count.
- * Calls osDelay: tasks only. */
+/* Banzai mode: how many echoes nearer than maxCm come back in about `pings`
+ * ping periods (standing). Echoes from farther away (the room behind) don't
+ * count. Calls osDelay: tasks only. */
 int Ultra_CountNear(int pings, float maxCm)
 {
     float d;
@@ -1320,7 +1320,8 @@ void StartCommunicateTask(void *argument)
    *                            (echoes under <ign> cm ignored for the first <until> cm)
    *   SW<D>[,<max>[,<min>]]    same at <= FACE_V_MAX, never past <max> / before <min> cm of travel
    *   US?                      stationary ultrasonic, median of 5 pings -> "A US u=<cm> n=<good>"
-   *   IR?                      stationary IR, median of 5 updates       -> "A IR l=<cm> r=<cm>" (999 = clear)
+   *   IR?                      stationary IR, median of 5 updates       -> "A IR l=<cm> r=<cm> vl=<V> vr=<V>"
+   *                            (999 = clear; vl / vr = the latest averaged volts)
    *   PO?                      tracked pose (rear-axle centre)          -> "A PO x=<cm> y=<cm> h=<deg>"
    *   GO / AL / AR             Task 2 sequencer (task2.h)               -> "A S1 ..", "A S2 ..", "A FIN .."
    *   GL / GR                  Task 2: GO with arrow 1 known, no stop at scan 1 -> "A S2 .. u1=.."
@@ -1341,223 +1342,223 @@ void StartCommunicateTask(void *argument)
 
   for(;;)
   {
-	// Block until a character arrives from the UART interrupt
-	if (osMessageQueueGet(uartQueueHandle, &receivedChar, NULL, osWaitForever) != osOK) {
-		continue;
-	}
+    // Block until a character arrives from the UART interrupt
+    if (osMessageQueueGet(uartQueueHandle, &receivedChar, NULL, osWaitForever) != osOK) {
+        continue;
+    }
 
-	// Collect characters until the end of the line
-	if (receivedChar != '\n' && receivedChar != '\r') {
-		if (cmdIndex < 14) {
-			cmdBuffer[cmdIndex] = receivedChar;
-			cmdIndex++;
-		}
-		continue;
-	}
-	if (cmdIndex == 0) {
-		continue;                                   // empty line (e.g. the \n after a \r)
-	}
-	cmdBuffer[cmdIndex] = '\0';
-	cmdIndex = 0;
+    // Collect characters until the end of the line
+    if (receivedChar != '\n' && receivedChar != '\r') {
+        if (cmdIndex < 14) {
+            cmdBuffer[cmdIndex] = receivedChar;
+            cmdIndex++;
+        }
+        continue;
+    }
+    if (cmdIndex == 0) {
+        continue;                                   // empty line (e.g. the \n after a \r)
+    }
+    cmdBuffer[cmdIndex] = '\0';
+    cmdIndex = 0;
 
-	// 1. PARSE: one or two letters then a number ("SF050", "LB090", "ZH", "S50")
-	char c1 = ' ';
-	char c2 = ' ';
-	int value = 0;
-	int parsed;
-	if ((cmdBuffer[1] >= 'A' && cmdBuffer[1] <= 'Z') ||
-		(cmdBuffer[1] >= 'a' && cmdBuffer[1] <= 'z')) {
-		parsed = sscanf(cmdBuffer, "%c%c%d", &c1, &c2, &value);
-	} else {
-		parsed = sscanf(cmdBuffer, "%c%d", &c1, &value);
-	}
+    // 1. PARSE: one or two letters then a number ("SF050", "LB090", "ZH", "S50")
+    char c1 = ' ';
+    char c2 = ' ';
+    int value = 0;
+    int parsed;
+    if ((cmdBuffer[1] >= 'A' && cmdBuffer[1] <= 'Z') ||
+        (cmdBuffer[1] >= 'a' && cmdBuffer[1] <= 'z')) {
+        parsed = sscanf(cmdBuffer, "%c%c%d", &c1, &c2, &value);
+    } else {
+        parsed = sscanf(cmdBuffer, "%c%d", &c1, &value);
+    }
 
-	// 2. EXECUTE and prepare the reply text (without the leading "A")
-	char replyText[64] = "";
-	int sentOwn = 0;                                 // the command already sent its own reply line (VT)
-	int isMove  = 0;                                 // reply with the move's result
-	int unknown = 0;                                 // reply "A ERR <command>"
+    // 2. EXECUTE and prepare the reply text (without the leading "A")
+    char replyText[64] = "";
+    int sentOwn = 0;                                 // the command already sent its own reply line (VT)
+    int isMove  = 0;                                 // reply with the move's result
+    int unknown = 0;                                 // reply "A ERR <command>"
 
-	if (parsed <= 0) {
-		unknown = 1;
-	} else {
-		switch (c1) {
-			case 'S':                                   // straight: SF / SB / S
-				if (c2 == 'B') {
-					Motion_Straight(-(float)value);
-					isMove = 1;
-				} else if ((c2 == 'U' || c2 == 'W') && value > 0) {
-					// SU / SW, optional extra numbers after commas
-					int a = 0, b = -1, c = -1;
-					sscanf(cmdBuffer + 2, "%d,%d,%d", &a, &b, &c);
-					if (c2 == 'U') {                    // SU<D>[,<ignore below>,<until travelled>]
-						Motion_StraightUntil((float)value, 0.0f, SU_MAX_CM, STRAIGHT_V_MAX,
-						                     (b > 0) ? (float)b : 0.0f, (c > 0) ? (float)c : 0.0f);
-					} else {                            // SW<D>[,<max travel>[,<min travel>]]
-						Motion_StraightUntil((float)value,
-						                     (c >= 0) ? (float)c : SW_MIN_CM_DEFAULT,
-						                     (b > 0)  ? (float)b : SW_MAX_CM_DEFAULT,
-						                     FACE_V_MAX, 0.0f, 0.0f);
-					}
-					isMove = 1;
-				} else if (c2 == 'T' && cmdBuffer[2] == '?') {
-					// ST?: least free stack each task has had (bytes). Under ~200 = too tight.
-					snprintf(replyText, sizeof(replyText), "ST c=%lu m=%lu s=%lu o=%lu g=%lu d=%lu",
-					         (unsigned long)osThreadGetStackSpace(communicateTaskHandle),
-					         (unsigned long)osThreadGetStackSpace(motorTaskHandle),
-					         (unsigned long)osThreadGetStackSpace(ultrasonicTaskHandle),
-					         (unsigned long)osThreadGetStackSpace(oledTaskHandle),
-					         (unsigned long)osThreadGetStackSpace(gyroTaskHandle),
-					         (unsigned long)osThreadGetStackSpace(defaultTaskHandle));
-				} else if (c2 == 'E' && (cmdBuffer[2] == 'L' || cmdBuffer[2] == 'R')) {
-					Task2_AlongFace(cmdBuffer[2] == 'L');   // SEL / SER
-					isMove = 1;
-				} else if (c2 == 'U' || c2 == 'W' || c2 == 'E') {
-					unknown = 1;                        // SU / SW without a distance, bad SE
-				} else if (c2 == 'L' || c2 == 'R') {
-					unknown = 1;                        // old slide commands: removed
-				} else {
-					Motion_Straight((float)value);
-					isMove = 1;
-				}
-				break;
+    if (parsed <= 0) {
+        unknown = 1;
+    } else {
+        switch (c1) {
+            case 'S':                                   // straight: SF / SB / S
+                if (c2 == 'B') {
+                    Motion_Straight(-(float)value);
+                    isMove = 1;
+                } else if ((c2 == 'U' || c2 == 'W') && value > 0) {
+                    // SU / SW, optional extra numbers after commas
+                    int a = 0, b = -1, c = -1;
+                    sscanf(cmdBuffer + 2, "%d,%d,%d", &a, &b, &c);
+                    if (c2 == 'U') {                    // SU<D>[,<ignore below>,<until travelled>]
+                        Motion_StraightUntil((float)value, 0.0f, SU_MAX_CM, STRAIGHT_V_MAX,
+                                             (b > 0) ? (float)b : 0.0f, (c > 0) ? (float)c : 0.0f);
+                    } else {                            // SW<D>[,<max travel>[,<min travel>]]
+                        Motion_StraightUntil((float)value,
+                                             (c >= 0) ? (float)c : SW_MIN_CM_DEFAULT,
+                                             (b > 0)  ? (float)b : SW_MAX_CM_DEFAULT,
+                                             FACE_V_MAX, 0.0f, 0.0f);
+                    }
+                    isMove = 1;
+                } else if (c2 == 'T' && cmdBuffer[2] == '?') {
+                    // ST?: least free stack each task has had (bytes). Under ~200 = too tight.
+                    snprintf(replyText, sizeof(replyText), "ST c=%lu m=%lu s=%lu o=%lu g=%lu d=%lu",
+                             (unsigned long)osThreadGetStackSpace(communicateTaskHandle),
+                             (unsigned long)osThreadGetStackSpace(motorTaskHandle),
+                             (unsigned long)osThreadGetStackSpace(ultrasonicTaskHandle),
+                             (unsigned long)osThreadGetStackSpace(oledTaskHandle),
+                             (unsigned long)osThreadGetStackSpace(gyroTaskHandle),
+                             (unsigned long)osThreadGetStackSpace(defaultTaskHandle));
+                } else if (c2 == 'E' && (cmdBuffer[2] == 'L' || cmdBuffer[2] == 'R')) {
+                    Task2_AlongFace(cmdBuffer[2] == 'L');   // SEL / SER
+                    isMove = 1;
+                } else if (c2 == 'U' || c2 == 'W' || c2 == 'E') {
+                    unknown = 1;                        // SU / SW without a distance, bad SE
+                } else if (c2 == 'L' || c2 == 'R') {
+                    unknown = 1;                        // SL / SR (slide moves): not supported
+                } else {
+                    Motion_Straight((float)value);
+                    isMove = 1;
+                }
+                break;
 
-			case 'F':                                   // forward (alias)
-				Motion_Straight((float)value);
-				isMove = 1;
-				break;
+            case 'F':                                   // forward (alias)
+                Motion_Straight((float)value);
+                isMove = 1;
+                break;
 
-			case 'B':                                   // backward (alias)
-				Motion_Straight(-(float)value);
-				isMove = 1;
-				break;
+            case 'B':                                   // backward (alias)
+                Motion_Straight(-(float)value);
+                isMove = 1;
+                break;
 
-			case 'L':                                   // left turn: LF / LB / L
-				Motion_Turn(1, (c2 == 'B') ? -1 : 1, (float)value);
-				isMove = 1;
-				break;
+            case 'L':                                   // left turn: LF / LB / L
+                Motion_Turn(1, (c2 == 'B') ? -1 : 1, (float)value);
+                isMove = 1;
+                break;
 
-			case 'R':                                   // right turn: RF / RB / R
-				Motion_Turn(0, (c2 == 'B') ? -1 : 1, (float)value);
-				isMove = 1;
-				break;
+            case 'R':                                   // right turn: RF / RB / R
+                Motion_Turn(0, (c2 == 'B') ? -1 : 1, (float)value);
+                isMove = 1;
+                break;
 
-			case 'Z':                                   // ZH: zero heading
-				if (c2 == 'H') {
-					Motion_ZeroHeading();
-					Task2_Reset();                      // sequencer back to "waiting for GO"
-					strcpy(replyText, "ZH");
-				} else {
-					unknown = 1;
-				}
-				break;
+            case 'Z':                                   // ZH: zero heading
+                if (c2 == 'H') {
+                    Motion_ZeroHeading();
+                    Task2_Reset();                      // sequencer back to "waiting for GO"
+                    strcpy(replyText, "ZH");
+                } else {
+                    unknown = 1;
+                }
+                break;
 
-			case 'U':                                   // US?: stationary ultrasonic
-				if (c2 == 'S' && cmdBuffer[2] == '?') {
-					int n = 0;
-					float u = Ultra_Query(US_QUERY_PINGS, &n);
-					snprintf(replyText, sizeof(replyText), "US u=%.1f n=%d", u, n);
-				} else {
-					unknown = 1;
-				}
-				break;
+            case 'U':                                   // US?: stationary ultrasonic
+                if (c2 == 'S' && cmdBuffer[2] == '?') {
+                    int n = 0;
+                    float u = Ultra_Query(US_QUERY_PINGS, &n);
+                    snprintf(replyText, sizeof(replyText), "US u=%.1f n=%d", u, n);
+                } else {
+                    unknown = 1;
+                }
+                break;
 
-			case 'I':                                   // IR?: stationary side IRs
-				if (c2 == 'R' && cmdBuffer[2] == '?') {
-					float ir[2];
-					IR_Query(5, ir);
-					snprintf(replyText, sizeof(replyText), "IR l=%.1f r=%.1f vl=%.2f vr=%.2f",
-					         ir[IR_LEFT], ir[IR_RIGHT], irVolts[IR_LEFT], irVolts[IR_RIGHT]);
-				} else {
-					unknown = 1;
-				}
-				break;
+            case 'I':                                   // IR?: stationary side IRs
+                if (c2 == 'R' && cmdBuffer[2] == '?') {
+                    float ir[2];
+                    IR_Query(5, ir);
+                    snprintf(replyText, sizeof(replyText), "IR l=%.1f r=%.1f vl=%.2f vr=%.2f",
+                             ir[IR_LEFT], ir[IR_RIGHT], irVolts[IR_LEFT], irVolts[IR_RIGHT]);
+                } else {
+                    unknown = 1;
+                }
+                break;
 
-			case 'P':                                   // PO?: tracked pose
-				if (c2 == 'O' && cmdBuffer[2] == '?') {
-					float px, py, ph;
-					Motion_GetPose(&px, &py, &ph);
-					snprintf(replyText, sizeof(replyText), "PO x=%.1f y=%.1f h=%+.1f", px, py, ph);
-				} else {
-					unknown = 1;
-				}
-				break;
+            case 'P':                                   // PO?: tracked pose
+                if (c2 == 'O' && cmdBuffer[2] == '?') {
+                    float px, py, ph;
+                    Motion_GetPose(&px, &py, &ph);
+                    snprintf(replyText, sizeof(replyText), "PO x=%.1f y=%.1f h=%+.1f", px, py, ph);
+                } else {
+                    unknown = 1;
+                }
+                break;
 
-			case 'G':                                   // GO: Task 2, drive to scan 1
-				if (c2 == 'O') {
-					Task2_Go(replyText, sizeof(replyText));
-				} else if (c2 == 'L' || c2 == 'R') {    // GL / GR: GO with arrow 1 known (no scan 1 stop)
-					Task2_GoArrow(c2 == 'L', replyText, sizeof(replyText));
-				} else {
-					unknown = 1;
-				}
-				break;
+            case 'G':                                   // GO: Task 2, drive to scan 1
+                if (c2 == 'O') {
+                    Task2_Go(replyText, sizeof(replyText));
+                } else if (c2 == 'L' || c2 == 'R') {    // GL / GR: GO with arrow 1 known (no scan 1 stop)
+                    Task2_GoArrow(c2 == 'L', replyText, sizeof(replyText));
+                } else {
+                    unknown = 1;
+                }
+                break;
 
-			case 'A':                                   // AL / AR: arrow seen (1st, then 2nd)
-				if (c2 == 'L' || c2 == 'R') {
-					Task2_Arrow(c2 == 'L', replyText, sizeof(replyText));
-				} else {
-					unknown = 1;
-				}
-				break;
+            case 'A':                                   // AL / AR: arrow seen (1st, then 2nd)
+                if (c2 == 'L' || c2 == 'R') {
+                    Task2_Arrow(c2 == 'L', replyText, sizeof(replyText));
+                } else {
+                    unknown = 1;
+                }
+                break;
 
-			case 'V':                                   // Banzai calibration tests
-				if (c2 == 'M' && strncmp(cmdBuffer, "VMAX", 4) == 0) {
-					int cm = 0;
-					sscanf(cmdBuffer + 4, "%d", &cm);       // "VMAX?" -> 0 -> default length
-					Motion_VmaxTest((float)cm, replyText, sizeof(replyText));
-				} else if (c2 == 'B' && value > 0) {
-					Motion_BrakeTest((float)value);         // VB<v>
-					isMove = 1;
-				} else if (c2 == 'T') {                     // VT: the last Task 2 run's move log (one long line)
-					static char trBuf[640];
-					trBuf[0] = 'A'; trBuf[1] = ' ';
-					Task2_Trace(trBuf + 2, sizeof(trBuf) - 3);
-					strcat(trBuf, "\n");
-					HAL_UART_Transmit(&huart3, (uint8_t *)trBuf, strlen(trBuf), 300);
-					sentOwn = 1;
-				} else {
-					unknown = 1;
-				}
-				break;
+            case 'V':                                   // VMAX / VB: Banzai calibration tests, VT: run log
+                if (c2 == 'M' && strncmp(cmdBuffer, "VMAX", 4) == 0) {
+                    int cm = 0;
+                    sscanf(cmdBuffer + 4, "%d", &cm);       // "VMAX?" -> 0 -> default length
+                    Motion_VmaxTest((float)cm, replyText, sizeof(replyText));
+                } else if (c2 == 'B' && value > 0) {
+                    Motion_BrakeTest((float)value);         // VB<v>
+                    isMove = 1;
+                } else if (c2 == 'T') {                     // VT: the last Task 2 run's move log (one long line)
+                    static char trBuf[640];
+                    trBuf[0] = 'A'; trBuf[1] = ' ';
+                    Task2_Trace(trBuf + 2, sizeof(trBuf) - 3);
+                    strcat(trBuf, "\n");
+                    HAL_UART_Transmit(&huart3, (uint8_t *)trBuf, strlen(trBuf), 300);
+                    sentOwn = 1;
+                } else {
+                    unknown = 1;
+                }
+                break;
 
-			case 'D':                                   // task done
-				strcpy(oled_status_msg, "TASK A.5 DONE!");
-				break;
+            case 'D':                                   // task done
+                strcpy(oled_status_msg, "TASK A.5 DONE!");
+                break;
 
 #if FIELD_TOOLS
-			case 'T':                                   // TD / TV
-				if (!FieldTools_Command(c2, value, replyText, sizeof(replyText))) {
-					unknown = 1;
-				}
-				break;
+            case 'T':                                   // TD / TV
+                if (!FieldTools_Command(c2, value, replyText, sizeof(replyText))) {
+                    unknown = 1;
+                }
+                break;
 #endif
 
-			default:
-				unknown = 1;
-				break;
-		}
-	}
+            default:
+                unknown = 1;
+                break;
+        }
+    }
 
-	// 3. REPLY TO THE RPI
-	char ackMsg[96];
-	if (sentOwn) {
-		ackMsg[0] = '\0';
-	} else if (unknown) {
-		snprintf(ackMsg, sizeof(ackMsg), "A ERR %s\n", cmdBuffer);
-	} else if (isMove) {
-		snprintf(ackMsg, sizeof(ackMsg), "A %s\n", Motion_Reply());
-	} else if (replyText[0] != '\0') {
-		snprintf(ackMsg, sizeof(ackMsg), "A %s\n", replyText);
-	} else {
-		snprintf(ackMsg, sizeof(ackMsg), "A\n");
-	}
-	if (ackMsg[0] != '\0') {
-		HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
-	}
+    // 3. REPLY TO THE RPI
+    char ackMsg[96];
+    if (sentOwn) {
+        ackMsg[0] = '\0';
+    } else if (unknown) {
+        snprintf(ackMsg, sizeof(ackMsg), "A ERR %s\n", cmdBuffer);
+    } else if (isMove) {
+        snprintf(ackMsg, sizeof(ackMsg), "A %s\n", Motion_Reply());
+    } else if (replyText[0] != '\0') {
+        snprintf(ackMsg, sizeof(ackMsg), "A %s\n", replyText);
+    } else {
+        snprintf(ackMsg, sizeof(ackMsg), "A\n");
+    }
+    if (ackMsg[0] != '\0') {
+        HAL_UART_Transmit(&huart3, (uint8_t *)ackMsg, strlen(ackMsg), 100);
+    }
 
-	// 4. DASHBOARD
-	strcpy(dash_lastCmd, cmdBuffer);
+    // 4. DASHBOARD
+    strcpy(dash_lastCmd, cmdBuffer);
   }
   /* USER CODE END StartCommunicateTask */
 }
@@ -1603,23 +1604,23 @@ void StartMotorTask(void *argument)
   /* Infinite loop: 100 Hz */
   for(;;)
   {
-	// 1. Encoder ticks since the last loop
-	cnt_L = (int16_t)__HAL_TIM_GET_COUNTER(&htim2);
-	cnt_R = (int16_t)__HAL_TIM_GET_COUNTER(&htim3);
-	__HAL_TIM_SET_COUNTER(&htim2, 0);
-	__HAL_TIM_SET_COUNTER(&htim3, 0);
+    // 1. Encoder ticks since the last loop
+    cnt_L = (int16_t)__HAL_TIM_GET_COUNTER(&htim2);
+    cnt_R = (int16_t)__HAL_TIM_GET_COUNTER(&htim3);
+    __HAL_TIM_SET_COUNTER(&htim2, 0);
+    __HAL_TIM_SET_COUNTER(&htim3, 0);
 
-	left_encoder_val += cnt_L;
-	right_encoder_val += cnt_R;
+    left_encoder_val += cnt_L;
+    right_encoder_val += cnt_R;
 
-	dash_encoderL = left_encoder_val;
-	dash_encoderR = right_encoder_val;
-	dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
+    dash_encoderL = left_encoder_val;
+    dash_encoderR = right_encoder_val;
+    dash_direction = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim2);
 
-	// 2. Drive the active move, or keep the motors off (motion.c)
-	Motion_Step(cnt_L, cnt_R);
+    // 2. Drive the active move, or keep the motors off (motion.c)
+    Motion_Step(cnt_L, cnt_R);
 
-	osDelay(10);
+    osDelay(10);
   }
   /* USER CODE END StartMotorTask */
 }
@@ -1634,63 +1635,63 @@ void StartMotorTask(void *argument)
 void StartOledTask(void *argument)
 {
   /* USER CODE BEGIN StartOledTask */
-  char textBuffer[32];	// Temp buffer to format numbers into text
+  char textBuffer[32];  // Temp buffer to format numbers into text
   float u;
 
   /* Infinite loop */
   for(;;)
   {
-	OLED_Clear();
+    OLED_Clear();
 
-	// If an overarching system status exists (like boot up or test mode), show it exclusively
-	if (strlen(oled_status_msg) > 0) {
-		OLED_ShowString(0, 24, (uint8_t*)oled_status_msg);
-	}
-	// Otherwise, paint the main telemetry dashboard
-	else {
-		// Line 1: Last received RPi Command
-		OLED_ShowString(0, 0, (uint8_t*) "CMD: ");
-		OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
+    // If an overarching system status exists (like boot up or test mode), show it exclusively
+    if (strlen(oled_status_msg) > 0) {
+        OLED_ShowString(0, 24, (uint8_t*)oled_status_msg);
+    }
+    // Otherwise, paint the main telemetry dashboard
+    else {
+        // Line 1: Last received RPi Command
+        OLED_ShowString(0, 0, (uint8_t*) "CMD: ");
+        OLED_ShowString(35, 0, (uint8_t*) dash_lastCmd);
 
-		// Line 2: Gyroscope Angle & Ultrasonic Distance ("--" = stale / no echo)
-		Ultra_Get(&u);
-		// Integer formatting only (14 Oct): float printf (%f) here could run at the same
-		// time as the command task's replies, and newlib's float formatting is not
-		// safe in two tasks at once (shared buffers, malloc).
-		char gTxt[12], dTxt[12];
-		fixed1(gTxt, (float)(headingDeg - headingZero), 1);
-		if (u > 0.0f) { fixed1(dTxt, u, 1); sprintf(textBuffer, "G: %s D: %scm", gTxt, dTxt); }   // heading relative to "north"
-		else          sprintf(textBuffer, "G: %s D: --", gTxt);
-		OLED_ShowString(0, 12, (uint8_t*) textBuffer);
+        // Line 2: Gyroscope Angle & Ultrasonic Distance ("--" = stale / no echo)
+        Ultra_Get(&u);
+        // Integer formatting only: float printf (%f) here could run at the same
+        // time as the command task's replies, and newlib's float formatting is not
+        // safe in two tasks at once (shared buffers, malloc).
+        char gTxt[12], dTxt[12];
+        fixed1(gTxt, (float)(headingDeg - headingZero), 1);
+        if (u > 0.0f) { fixed1(dTxt, u, 1); sprintf(textBuffer, "G: %s D: %scm", gTxt, dTxt); }   // heading relative to "north"
+        else          sprintf(textBuffer, "G: %s D: --", gTxt);
+        OLED_ShowString(0, 12, (uint8_t*) textBuffer);
 
 #if OLED_SHOW_IR
-		// Lines 3-4: IR sensors, cm from the lens ("--" = clear / over 60 cm)
-		for (int s = 0; s < 2; s++) {
-			float d = irCm[s];
-			char vTxt[12], cTxt[12];
-			fixed1(vTxt, irVolts[s], 2);
-			if (d < IR_CLEAR) { fixed1(cTxt, d, 1); sprintf(textBuffer, "IR%d %sV %scm", s + 1, vTxt, cTxt); }
-			else              sprintf(textBuffer, "IR%d %sV  --   ", s + 1, vTxt);
-			OLED_ShowString(0, 24 + 12 * s, (uint8_t *) textBuffer);
-		}
+        // Lines 3-4: IR sensors, cm from the lens ("--" = clear / over IR_MAX_CM)
+        for (int s = 0; s < 2; s++) {
+            float d = irCm[s];
+            char vTxt[12], cTxt[12];
+            fixed1(vTxt, irVolts[s], 2);
+            if (d < IR_CLEAR) { fixed1(cTxt, d, 1); sprintf(textBuffer, "IR%d %sV %scm", s + 1, vTxt, cTxt); }
+            else              sprintf(textBuffer, "IR%d %sV  --   ", s + 1, vTxt);
+            OLED_ShowString(0, 24 + 12 * s, (uint8_t *) textBuffer);
+        }
 #else
-		// Line 3: Accumulated Left Encoder
-		sprintf(textBuffer, "Enc L: %d", dash_encoderL);
-		OLED_ShowString(0, 24, (uint8_t *) textBuffer);
+        // Line 3: Accumulated Left Encoder
+        sprintf(textBuffer, "Enc L: %d", dash_encoderL);
+        OLED_ShowString(0, 24, (uint8_t *) textBuffer);
 
-		// Line 4: Accumulated Right Encoder
-		sprintf(textBuffer, "Enc R: %d", dash_encoderR);
-		OLED_ShowString(0, 36, (uint8_t *) textBuffer);
+        // Line 4: Accumulated Right Encoder
+        sprintf(textBuffer, "Enc R: %d", dash_encoderR);
+        OLED_ShowString(0, 36, (uint8_t *) textBuffer);
 #endif
 
-		// Line 5: Raw Direction Indicator & Battery Percentage (battery read by the sensor task)
-		dash_battPct = batteryPercent(dash_battV);
-		sprintf(textBuffer, "Dir:%d B:%d%%", dash_direction, dash_battPct);
-		OLED_ShowString(0, 48, (uint8_t *) textBuffer);
-	}
+        // Line 5: Raw Direction Indicator & Battery Percentage (battery read by the sensor task)
+        dash_battPct = batteryPercent(dash_battV);
+        sprintf(textBuffer, "Dir:%d B:%d%%", dash_direction, dash_battPct);
+        OLED_ShowString(0, 48, (uint8_t *) textBuffer);
+    }
 
-	OLED_Refresh_Gram();
-	osDelay(100); // UI Refresh rate 10Hz
+    OLED_Refresh_Gram();
+    osDelay(100); // UI Refresh rate 10Hz
   }
   /* USER CODE END StartOledTask */
 }
@@ -1711,22 +1712,22 @@ void StartGyroTask(void *argument)
   uint32_t tick = 0;
   int i = 0;
 
-  // Give sensor hardware time to stabilize on power up
+  // Give sensor hardware time to stabilise on power up
   strcpy(oled_status_msg, "Warmup IMU...");
   osDelay(2000);
 
   // ---------------------------------------------------------
-  // START-UP CALIBRATION PHASE (Robots must be kept still!)
+  // START-UP CALIBRATION (the robot must be kept still!)
   // ---------------------------------------------------------
   strcpy(oled_status_msg, "Calibrating Gyro...");
   osDelay(500);
 
   // Read 100 samples to establish natural zero-drift offset
   while (i < 100) {
-	  osDelay(30); // Get sample every 30ms
-	  ICM_ReadData(&IMU_Data);
-	  offset += (double)IMU_Data.z_gyro;
-	  i++;
+      osDelay(30); // Get sample every 30ms
+      ICM_ReadData(&IMU_Data);
+      offset += (double)IMU_Data.z_gyro;
+      i++;
   }
   offset = offset / 100.0;
 
@@ -1739,42 +1740,42 @@ void StartGyroTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	// High-frequency 100Hz loop essential for accurate Euler integration
+    // High-frequency 100Hz loop essential for accurate Euler integration
     osDelay(10);
 
-	// 1. Fetch IMU data
-	ICM_ReadData(&IMU_Data);
+    // 1. Fetch IMU data
+    ICM_ReadData(&IMU_Data);
 
-	// 2. Calculate true delta-time (dt) in seconds
-	uint32_t current_tick = HAL_GetTick();
-	double dt = (double)(current_tick - tick) / 1000.0;
-	tick = current_tick;
+    // 2. Calculate true delta-time (dt) in seconds
+    uint32_t current_tick = HAL_GetTick();
+    double dt = (double)(current_tick - tick) / 1000.0;
+    tick = current_tick;
 
-	// 3. Subtract baseline drift offset from angular velocity
-	double gz_raw = (double)IMU_Data.z_gyro;
-	double gz_corrected;
-	double dev = gz_raw - offset;
+    // 3. Subtract baseline drift offset from angular velocity
+    double gz_raw = (double)IMU_Data.z_gyro;
+    double gz_corrected;
+    double dev = gz_raw - offset;
 
-	if (robotStill && dev > -GYRO_STILL_BAND && dev < GYRO_STILL_BAND) {
-		// Wheels still and the gyro reads close to zero: the robot really is
-		// at rest. Track the zero-rate offset, which drifts as the sensor warms up.
-		offset += 0.002 * dev;
-		gz_corrected = 0.0;
-	} else if (robotStill) {
-		// Wheels still but the gyro reads a real rotation: the robot is being
-		// turned by hand. Count it as rotation and leave the offset alone.
-		gz_corrected = dev;
-	} else {
-		// No deadband: even slow drifts must be seen by the heading hold.
-		gz_corrected = gz_raw - offset;
-	}
+    if (robotStill && dev > -GYRO_STILL_BAND && dev < GYRO_STILL_BAND) {
+        // Wheels still and the gyro reads close to zero: the robot really is
+        // at rest. Track the zero-rate offset, which drifts as the sensor warms up.
+        offset += 0.002 * dev;
+        gz_corrected = 0.0;
+    } else if (robotStill) {
+        // Wheels still but the gyro reads a real rotation: the robot is being
+        // turned by hand. Count it as rotation and leave the offset alone.
+        gz_corrected = dev;
+    } else {
+        // No deadband: even slow drifts must be seen by the heading hold.
+        gz_corrected = gz_raw - offset;
+    }
 
-	// 4. Integrate the filtered velocity to get absolute heading
-	total_angle += gz_corrected * dt;
-	dash_gyroRate = (float)gz_corrected;   // yaw rate, used by turns
+    // 4. Integrate the filtered velocity to get absolute heading
+    total_angle += gz_corrected * dt;
+    dash_gyroRate = (float)gz_corrected;   // yaw rate, used by turns
 
-	// 5. Publish for the other tasks (float: a single 32-bit write, never torn)
-	headingDeg = (float)total_angle;
+    // 5. Publish for the other tasks (float: a single 32-bit write, never torn)
+    headingDeg = (float)total_angle;
   }
   /* USER CODE END StartGyroTask */
 }
@@ -1790,11 +1791,12 @@ void StartUltrasonicTask(void *argument)
 {
   /* USER CODE BEGIN StartUltrasonicTask */
   /* SENSOR TASK. Owns the ultrasonic trigger AND the ADC (IR, battery, knob):
-   * one owner, so no mutex. A new task wasn't added because the FreeRTOS heap
-   * (15360 B) is nearly full. One loop every IR_PERIOD_MS (20 ms):
+   * one owner, so no mutex. The IR has no task of its own because the task
+   * stacks already take most of the FreeRTOS heap (15360 of 20480 B).
+   * One loop every IR_PERIOD_MS (20 ms):
    *   every loop      IR1 + IR2, 8 samples each (~2 ms)
    *   every 3rd loop  ultrasonic ping (60 ms apart, so old echoes have died)
-   *   every 5th loop  battery (and the knob with FIELD_TOOLS), 10 Hz as before */
+   *   every 5th loop  battery (and the knob with FIELD_TOOLS), 10 Hz */
   float    hist[2][3] = {{IR_CLEAR, IR_CLEAR, IR_CLEAR}, {IR_CLEAR, IR_CLEAR, IR_CLEAR}};
   uint8_t  h = 0;                                     // slot in hist for this update
   uint8_t  loop = 0;                                  // 0..14
@@ -1804,45 +1806,45 @@ void StartUltrasonicTask(void *argument)
 
   for(;;)
   {
-	if (loop % 3 == 0) {
-		// 1. Ensure trigger line is completely low before pulsing
-		HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
-		delay_us(2);
+    if (loop % 3 == 0) {
+        // 1. Ensure trigger line is completely low before pulsing
+        HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+        delay_us(2);
 
-		// 2. Prime the input capture interrupt to wait for the rising edge
-		first_captured = 0;
-		__HAL_TIM_SET_CAPTUREPOLARITY(&htim5, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
-		__HAL_TIM_ENABLE_IT(&htim5, TIM_IT_CC3);
+        // 2. Prime the input capture interrupt to wait for the rising edge
+        first_captured = 0;
+        __HAL_TIM_SET_CAPTUREPOLARITY(&htim5, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+        __HAL_TIM_ENABLE_IT(&htim5, TIM_IT_CC3);
 
-		// 3. Send 10us HIGH acoustic pulse (the echo is caught by the TIM5 interrupt)
-		HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_SET);
-		delay_us(10); // Hardware blocking delay here is brief and safe
-		HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
-	}
+        // 3. Send 10us HIGH acoustic pulse (the echo is caught by the TIM5 interrupt)
+        HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_SET);
+        delay_us(10); // Hardware blocking delay here is brief and safe
+        HAL_GPIO_WritePin(ULTRASONIC_TRIG_GPIO_Port, ULTRASONIC_TRIG_Pin, GPIO_PIN_RESET);
+    }
 
-	// 4. IR: average 8 ADC samples per side, convert, median of the last 3
-	//    updates (one bad update can't fake an obstacle edge), then publish.
-	for (int s = 0; s < 2; s++) {
-		float v = irReadVolts((s == IR_LEFT) ? IR1_ADC_CHANNEL : IR2_ADC_CHANNEL);
-		if (v < 0.0f) continue;                       // ADC failed: keep the last value
-		irVolts[s] = v;
-		hist[s][h] = irToCm(s, v);
-		irCm[s]    = median3f(hist[s][0], hist[s][1], hist[s][2]);
-	}
-	h = (uint8_t)((h + 1) % 3);
-	irSeq++;
+    // 4. IR: average 8 ADC samples per side, convert, median of the last 3
+    //    updates (one bad update can't fake an obstacle edge), then publish.
+    for (int s = 0; s < 2; s++) {
+        float v = irReadVolts((s == IR_LEFT) ? IR1_ADC_CHANNEL : IR2_ADC_CHANNEL);
+        if (v < 0.0f) continue;                       // ADC failed: keep the last value
+        irVolts[s] = v;
+        hist[s][h] = irToCm(s, v);
+        irCm[s]    = median3f(hist[s][0], hist[s][1], hist[s][2]);
+    }
+    h = (uint8_t)((h + 1) % 3);
+    irSeq++;
 
-	// 5. Battery (and knob), 10 Hz
-	if (loop % 5 == 0) {
-		dash_battV = dash_battV * 0.9f + readBatteryVoltage() * 0.1f;   // smooth out load sag
+    // 5. Battery (and knob), 10 Hz
+    if (loop % 5 == 0) {
+        dash_battV = dash_battV * 0.9f + readBatteryVoltage() * 0.1f;   // smooth out load sag
 #if FIELD_TOOLS
-		FieldTools_UpdateKnob();
+        FieldTools_UpdateKnob();
 #endif
-	}
+    }
 
-	loop = (uint8_t)((loop + 1) % 15);
-	wake += IR_PERIOD_MS;
-	osDelayUntil(wake);                               // fixed 20 ms rate, however long the reads took
+    loop = (uint8_t)((loop + 1) % 15);
+    wake += IR_PERIOD_MS;
+    osDelayUntil(wake);                               // fixed 20 ms rate, however long the reads took
   }
   /* USER CODE END StartUltrasonicTask */
 }
